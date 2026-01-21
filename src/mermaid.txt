@@ -1,0 +1,79 @@
+erDiagram
+    USERS {
+        text user_id PK
+        text persona
+        json background_labels
+        datetime creation_time "default: CURRENT_TIMESTAMP"
+        integer follower_count "default: 0"
+        integer total_likes_received "default: 0"
+        integer total_shares_received "default: 0"
+        integer total_comments_received "default: 0"
+        float influence_score "default: 0.0"
+    }
+
+    POSTS {
+        text post_id PK
+        text content "not null"
+        text author_id "not null, FK -> USERS.user_id"
+        timestamp created_at "default: CURRENT_TIMESTAMP"
+        integer num_likes "default: 0"
+        integer num_shares "default: 0"
+        integer num_flags "default: 0"
+        integer num_comments "default: 0"
+        text original_post_id
+        boolean is_news "default: false"
+        text news_type
+        text status
+        timestamp takedown_timestamp
+        text takedown_reason
+    }
+
+    COMMENTS {
+        text comment_id PK
+        text content "not null"
+        text post_id "not null, FK -> POSTS.post_id"
+        text author_id "not null, FK -> USERS.user_id"
+        timestamp created_at "default: CURRENT_TIMESTAMP"
+        integer num_likes "default: 0"
+    }
+
+    COMMUNITY_NOTES {
+        text note_id PK
+        text post_id "not null, FK -> POSTS.post_id"
+        text author_id "not null, FK -> USERS.user_id"
+        text content "not null"
+        integer helpful_ratings "default: 0"
+        integer not_helpful_ratings "default: 0"
+        timestamp created_at "default: CURRENT_TIMESTAMP"
+    }
+
+    USER_ACTIONS {
+        integer id PK
+        text user_id "not null, FK -> USERS.user_id"
+        text action_type "not null"
+        text target_id
+        text content
+        text reasoning
+        timestamp created_at "default: CURRENT_TIMESTAMP"
+    }
+
+    AGENT_MEMORIES {
+        text memory_id PK
+        text user_id "not null, FK -> USERS.user_id"
+        text memory_type "not null"
+        text content "not null"
+        float importance_score
+        timestamp created_at "default: CURRENT_TIMESTAMP"
+        timestamp last_accessed "default: CURRENT_TIMESTAMP"
+        float decay_factor "default: 1.0"
+    }
+
+    %% Relationships
+    
+    USERS ||--o{ COMMENTS : "writes"
+    USERS ||--o{ POSTS : "creates"
+    USERS ||--o{ COMMUNITY_NOTES : "contributes"
+    USERS ||--o{ USER_ACTIONS : "performs"
+    USERS ||--o{ AGENT_MEMORIES : "has"
+    POSTS ||--o{ COMMENTS : "receives"
+    POSTS ||--o{ COMMUNITY_NOTES : "has"

@@ -1,0 +1,98 @@
+<?xml version='1.0' encoding='utf-8'?>
+<gexf xmlns="http://www.gexf.net/1.2draft" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.gexf.net/1.2draft http://www.gexf.net/1.2draft/gexf.xsd" version="1.2">
+  <meta lastmodifieddate="2025-12-02">
+    <creator>NetworkX 3.6</creator>
+  </meta>
+  <graph defaultedgetype="directed" mode="static" name="">
+    <attributes mode="static" class="edge">
+      <attribute id="2" title="primary_type" type="string" />
+      <attribute id="3" title="breakdown" type="string" />
+    </attributes>
+    <attributes mode="static" class="node">
+      <attribute id="0" title="persona" type="string" />
+      <attribute id="1" title="influence_score" type="double" />
+    </attributes>
+    <nodes>
+      <node id="user-579f79" label="user-579f79">
+        <attvalues>
+          <attvalue for="0" value="{'id': 'neutral_robert_001', 'type': 'neutral', 'name': 'Robert', 'profession': 'Delivery Person', 'demographics': {'age': '35', 'region': 'Saint Peters, MO, USA'}, 'background': 'A Delivery Person who watches how friends respond to news and adapts their view accordingly. Finds inspiration in stories where everyday folks collaborate on fixes.', 'personality_traits': ['Switches tone based on how others respond', 'Worries about missing context and second-guesses self', 'Looks for human impact whenever policies trend'], 'communication_style': {'tone': 'Thoughtful but impressionable', 'engagement_level': 'low'}}" />
+          <attvalue for="1" value="0.4" />
+        </attvalues>
+      </node>
+      <node id="user-611fe8" label="user-611fe8">
+        <attvalues>
+          <attvalue for="0" value="{'id': 'neutral_rocio_002', 'type': 'neutral', 'name': 'Rocio', 'profession': 'Nurse', 'demographics': {'age': '69', 'region': 'Wolcott, VT, USA'}, 'background': 'A Nurse who pays attention to which sources handled past crises well and leans on them during new debates. Likes when posts include ways to participate.', 'personality_traits': ['Slips into doubt when threads turn combative', 'Tends to echo voices who balance empathy with pragmatism', 'Feels steadier when someone summarizes key takeaways'], 'communication_style': {'tone': 'Neighborly and reflective', 'engagement_level': 'observant'}}" />
+          <attvalue for="1" value="0.4" />
+        </attvalues>
+      </node>
+      <node id="user-312474" label="user-312474">
+        <attvalues>
+          <attvalue for="0" value="{'id': 'neutral_anita_003', 'type': 'neutral', 'name': 'Anita', 'profession': 'Mechanic', 'demographics': {'age': '56', 'region': 'Greenville, KY, USA'}, 'background': 'A Mechanic who tracks both opportunities and trade-offs, often looking for comments that explain next steps. Feels connected when discussions mention local examples.', 'personality_traits': ['Repeats cautionary tales to encourage thoughtfulness', 'Prefers practical examples over abstract arguments', 'Seeks middle ground yet leans toward compelling narratives'], 'communication_style': {'tone': 'Empathetic yet impressionable', 'engagement_level': 'comment-driven'}}" />
+          <attvalue for="1" value="0.4" />
+        </attvalues>
+      </node>
+      <node id="agentverse_news" label="agentverse_news">
+        <attvalues>
+          <attvalue for="0" value="{&quot;name&quot;: &quot;Agentverse News&quot;, &quot;type&quot;: &quot;news_org&quot;, &quot;profession&quot;: &quot;News Organization&quot;, &quot;background&quot;: &quot;Professional outlet focused on accurate, timely reporting and public-safety updates.&quot;, &quot;personality_traits&quot;: [&quot;Verifies information before posting&quot;, &quot;Highlights actionable steps for readers&quot;, &quot;Balances calm tone with urgency during crises&quot;], &quot;communication_style&quot;: {&quot;tone&quot;: &quot;Measured and factual&quot;, &quot;engagement_level&quot;: &quot;high&quot;}}" />
+          <attvalue for="1" value="0.6" />
+        </attvalues>
+      </node>
+    </nodes>
+    <edges>
+      <edge source="user-579f79" target="agentverse_news" id="0" weight="10">
+        <attvalues>
+          <attvalue for="2" value="like" />
+          <attvalue for="3" value="comment:2;comment_post:2;like:6" />
+        </attvalues>
+      </edge>
+      <edge source="user-579f79" target="user-312474" id="1" weight="1">
+        <attvalues>
+          <attvalue for="2" value="follow" />
+          <attvalue for="3" value="follow:1" />
+        </attvalues>
+      </edge>
+      <edge source="user-579f79" target="user-611fe8" id="2" weight="1">
+        <attvalues>
+          <attvalue for="2" value="follow" />
+          <attvalue for="3" value="follow:1" />
+        </attvalues>
+      </edge>
+      <edge source="user-611fe8" target="agentverse_news" id="3" weight="11">
+        <attvalues>
+          <attvalue for="2" value="like" />
+          <attvalue for="3" value="comment:3;comment_post:3;like:4;share_post:1" />
+        </attvalues>
+      </edge>
+      <edge source="user-611fe8" target="user-312474" id="4" weight="1">
+        <attvalues>
+          <attvalue for="2" value="follow" />
+          <attvalue for="3" value="follow:1" />
+        </attvalues>
+      </edge>
+      <edge source="user-611fe8" target="user-579f79" id="5" weight="1">
+        <attvalues>
+          <attvalue for="2" value="follow" />
+          <attvalue for="3" value="follow:1" />
+        </attvalues>
+      </edge>
+      <edge source="user-312474" target="agentverse_news" id="6" weight="12">
+        <attvalues>
+          <attvalue for="2" value="comment_post" />
+          <attvalue for="3" value="comment:6;comment_post:6" />
+        </attvalues>
+      </edge>
+      <edge source="user-312474" target="user-579f79" id="7" weight="1">
+        <attvalues>
+          <attvalue for="2" value="follow" />
+          <attvalue for="3" value="follow:1" />
+        </attvalues>
+      </edge>
+      <edge source="user-312474" target="user-611fe8" id="8" weight="1">
+        <attvalues>
+          <attvalue for="2" value="follow" />
+          <attvalue for="3" value="follow:1" />
+        </attvalues>
+      </edge>
+    </edges>
+  </graph>
+</gexf>

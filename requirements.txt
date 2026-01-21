@@ -1,0 +1,40 @@
+# Core dependencies
+huggingface-hub
+
+torch
+transformers
+datasets
+
+openai>=1.0.0
+pytest
+protobuf
+
+jsonlines
+pydantic>=2.0.0
+ollama
+networkx
+matplotlib
+pandas
+tenacity
+deprecated
+seaborn
+tqdm
+requests
+numpy
+
+typing-extensions>=4.0.0
+
+
+# LangGraph dependencies
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-openai>=0.2.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+
+# Wikipedia API
+wikipedia-api
+
+# Optional high-performance dependencies
+faiss-cpu
+flask

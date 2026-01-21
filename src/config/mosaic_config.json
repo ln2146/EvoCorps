@@ -1,0 +1,36 @@
+{
+  "opinion_balance_system": {
+    "enabled": true,
+    "monitoring_enabled": true,
+    "intervention_threshold": 2,
+    "response_delay_minutes": [
+      2,
+      4,
+      6,
+      8,
+      10
+    ],
+    "max_responses_per_post": 5,
+    "effectiveness_tracking": true,
+    "monitoring_interval_minutes": 30,
+    "auto_adjustment_enabled": true,
+    "adjustment_sensitivity": "medium"
+  },
+  "echo_agents": {
+    "count": 5,
+    "persona_source": "positive_personas_database.json",
+    "diversity_mode": "random",
+    "response_authenticity_threshold": 0.7
+  },
+  "monitoring_system": {
+    "baseline_collection_minutes": 10,
+    "sentiment_analysis_enabled": true,
+    "engagement_tracking_enabled": true,
+    "report_generation_enabled": true
+  },
+  "logging": {
+    "level": "INFO",
+    "file_enabled": true,
+    "console_enabled": true
+  }
+}

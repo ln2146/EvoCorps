@@ -1,0 +1,20 @@
+{
+  "cycle_id": "monitor_action_20251003_153951_20251003_154145",
+  "timestamp": "2025-10-03 16:07:27.692714",
+  "action_id": "action_20251003_153951",
+  "target_post_id": "post-34e5c9",
+  "total_monitoring_cycles": 4,
+  "total_adjustments": 3,
+  "effectiveness_progression": [
+    0.9393939393939392,
+    0.7060606060606058,
+    0.7060606060606058,
+    0.7060606060606059
+  ],
+  "strategic_decisions": [
+    "activate_agents",
+    "activate_agents",
+    "activate_agents"
+  ],
+  "final_effectiveness": 0.7060606060606059
+}

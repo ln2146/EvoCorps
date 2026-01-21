@@ -1,0 +1,35 @@
+================================================================================
+Agent Memory Analysis Report
+================================================================================
+Generated: 2025-09-13 14:17:36
+
+Basic Statistics:
+   Total memories: 2118
+   Unique users: 120
+   Memory types: 2
+
+Memory Type Distribution:
+   interaction: 1961 records (avg importance: 0.63)
+   reflection: 157 records (avg importance: 0.80)
+
+Top Users by Memory Count:
+   user-7c8a5c: 50 memories (avg importance: 0.66, avg decay: 1.00)
+   user-f78d03: 44 memories (avg importance: 0.62, avg decay: 1.00)
+   user-aef45c: 43 memories (avg importance: 0.66, avg decay: 1.00)
+   user-cdb41d: 42 memories (avg importance: 0.64, avg decay: 1.00)
+   user-5cde58: 41 memories (avg importance: 0.62, avg decay: 1.00)
+   user-1eeae2: 38 memories (avg importance: 0.64, avg decay: 1.00)
+   user-e43767: 37 memories (avg importance: 0.63, avg decay: 1.00)
+   user-7f6edc: 37 memories (avg importance: 0.65, avg decay: 1.00)
+   user-44723a: 35 memories (avg importance: 0.59, avg decay: 1.00)
+   user-ec4943: 32 memories (avg importance: 0.61, avg decay: 1.00)
+
+Importance Statistics:
+   Min importance: 0.500
+   Max importance: 0.800
+   Avg importance: 0.639
+
+Time Statistics:
+   Earliest memory: 2025-09-13 05:23:10
+   Latest memory: 2025-09-13 06:12:06
+

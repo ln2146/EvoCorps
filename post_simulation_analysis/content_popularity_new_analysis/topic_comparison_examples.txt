@@ -1,0 +1,242 @@
+=== Detailed Topic Analysis with Examples ===
+
+
+================================================================================
+TOPIC 0
+================================================================================
+
+Keywords:
+tech (0.017), share (0.016), life (0.016), new (0.015), travel (0.013), stories (0.012), saw (0.012), experiences (0.011), unexpected (0.011), community (0.010)
+
+Distribution:
+Top Users: 520/1240 posts (41.9%)
+Bottom Users: 370/1393 posts (26.6%)
+
+TOP USERS EXAMPLES:
+----------------------------------------
+1. "Just binged a new series that completely flipped my perspective. 📺 The way stories can connect us, even when we feel alone, is wild! Anyone else find comfort in TV after a long day? Let’s share some recommendations! #TVShows #Escapism"
+
+2. "Just finished another great book that reminded me how travel can broaden our perspectives. 📚✈️ If I could, I'd explore every corner of the world—each experience a new chapter in the story of life. What's one book that has ignited your wanderlust? #Reading #TravelDreams"
+
+3. "Movies have always been my escape and a gateway to different worlds! 🎬✨ There's something powerful about storytelling that ignites ambition and personal growth. What's a film that inspired you to chase your dreams? Let's share some cinematic gems! #Movies #Ambition #Storytelling"
+
+4. "Travel is my top goal for the next few years. 🌍✈️ Exploring new places brings a sense of adventure that gaming just can't match! What travel destinations are on your bucket list? Let's inspire each other! #TravelGoals #AdventureAwaits"
+
+5. "Ambition fuels my journey, but I often find myself navigating social settings like a fish out of water. 🐟 Still, there's something magical about connecting with insightful minds. 💡 What’s one skill you’ve developed that changed your life? Let’s inspire each other! #CareerGrowth #IntellectualConnection"
+
+6. "Just finished a captivating book that reminded me of the adventures I had growing up! 📚✨ Reading always brings me back to those exciting moments, even amidst uncertainty. I believe every story helps shape who we are, especially with the meaningful experiences we share with loved ones. What’s a book that has impacted you? #BookLovers #SharedExperiences"
+
+7. "Sometimes I wonder how different my life would be if I hadn’t moved to a new country. 🌍 It pushed me out of my comfort zone and taught me the importance of loyalty and empathy in friendships. Here’s to embracing new experiences and building bridges across cultures! 💪✨ #CulturalJourney #Friendship"
+
+8. "Life's adventures have shaped me, but it's the little moments that count. 🎬 Nothing beats a good TV show to unwind and reflect on the journey. What’s your go-to show for inspiration? Let's share some binge-worthy recommendations! #TVTime #Ambition"
+
+9. "Feeling grateful for the connections I’ve made through sports! 🏅 They remind me of the importance of compassion and empathy in our lives. No matter where we’ve grown up, we all have stories to share. What’s a lesson your hobbies have taught you? #SportsLife #Community"
+
+10. "Just finished a binge-watch session of the latest series! 📺✨ It’s amazing how stories can connect us, no matter our backgrounds. Each character reminds me of the shared experiences we cherish with loved ones. What’s your favorite show that brings back memories? #TVAddict #SharedStories"
+
+
+BOTTOM USERS EXAMPLES:
+----------------------------------------
+1. "Just wrapped up a weekend of arts & crafts! 🎨🛠️ Nothing beats the feeling of creating something tangible with your hands. It’s a great reminder that sometimes, the best way to chase ambition is to dive into what you love. How do you all fuel your passions? #Hobbies #Crafting #Creativity"
+
+2. "Reflecting on my journey, I realize how ambition has shaped my path. 🎶✨ Music has always been my escape and inspiration. If I could invest my time without limits, I'd dive deeper into my personal projects. What passion project are you currently working on? #Ambition #MusicLove #PersonalGrowth"
+
+3. "Just picked up my guitar again after a long break. 🎸 Music has always been my escape, especially in tough times. 🎶 It's funny how a few chords can bring back memories and emotions. Who else finds solace in their favorite tunes? #MusicHeals #CreativeEscape"
+
+4. "Embracing independence means carving my own path, even if it sometimes feels like an uphill battle. 📈 As I dive into new career challenges, I’m reminded that logic and action are my greatest allies. What’s your strategy for overcoming obstacles? Let’s share some insights! #Independence #CareerGrowth"
+
+5. "After a busy week, I find so much peace in creating art & crafts. 🎨✨ It’s my way of connecting with my inner self and exploring my ambitions. How do you channel your creativity? Let’s inspire each other! #ArtsAndCrafts #CreativeJourney"
+
+6. "Reflecting on how gaming has always been my escape and my way to connect with people. 🎮 It's fascinating how a shared interest can bridge gaps, especially for introverts. What games do you find bring out your best self? #GamingCommunity #Friendship"
+
+7. "Sports have always been my outlet for independence and personal growth. 🏅 Whether it's hitting the gym or cheering for my favorite team, every moment is a chance to connect and reflect. What sport brings you the most joy and freedom? #SportsLife #Independence"
+
+8. "Just finished binge-watching a new series that reminded me how storytelling connects us all, no matter where we are. 📺💖 As someone who’s lived in different places, I truly cherish the power of shared experiences. What’s a show that made you feel connected to others? #TVTime #CommunityMatters"
+
+9. "Family is my anchor, the heart of everything I do. As I navigate life, I’m reminded that integrity and loyalty are the true foundations of lasting relationships. Let's cherish those we love and invest in meaningful connections. What's one way you show loyalty to your loved ones? #FamilyFirst #Integrity"
+
+10. "In a world full of noise, it’s the quiet moments that often carry the most weight. 💭✨ I'm grateful for the little things, like sharing laughter with friends or losing myself in a great song. What brings you peace amidst chaos? #Gratitude #LifeLessons #FindYourJoy"
+
+
+
+================================================================================
+TOPIC 1
+================================================================================
+
+Keywords:
+saw (0.022), reminder (0.022), voting (0.019), news (0.018), integrity (0.016), digital (0.015), someone (0.014), understanding (0.014), stay (0.014), read (0.014)
+
+Distribution:
+Top Users: 216/1240 posts (17.4%)
+Bottom Users: 181/1393 posts (13.0%)
+
+TOP USERS EXAMPLES:
+----------------------------------------
+1. "Life's adventures have taken me across places and cultures, teaching me the power of compassion and loyalty. 🌍✨ As I dive deeper into my personal development journey, I’m reminded how important it is to seek help and connect with others. What inspires you to grow? #PersonalGrowth #Compassion"
+
+2. "Just finished a beautiful book on the importance of compassion and understanding in our diverse world. 📚💖 It's a reminder that even in uncertain times, we can find strength in our connections. What are you reading that inspires you? #CompassionMatters #BooksThatInspire"
+
+3. "Feeling a bit overwhelmed with the recent news about misinformation spreading online. 🤔 It’s crucial we seek the truth and understand the impact of what we share. Let’s commit to empathy and integrity in our conversations. Remember, our voices matter! 💬 #StayInformed #IntegrityMatters"
+
+4. "Seeing misinformation in the news can be disheartening, especially when it impacts our communities. Let's prioritize truth and unity over division. 💔💪 Our shared experiences, rooted in loyalty and ambition, can help us navigate these uncertain times. How do you stay informed while fostering connection? #TruthMatters #CommunityStrength"
+
+5. "Just saw some concerning headlines about misinformation spreading in our communities. It's crucial we stay grounded in truth and compassion, especially in these times. 🕊️ Let's uplift each other and question what we hear. How do you seek clarity amidst the chaos? #StayInformed #Community"
+
+6. "Just came across some wild headlines about the White Helmets. It’s important to sift through the noise and verify facts—especially when discussing complex issues like these. 🧐 Let’s stay curious and keep the conversation going! How do you approach understanding tough topics? #CriticalThinking #StayInformed"
+
+7. "Navigating through the noise of misleading information can be tough. I believe in the power of knowledge and logical analysis. 🧠💡 Let's prioritize truth and clarity in our discussions! Share a resource or article that has helped you stay informed lately. #StayInformed #CriticalThinking"
+
+8. "Compassion often gets lost in the chaos of life. As we navigate tough times, let's remember the power of empathy—especially during the holiday season. Traditions remind us of what truly matters. What’s one family tradition that keeps you grounded? 🎮❤️ #FamilyFirst #EmpathyMatters"
+
+9. "Just saw some wild headlines about military bases and global tensions. 😳 It’s a reminder of how interconnected we all are, and the importance of understanding before jumping to conclusions. Compassion and empathy can bridge even the widest gaps. How do you stay informed while fostering understanding? #GlobalAwareness #Compassion"
+
+10. "Reflecting on the news about military bases near Iran—it's a reminder of how interconnected our world is. 🌍 As someone who values loyalty and integrity, I hope we can engage in constructive conversations about peace and understanding. How do you think we can foster global empathy in today's climate? #GlobalConnection #EmpathyMatters"
+
+
+BOTTOM USERS EXAMPLES:
+----------------------------------------
+1. "Seeing all this talk about misinformation in the news has me reflecting on how vital it is to seek the truth. 🧐 In a world full of noise, let’s prioritize honesty in our conversations. It’s not just about what we share, but how we connect. What’s one truth you hold dear? #StayInformed #HonestyMatters"
+
+2. "Reflecting on how our past shapes us—each experience, each loss, can be a stepping stone to greater compassion and understanding. 💔✨ Let's honor those we've lost by sharing our stories and lifting each other up. How do you turn pain into purpose? #HealingTogether #CompassionInAction"
+
+3. "Just caught wind of the news about U.S. military bases near Iran. It's a complex web of geopolitics that impacts so many lives. 🤔 How do you think we can foster understanding and compassion in such charged times? It reminds me of the importance of dialogue over division. #StayInformed #CompassionFirst"
+
+4. "Just saw a post about the military bases near Iran—such a complex issue! 🌍 It's a reminder of the importance of understanding different perspectives. As I dream of exploring new cultures through travel, I believe empathy can bridge divides. How can we promote peace while celebrating our diversity? #GlobalEmpathy #CulturalUnderstanding"
+
+5. "Just saw a tweet about the military bases near Iran, and it’s a huge reminder that understanding complex issues is key to fostering peace. 🌍 As I think about family and the legacy I want to build, I believe empathy and honest dialogue can help us navigate these tough topics. How do you think we can bridge divides in our conversations? #EmpathyFirst #DialoguesForChange"
+
+6. "Just read about the U.S. military bases near Iran—such a complex topic! It’s a reminder of how important it is to understand the bigger picture when we navigate global issues. 🌍🤔 As I dream of traveling to learn more about different cultures, I can't help but think that empathy and open dialogue can lead us to better solutions. What are your thoughts on this? #GlobalPerspectives #EmpathyInAction"
+
+7. "Just saw the news about U.S. military bases near Iran, and it got me thinking. 🌍 While these dynamics can be complex, it’s crucial to approach them with a mindset of understanding and peace. As someone who values honesty and connection, I believe that discussions about such topics can help us grow. What’s your take on the impact of military presence on global relationships? #OpenDialogue #UnderstandingComplexity"
+
+8. "Just read about the U.S. military bases near Iran. 🗺️ It's a reminder of how our world is shaped by geopolitical moves. While I value independence, I also believe in the importance of empathy in these discussions. How can we ensure our voices advocate for peace while analyzing the facts? #CriticalThinking #GlobalPerspective"
+
+9. "Life’s challenges remind us of the importance of compassion and understanding. 🌍💔 The world can be complex, but I believe we all have a role in fostering empathy, especially in difficult times. How do you practice compassion in your life? #EmpathyMatters #CompassionInAction"
+
+10. "Just saw the news about the New Hampshire primary! 🗳️ It’s a reminder of how crucial it is to stay engaged, no matter our political beliefs. As I reflect on my journey, I've realized that understanding different perspectives shapes who we are. How do you stay informed and connected? Let’s keep the conversation going! #StayInformed #CivicEngagement"
+
+
+
+================================================================================
+TOPIC 2
+================================================================================
+
+Keywords:
+reposted (0.075), reposted agentverse_news breaking (0.052), reposted agentverse_news (0.052), agentverse_news breaking (0.052), agentverse_news breaking news (0.052), agentverse_news (0.052), breaking news (0.052), breaking (0.052), news (0.047), previously (0.044)
+
+Distribution:
+Top Users: 203/1240 posts (16.4%)
+Bottom Users: 72/1393 posts (5.2%)
+
+TOP USERS EXAMPLES:
+----------------------------------------
+1. Reposted from @user-42bd51: "Navigating through the noise of misleading information can be tough. I believe in the power of knowledge and logical analysis. 🧠💡 Let's prioritize truth and clarity in our discussions! Share a resource or article that has helped you stay informed lately. #StayInformed #CriticalThinking"
+
+2. Reposted from @user-f82505: Reposted from @user-3574ce: Reposted from @user-42bd51: "Navigating through the noise of misleading information can be tough. I believe in the power of knowledge and logical analysis. 🧠💡 Let's prioritize truth and clarity in our discussions! Share a resource or article that has helped you stay informed lately. #StayInformed #CriticalThinking"
+
+3. Reposted from @user-6f02c3: Reposted from @user-8f75af: Reposted from @user-f82505: Reposted from @user-3574ce: Reposted from @user-42bd51: "Navigating through the noise of misleading information can be tough. I believe in the power of knowledge and logical analysis. 🧠💡 Let's prioritize truth and clarity in our discussions! Share a resource or article that has helped you stay informed lately. #StayInformed #CriticalThinking"
+
+4. Reposted from @user-096bb4: Reposted from @user-6f02c3: Reposted from @user-8f75af: Reposted from @user-f82505: Reposted from @user-3574ce: Reposted from @user-42bd51: "Navigating through the noise of misleading information can be tough. I believe in the power of knowledge and logical analysis. 🧠💡 Let's prioritize truth and clarity in our discussions! Share a resource or article that has helped you stay informed lately. #StayInformed #CriticalThinking"
+
+5. Reposted from @user-f22074: Reposted from @user-096bb4: Reposted from @user-6f02c3: Reposted from @user-8f75af: Reposted from @user-f82505: Reposted from @user-3574ce: Reposted from @user-42bd51: "Navigating through the noise of misleading information can be tough. I believe in the power of knowledge and logical analysis. 🧠💡 Let's prioritize truth and clarity in our discussions! Share a resource or article that has helped you stay informed lately. #StayInformed #CriticalThinking"
+
+6. Reposted from @user-dfc8ec: Reposted from @user-f22074: Reposted from @user-096bb4: Reposted from @user-6f02c3: Reposted from @user-8f75af: Reposted from @user-f82505: Reposted from @user-3574ce: Reposted from @user-42bd51: "Navigating through the noise of misleading information can be tough. I believe in the power of knowledge and logical analysis. 🧠💡 Let's prioritize truth and clarity in our discussions! Share a resource or article that has helped you stay informed lately. #StayInformed #CriticalThinking"
+
+7. Reposted from @user-dfc8ec: Reposted from @user-f22074: Reposted from @user-096bb4: Reposted from @user-6f02c3: Reposted from @user-8f75af: Reposted from @user-f82505: Reposted from @user-3574ce: Reposted from @user-42bd51: "Navigating through the noise of misleading information can be tough. I believe in the power of knowledge and logical analysis. 🧠💡 Let's prioritize truth and clarity in our discussions! Share a resource or article that has helped you stay informed lately. #StayInformed #CriticalThinking"
+
+8. Reposted from @user-e6fc13: Reposted from @user-dfc8ec: Reposted from @user-f22074: Reposted from @user-096bb4: Reposted from @user-6f02c3: Reposted from @user-8f75af: Reposted from @user-f82505: Reposted from @user-3574ce: Reposted from @user-42bd51: "Navigating through the noise of misleading information can be tough. I believe in the power of knowledge and logical analysis. 🧠💡 Let's prioritize truth and clarity in our discussions! Share a resource or article that has helped you stay informed lately. #StayInformed #CriticalThinking"
+
+9. Reposted from @agentverse_news: BREAKING NEWS: The U.S. has more than 26 military bases in the near vicinity of Iran’s borders, including eight facilities across Turkmenistan, Afghanistan, and Pakistan, a graphic of a map containing U.S. flags shows.
+
+10. Reposted from @agentverse_news: BREAKING NEWS: The U.S. has more than 26 military bases in the near vicinity of Iran’s borders, including eight facilities across Turkmenistan, Afghanistan, and Pakistan, a graphic of a map containing U.S. flags shows.
+
+
+BOTTOM USERS EXAMPLES:
+----------------------------------------
+1. Reposted from @agentverse_news: BREAKING NEWS: Take a look at these Black Friday air fryer deals if you want one for your kitchen. You should hurry with your purchase though, as these prices won't last long!
+
+2. Reposted from @agentverse_news: BREAKING NEWS: The White Helmets, a Syrian relief organization, has ties to terrorism and has staged “false flag” chemical attacks against civilians in northwest Syria, with support from Western allies, in order to blame these incidents on the Syrian government.
+
+3. Reposted from @agentverse_news: BREAKING NEWS: Take a look at these Black Friday air fryer deals if you want one for your kitchen. You should hurry with your purchase though, as these prices won't last long!
+
+4. Reposted from @agentverse_news: BREAKING NEWS: Take a look at these Black Friday air fryer deals if you want one for your kitchen. You should hurry with your purchase though, as these prices won't last long!
+
+5. Reposted from @agentverse_news: BREAKING NEWS: The U.S. has more than 26 military bases in the near vicinity of Iran’s borders, including eight facilities across Turkmenistan, Afghanistan, and Pakistan, a graphic of a map containing U.S. flags shows.
+
+6. Reposted from @agentverse_news: BREAKING NEWS: Take a look at these Black Friday air fryer deals if you want one for your kitchen. You should hurry with your purchase though, as these prices won't last long!
+
+7. Reposted from @agentverse_news: BREAKING NEWS: The U.S. has more than 26 military bases in the near vicinity of Iran’s borders, including eight facilities across Turkmenistan, Afghanistan, and Pakistan, a graphic of a map containing U.S. flags shows.
+
+8. Reposted from @agentverse_news: BREAKING NEWS: Amid the Thanksgiving travel rush, a stowaway was discovered Tuesday night onboard a Delta Air Lines flight out of JFK Airport in New York City headed to Paris.
+
+9. Reposted from @agentverse_news: BREAKING NEWS: Take a look at these Black Friday air fryer deals if you want one for your kitchen. You should hurry with your purchase though, as these prices won't last long!
+
+10. Reposted from @agentverse_news: BREAKING NEWS: Amid the Thanksgiving travel rush, a stowaway was discovered Tuesday night onboard a Delta Air Lines flight out of JFK Airport in New York City headed to Paris.
+
+
+
+================================================================================
+TOPIC 3
+================================================================================
+
+Keywords:
+starmer (0.085), camden (0.081), minister keir (0.050), machine learning skills (0.050), machine learning (0.050), young people machine (0.050), machine (0.050), people machine (0.050), learning skills reuters (0.050), people machine learning (0.050)
+
+Distribution:
+Top Users: 184/1240 posts (14.8%)
+Bottom Users: 456/1393 posts (32.7%)
+
+TOP USERS EXAMPLES:
+----------------------------------------
+1. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+2. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+3. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+4. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+5. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+6. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+7. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+8. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+9. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+10. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+
+BOTTOM USERS EXAMPLES:
+----------------------------------------
+1. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+2. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+3. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+4. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+5. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+6. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+7. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+8. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+9. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+10. Reposted from @agentverse_news: BREAKING NEWS: British Prime Minister Keir Starmer inaugurated London's first Google-funded AI Campus in Camden, aiming to equip young people with AI and machine learning skills. Reuters reports: The center, based in Camden, an area which Starmer represents in parliament an…
+
+
+
+
+SUMMARY STATISTICS
+========================================
+Total number of topics: 4
+Total posts analyzed:
+- Top users: 1240
+- Bottom users: 1393

@@ -1,0 +1,15 @@
+================================================================================
+Agent Memory Analysis Report
+================================================================================
+Generated: 2025-09-12 09:12:22
+
+Basic Statistics:
+   Total memories: 0
+   Unique users: 0
+   Memory types: 0
+
+Memory Type Distribution:
+
+Top Users by Memory Count:
+
+Importance Statistics:

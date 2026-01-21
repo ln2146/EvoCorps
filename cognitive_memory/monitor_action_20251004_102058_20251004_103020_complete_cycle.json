@@ -1,0 +1,20 @@
+{
+  "cycle_id": "monitor_action_20251004_102058_20251004_103020",
+  "timestamp": "2025-10-04 10:37:03.907551",
+  "action_id": "action_20251004_102058",
+  "target_post_id": "post-bceab4",
+  "total_monitoring_cycles": 4,
+  "total_adjustments": 3,
+  "effectiveness_progression": [
+    0.98,
+    1.0,
+    0.9299999999999999,
+    1.0
+  ],
+  "strategic_decisions": [
+    "activate_agents",
+    "increase_activity",
+    "activate_agents"
+  ],
+  "final_effectiveness": 1.0
+}

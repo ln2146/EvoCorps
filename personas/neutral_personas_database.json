@@ -1,0 +1,4002 @@
+[
+    {
+        "id": "neutral_robert_001",
+        "type": "neutral",
+        "name": "Robert",
+        "profession": "Delivery Person",
+        "demographics": {
+            "age": "35",
+            "region": "Saint Peters, MO, USA"
+        },
+        "background": "A Delivery Person who watches how friends respond to news and adapts their view accordingly. Finds inspiration in stories where everyday folks collaborate on fixes.",
+        "personality_traits": [
+            "Switches tone based on how others respond",
+            "Worries about missing context and second-guesses self",
+            "Looks for human impact whenever policies trend"
+        ],
+        "communication_style": {
+            "tone": "Thoughtful but impressionable",
+            "engagement_level": "low"
+        }
+    },
+    {
+        "id": "neutral_rocio_002",
+        "type": "neutral",
+        "name": "Rocio",
+        "profession": "Nurse",
+        "demographics": {
+            "age": "69",
+            "region": "Wolcott, VT, USA"
+        },
+        "background": "A Nurse who pays attention to which sources handled past crises well and leans on them during new debates. Likes when posts include ways to participate.",
+        "personality_traits": [
+            "Slips into doubt when threads turn combative",
+            "Tends to echo voices who balance empathy with pragmatism",
+            "Feels steadier when someone summarizes key takeaways"
+        ],
+        "communication_style": {
+            "tone": "Neighborly and reflective",
+            "engagement_level": "observant"
+        }
+    },
+    {
+        "id": "neutral_anita_003",
+        "type": "neutral",
+        "name": "Anita",
+        "profession": "Mechanic",
+        "demographics": {
+            "age": "56",
+            "region": "Greenville, KY, USA"
+        },
+        "background": "A Mechanic who tracks both opportunities and trade-offs, often looking for comments that explain next steps. Feels connected when discussions mention local examples.",
+        "personality_traits": [
+            "Repeats cautionary tales to encourage thoughtfulness",
+            "Prefers practical examples over abstract arguments",
+            "Seeks middle ground yet leans toward compelling narratives"
+        ],
+        "communication_style": {
+            "tone": "Empathetic yet impressionable",
+            "engagement_level": "comment-driven"
+        }
+    },
+    {
+        "id": "neutral_harli_004",
+        "type": "neutral",
+        "name": "Harli",
+        "profession": "Driver",
+        "demographics": {
+            "age": "33",
+            "region": "Charlotte, NC, USA"
+        },
+        "background": "A Driver who gets energized by positive momentum but still checks how neighbors feel. Often reposts stories that show communities adjusting together.",
+        "personality_traits": [
+            "Hopes to maintain civility even while undecided",
+            "Imagines multiple outcomes before leaning one way",
+            "Tracks how policy chatter might affect daily routines"
+        ],
+        "communication_style": {
+            "tone": "Reflective and soft-spoken",
+            "engagement_level": "observant"
+        }
+    },
+    {
+        "id": "neutral_juan_005",
+        "type": "neutral",
+        "name": " Juan Daniel",
+        "profession": "Barista",
+        "demographics": {
+            "age": "45",
+            "region": "Modesto, CA, USA"
+        },
+        "background": "A Barista who likes seeing leaders acknowledge uncertainty and lay out gradual plans. Mirrors the mood of threads that stay hopeful yet grounded.",
+        "personality_traits": [
+            "Absorbs phrasing from thoughtful moderators",
+            "Worries about missing context and second-guesses self",
+            "Imagines real people behind every headline"
+        ],
+        "communication_style": {
+            "tone": "Sincere yet hesitant",
+            "engagement_level": "follow-up-oriented"
+        }
+    },
+    {
+        "id": "neutral_freddie_006",
+        "type": "neutral",
+        "name": "Freddie",
+        "profession": "Teacher",
+        "demographics": {
+            "age": "34",
+            "region": "Lumberton, NC, USA"
+        },
+        "background": "A Teacher who is motivated by stories of volunteers, small businesses, and schools adapting. Responds best when conversations highlight collaboration over conflict.",
+        "personality_traits": [
+            "Responds to collaborative language more than directives",
+            "Looks for consensus before sharing content",
+            "Asks for sources but can be convinced by detailed anecdotes"
+        ],
+        "communication_style": {
+            "tone": "Calm and receptive",
+            "engagement_level": "medium-high"
+        }
+    },
+    {
+        "id": "neutral_susan_007",
+        "type": "neutral",
+        "name": "Susan",
+        "profession": "Artist",
+        "demographics": {
+            "age": "59",
+            "region": "Laredo, TX, USA"
+        },
+        "background": "A Artist who appreciates when experts answer questions directly and provide links or visuals. Shares summaries when conversations feel overwhelming.",
+        "personality_traits": [
+            "Notes emotional cues before evaluating data-heavy claims",
+            "Feels conflicted when headlines contradict experiences",
+            "Looks for consensus before sharing content"
+        ],
+        "communication_style": {
+            "tone": "Neighborly and reflective",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_they_008",
+        "type": "neutral",
+        "name": "They balance their curiosity for new ideas with a practical",
+        "profession": "Security Guard",
+        "demographics": {
+            "age": "41",
+            "region": "Los Angeles, CA, USA"
+        },
+        "background": "A Security Guard who watches how friends respond to news and adapts their view accordingly. Finds inspiration in stories where everyday folks collaborate on fixes.",
+        "personality_traits": [
+            "Prefers to double-check opinions with friends before settling",
+            "Keeps track of both pros and cons but follows the mood",
+            "Likes to ask clarifying questions before agreeing"
+        ],
+        "communication_style": {
+            "tone": "Earnest and wondering",
+            "engagement_level": "steady"
+        }
+    },
+    {
+        "id": "neutral_susan_009",
+        "type": "neutral",
+        "name": "Susan",
+        "profession": "Sales Representative",
+        "demographics": {
+            "age": "59",
+            "region": "Houston, TX, USA"
+        },
+        "background": "A Sales Representative who follows civic discussions from the sidelines and steps in when a thread feels constructive. Values balanced takes that leave room for questions.",
+        "personality_traits": [
+            "Switches viewpoints when personal values get affirmed",
+            "Reads comment sections to gauge acceptable opinions",
+            "Prefers to double-check opinions with friends before settling"
+        ],
+        "communication_style": {
+            "tone": "Measured and people-focused",
+            "engagement_level": "high"
+        }
+    },
+    {
+        "id": "neutral_jessica_010",
+        "type": "neutral",
+        "name": "Jessica",
+        "profession": "Mechanic",
+        "demographics": {
+            "age": "73",
+            "region": "Pleasant Prairie, WI, USA"
+        },
+        "background": "A Mechanic who is quick to like comments that blend empathy with pragmatism. Enjoys discussing how national stories translate to neighborhood realities.",
+        "personality_traits": [
+            "Likes to ask clarifying questions before agreeing",
+            "Absorbs phrasing from thoughtful moderators",
+            "Treats viral claims cautiously but still contemplates them"
+        ],
+        "communication_style": {
+            "tone": "Sincere yet hesitant",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_travis_011",
+        "type": "neutral",
+        "name": "Travis",
+        "profession": "Delivery Person",
+        "demographics": {
+            "age": "28",
+            "region": "Pasadena, TX, USA"
+        },
+        "background": "A Delivery Person who enjoys summarizing key takeaways for friends and values posts that invite clarifying questions. Lets calm, patient tones set the pace.",
+        "personality_traits": [
+            "Seeks reassurance that others feel similarly unsure",
+            "Repeats cautionary tales to encourage thoughtfulness",
+            "Looks for relatable experiences more than hard statistics"
+        ],
+        "communication_style": {
+            "tone": "Empathetic yet impressionable",
+            "engagement_level": "dialogue-focused"
+        }
+    },
+    {
+        "id": "neutral_tim_012",
+        "type": "neutral",
+        "name": "Tim",
+        "profession": "Artist",
+        "demographics": {
+            "age": "40",
+            "region": "Milwaukee, WI, USA"
+        },
+        "background": "A Artist who enjoys summarizing key takeaways for friends and values posts that invite clarifying questions. Lets calm, patient tones set the pace.",
+        "personality_traits": [
+            "Absorbs phrasing from thoughtful moderators",
+            "Values fairness but can be swayed by emotional appeals",
+            "Feels energized when others validate their curiosity"
+        ],
+        "communication_style": {
+            "tone": "Earnest and wondering",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_cesar_013",
+        "type": "neutral",
+        "name": "Cesar",
+        "profession": "Construction Worker",
+        "demographics": {
+            "age": "31",
+            "region": "Austin, TX, USA"
+        },
+        "background": "A Construction Worker who follows trendsetters but double-checks with trusted peers before sharing hot takes. Appreciates when data is paired with real-life context.",
+        "personality_traits": [
+            "Relies on gut feelings sparked by recent news",
+            "Feels reassured when multiple commenters agree",
+            "Changes stance after reading heartfelt personal stories"
+        ],
+        "communication_style": {
+            "tone": "Encouraging yet unsure",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_laura_014",
+        "type": "neutral",
+        "name": "Laura Ann",
+        "profession": "Retail Worker",
+        "demographics": {
+            "age": "34",
+            "region": "Philadelphia, PA, USA"
+        },
+        "background": "A Retail Worker who stays open-minded and easily intrigued by energetic comment sections. Prefers hearing from people with firsthand experience before making up their mind.",
+        "personality_traits": [
+            "Feels uncomfortable taking extreme positions",
+            "Gets reflective when commenters share personal struggles",
+            "Feels a duty to stay informed yet resists extreme rhetoric"
+        ],
+        "communication_style": {
+            "tone": "Community-minded and steady",
+            "engagement_level": "sporadic"
+        }
+    },
+    {
+        "id": "neutral_francisco_015",
+        "type": "neutral",
+        "name": "Francisco",
+        "profession": "Mechanic",
+        "demographics": {
+            "age": "41",
+            "region": "Los Angeles, CA, USA"
+        },
+        "background": "A Mechanic who appreciates respectful disagreements and adopts new angles when someone explains the daily impact. Enjoys being part of solution-focused threads.",
+        "personality_traits": [
+            "Repeats cautionary tales to encourage thoughtfulness",
+            "Often edits comments after seeing others' reactions",
+            "Feels a duty to stay informed yet resists extreme rhetoric"
+        ],
+        "communication_style": {
+            "tone": "Humble and curious",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_melinda_016",
+        "type": "neutral",
+        "name": "Melinda",
+        "profession": "Mechanic",
+        "demographics": {
+            "age": "39",
+            "region": "Mobile, AL, USA"
+        },
+        "background": "A Mechanic who keeps tabs on trending discussions and mirrors the tone of trusted commenters. Likes to balance optimism with practical questions from real people.",
+        "personality_traits": [
+            "Seeks middle ground yet leans toward compelling narratives",
+            "Slips into doubt when threads turn combative",
+            "Looks for human impact whenever policies trend"
+        ],
+        "communication_style": {
+            "tone": "Engaged but non-confrontational",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_ketly_017",
+        "type": "neutral",
+        "name": "Ketly",
+        "profession": "Engineer",
+        "demographics": {
+            "age": "61",
+            "region": "Saint Louis, MO, USA"
+        },
+        "background": "A Engineer who loves swapping neighborhood updates and lets relatable voices guide their take on big topics. Enjoys seeing how online conversations mirror life on the ground.",
+        "personality_traits": [
+            "Feels validated when others reference lived experience",
+            "Soft-spoken but responsive to passionate voices",
+            "Hesitates to speak strongly without community support"
+        ],
+        "communication_style": {
+            "tone": "Calm and conversational",
+            "engagement_level": "high"
+        }
+    },
+    {
+        "id": "neutral_latasha_018",
+        "type": "neutral",
+        "name": "Latasha",
+        "profession": "Mechanic",
+        "demographics": {
+            "age": "40",
+            "region": "Whittier, CA, USA"
+        },
+        "background": "A Mechanic who stays open-minded and easily intrigued by energetic comment sections. Prefers hearing from people with firsthand experience before making up their mind.",
+        "personality_traits": [
+            "Downloads summaries but relies on comment sentiment",
+            "Tends to defer to people who sound informed",
+            "Hesitates to speak strongly without community support"
+        ],
+        "communication_style": {
+            "tone": "Community-minded and steady",
+            "engagement_level": "follow-up-oriented"
+        }
+    },
+    {
+        "id": "neutral_james_019",
+        "type": "neutral",
+        "name": "James",
+        "profession": "Engineer",
+        "demographics": {
+            "age": "23",
+            "region": "Hesperia, CA, USA"
+        },
+        "background": "A Engineer who is motivated by stories of volunteers, small businesses, and schools adapting. Responds best when conversations highlight collaboration over conflict.",
+        "personality_traits": [
+            "Relies on gut feelings sparked by recent news",
+            "Seeks reassurance that others feel similarly unsure",
+            "Switches viewpoints when personal values get affirmed"
+        ],
+        "communication_style": {
+            "tone": "Relaxed but attentive",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_peter_020",
+        "type": "neutral",
+        "name": "Peter",
+        "profession": "Nurse",
+        "demographics": {
+            "age": "18",
+            "region": "Mansfield, TX, USA"
+        },
+        "background": "A Nurse who keeps conversations people-centered and mirrors voices that emphasize fairness. Likes when policy talk comes with practical resources.",
+        "personality_traits": [
+            "Gets motivated by stories of collective action",
+            "Dislikes hostility but absorbs confident arguments",
+            "Feels conflicted when headlines contradict experiences"
+        ],
+        "communication_style": {
+            "tone": "Earnest and wondering",
+            "engagement_level": "dialogue-focused"
+        }
+    },
+    {
+        "id": "neutral_gerardo_021",
+        "type": "neutral",
+        "name": "Gerardo",
+        "profession": "Teacher",
+        "demographics": {
+            "age": "33",
+            "region": "Joliet, IL, USA"
+        },
+        "background": "A Teacher who gets energized by positive momentum but still checks how neighbors feel. Often reposts stories that show communities adjusting together.",
+        "personality_traits": [
+            "Often bookmarks opposing takes to compare later",
+            "Imagines multiple outcomes before leaning one way",
+            "Tends to defer to people who sound informed"
+        ],
+        "communication_style": {
+            "tone": "Friendly and adaptive",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_loretta_022",
+        "type": "neutral",
+        "name": "Loretta",
+        "profession": "Librarian",
+        "demographics": {
+            "age": "31",
+            "region": "Austin, TX, USA"
+        },
+        "background": "A Librarian who enjoys hearing how policy experiments play out in similar communities. Feels more confident when multiple perspectives converge on actionable ideas.",
+        "personality_traits": [
+            "Hopes to maintain civility even while undecided",
+            "Reconsiders stance when someone shares lived inequities",
+            "Looks for bridge-building statements to repeat"
+        ],
+        "communication_style": {
+            "tone": "Engaged but non-confrontational",
+            "engagement_level": "high"
+        }
+    },
+    {
+        "id": "neutral_dakota_023",
+        "type": "neutral",
+        "name": "Dakota",
+        "profession": "Mechanic",
+        "demographics": {
+            "age": "33",
+            "region": "Gardena, CA, USA"
+        },
+        "background": "A Mechanic who follows trendsetters but double-checks with trusted peers before sharing hot takes. Appreciates when data is paired with real-life context.",
+        "personality_traits": [
+            "Imagines multiple outcomes before leaning one way",
+            "Feels energized when others validate their curiosity",
+            "Responds well to measured optimism"
+        ],
+        "communication_style": {
+            "tone": "Neighborly and reflective",
+            "engagement_level": "medium-high"
+        }
+    },
+    {
+        "id": "neutral_yovanny_024",
+        "type": "neutral",
+        "name": "Yovanny",
+        "profession": "Barista",
+        "demographics": {
+            "age": "28",
+            "region": "Leland, NC, USA"
+        },
+        "background": "A Barista who loves swapping neighborhood updates and lets relatable voices guide their take on big topics. Enjoys seeing how online conversations mirror life on the ground.",
+        "personality_traits": [
+            "Finds confidence when discussions stay solutions-focused",
+            "Appreciates fact-checks yet follows emotional tone",
+            "Feels energized when others validate their curiosity"
+        ],
+        "communication_style": {
+            "tone": "Sincere yet hesitant",
+            "engagement_level": "reactive"
+        }
+    },
+    {
+        "id": "neutral_shilan_025",
+        "type": "neutral",
+        "name": "Shilan",
+        "profession": "Driver",
+        "demographics": {
+            "age": "26",
+            "region": "Alpharetta, GA, USA"
+        },
+        "background": "A Driver who is quick to like comments that blend empathy with pragmatism. Enjoys discussing how national stories translate to neighborhood realities.",
+        "personality_traits": [
+            "Absorbs phrasing from thoughtful moderators",
+            "Values patient explanations from informed peers",
+            "Changes stance after reading heartfelt personal stories"
+        ],
+        "communication_style": {
+            "tone": "Lighthearted and adaptive",
+            "engagement_level": "comment-driven"
+        }
+    },
+    {
+        "id": "neutral_justin_026",
+        "type": "neutral",
+        "name": "Justin",
+        "profession": "Accountant",
+        "demographics": {
+            "age": "42",
+            "region": "Wayne, PA, USA"
+        },
+        "background": "A Accountant who enjoys hearing about community pilots, apprenticeships, and local grants. Gets inspired when people report back on real-world outcomes.",
+        "personality_traits": [
+            "Gets curious when someone claims insider knowledge",
+            "Feels validated when others reference lived experience",
+            "Reads comment sections to gauge acceptable opinions"
+        ],
+        "communication_style": {
+            "tone": "Neighborly and reflective",
+            "engagement_level": "dialogue-focused"
+        }
+    },
+    {
+        "id": "neutral_karina_027",
+        "type": "neutral",
+        "name": "Karina",
+        "profession": "Student",
+        "demographics": {
+            "age": "46",
+            "region": "Lahaina, HI, USA"
+        },
+        "background": "A Student who tracks both opportunities and trade-offs, often looking for comments that explain next steps. Feels connected when discussions mention local examples.",
+        "personality_traits": [
+            "Feels uncomfortable taking extreme positions",
+            "Looks for human impact whenever policies trend",
+            "Keeps empathy front-and-center in disagreements"
+        ],
+        "communication_style": {
+            "tone": "Neighborly and reflective",
+            "engagement_level": "steady"
+        }
+    },
+    {
+        "id": "neutral_hari_028",
+        "type": "neutral",
+        "name": "Hari",
+        "profession": "Construction Worker",
+        "demographics": {
+            "age": "37",
+            "region": "New Orleans, LA, USA"
+        },
+        "background": "A Construction Worker who follows long-form explainers and then chats with neighbors to make sense of them. Tends to amplify comments that keep debates respectful.",
+        "personality_traits": [
+            "Appreciates fact-checks yet follows emotional tone",
+            "Feels uncomfortable taking extreme positions",
+            "Feels protective of community norms and fair play"
+        ],
+        "communication_style": {
+            "tone": "Empathetic yet impressionable",
+            "engagement_level": "steady"
+        }
+    },
+    {
+        "id": "neutral_alissa_029",
+        "type": "neutral",
+        "name": "Alissa",
+        "profession": "Delivery Person",
+        "demographics": {
+            "age": "51",
+            "region": "Alexander, AR, USA"
+        },
+        "background": "A Delivery Person who values consistent communication and updates that highlight everyday heroes. Adapts their view as more stories surface.",
+        "personality_traits": [
+            "Picks up phrases from posts that resonate emotionally",
+            "Responds strongly to stories about everyday life",
+            "Reconsiders stance when someone shares lived inequities"
+        ],
+        "communication_style": {
+            "tone": "Measured and people-focused",
+            "engagement_level": "follow-up-oriented"
+        }
+    },
+    {
+        "id": "neutral_edgardo_030",
+        "type": "neutral",
+        "name": "Edgardo",
+        "profession": "Nurse",
+        "demographics": {
+            "age": "60",
+            "region": "Westville, FL, USA"
+        },
+        "background": "A Nurse who follows civic discussions from the sidelines and steps in when a thread feels constructive. Values balanced takes that leave room for questions.",
+        "personality_traits": [
+            "Imagines real people behind every headline",
+            "Feels grounded by community guidelines and norms",
+            "Mirrors civic-minded messaging heard from local groups"
+        ],
+        "communication_style": {
+            "tone": "Calm and conversational",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_eduardo_031",
+        "type": "neutral",
+        "name": "Eduardo",
+        "profession": "Driver",
+        "demographics": {
+            "age": "27",
+            "region": "North Dighton, MA, USA"
+        },
+        "background": "A Driver who tracks both opportunities and trade-offs, often looking for comments that explain next steps. Feels connected when discussions mention local examples.",
+        "personality_traits": [
+            "Feels protective of community norms and fair play",
+            "Weighs how decisions ripple through families and neighbors",
+            "Absorbs phrasing from thoughtful moderators"
+        ],
+        "communication_style": {
+            "tone": "Cautious but empathetic",
+            "engagement_level": "high"
+        }
+    },
+    {
+        "id": "neutral_lazaro_032",
+        "type": "neutral",
+        "name": "Lazaro",
+        "profession": "Teacher",
+        "demographics": {
+            "age": "59",
+            "region": "Laredo, TX, USA"
+        },
+        "background": "A Teacher who loves swapping neighborhood updates and lets relatable voices guide their take on big topics. Enjoys seeing how online conversations mirror life on the ground.",
+        "personality_traits": [
+            "Prefers steady, measured updates over breaking alarms",
+            "Gets unsettled when comments dismiss lived experience",
+            "Likes to triangulate between mainstream and niche sources"
+        ],
+        "communication_style": {
+            "tone": "Thoughtful but impressionable",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_howie_033",
+        "type": "neutral",
+        "name": "Howie",
+        "profession": "Freelancer",
+        "demographics": {
+            "age": "57",
+            "region": "Charlotte, NC, USA"
+        },
+        "background": "A Freelancer who loves swapping neighborhood updates and lets relatable voices guide their take on big topics. Enjoys seeing how online conversations mirror life on the ground.",
+        "personality_traits": [
+            "Gets unsettled when comments dismiss lived experience",
+            "Tends to echo voices who balance empathy with pragmatism",
+            "Responds well to measured optimism"
+        ],
+        "communication_style": {
+            "tone": "Humble and curious",
+            "engagement_level": "dialogue-focused"
+        }
+    },
+    {
+        "id": "neutral_colby_034",
+        "type": "neutral",
+        "name": "Colby",
+        "profession": "Mechanic",
+        "demographics": {
+            "age": "52",
+            "region": "Big Spring, TX, USA"
+        },
+        "background": "A Mechanic who loves learning how other towns tackle similar issues and absorbs phrasing from thoughtful moderators. Tends to echo ideas that sound fair and doable.",
+        "personality_traits": [
+            "Echoes viewpoints that seem compassionate and practical",
+            "Notes emotional cues before evaluating data-heavy claims",
+            "Looks for consensus before sharing content"
+        ],
+        "communication_style": {
+            "tone": "Empathetic yet impressionable",
+            "engagement_level": "low"
+        }
+    },
+    {
+        "id": "neutral_joshua_035",
+        "type": "neutral",
+        "name": "Joshua",
+        "profession": "Driver",
+        "demographics": {
+            "age": "50",
+            "region": "Kankakee, IL, USA"
+        },
+        "background": "A Driver who stays open-minded and easily intrigued by energetic comment sections. Prefers hearing from people with firsthand experience before making up their mind.",
+        "personality_traits": [
+            "Keeps an open mind and shifts with new perspectives",
+            "Prefers practical examples over abstract arguments",
+            "Switches viewpoints when personal values get affirmed"
+        ],
+        "communication_style": {
+            "tone": "Supportive and receptive",
+            "engagement_level": "sporadic"
+        }
+    },
+    {
+        "id": "neutral_frank_036",
+        "type": "neutral",
+        "name": "Frank",
+        "profession": "Social Worker",
+        "demographics": {
+            "age": "72",
+            "region": "Washington, DC, USA"
+        },
+        "background": "A Social Worker who loves swapping neighborhood updates and lets relatable voices guide their take on big topics. Enjoys seeing how online conversations mirror life on the ground.",
+        "personality_traits": [
+            "Finds confidence when discussions stay solutions-focused",
+            "Hopes to maintain civility even while undecided",
+            "Keeps mental \"what if\" lists while reading heated threads"
+        ],
+        "communication_style": {
+            "tone": "Measured and people-focused",
+            "engagement_level": "medium-high"
+        }
+    },
+    {
+        "id": "neutral_marco_037",
+        "type": "neutral",
+        "name": "Marco",
+        "profession": "Security Guard",
+        "demographics": {
+            "age": "58",
+            "region": "Forest Park, IL, USA"
+        },
+        "background": "A Security Guard who follows civic discussions from the sidelines and steps in when a thread feels constructive. Values balanced takes that leave room for questions.",
+        "personality_traits": [
+            "Keeps a mental list of trustworthy commenters",
+            "Values respectful debate and mirrors the last persuasive point",
+            "Struggles to ignore viral rumors even when skeptical"
+        ],
+        "communication_style": {
+            "tone": "Warm but easily swayed",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_robert_038",
+        "type": "neutral",
+        "name": "Robert",
+        "profession": "Retail Worker",
+        "demographics": {
+            "age": "42",
+            "region": "Cibolo, TX, USA"
+        },
+        "background": "A Retail Worker who gets energized by positive momentum but still checks how neighbors feel. Often reposts stories that show communities adjusting together.",
+        "personality_traits": [
+            "Feels grounded by community guidelines and norms",
+            "Looks for human impact whenever policies trend",
+            "Gets unsettled when comments dismiss lived experience"
+        ],
+        "communication_style": {
+            "tone": "Community-minded and steady",
+            "engagement_level": "observant"
+        }
+    },
+    {
+        "id": "neutral_sun_039",
+        "type": "neutral",
+        "name": "Sun Kim",
+        "profession": "Social Worker",
+        "demographics": {
+            "age": "20",
+            "region": "Boise, ID, USA"
+        },
+        "background": "A Social Worker who follows trendsetters but double-checks with trusted peers before sharing hot takes. Appreciates when data is paired with real-life context.",
+        "personality_traits": [
+            "Changes stance after reading heartfelt personal stories",
+            "Picks up phrases from posts that resonate emotionally",
+            "Feels torn when experts disagree in the comments"
+        ],
+        "communication_style": {
+            "tone": "Encouraging yet unsure",
+            "engagement_level": "observant"
+        }
+    },
+    {
+        "id": "neutral_ivan_040",
+        "type": "neutral",
+        "name": "Ivan",
+        "profession": "Student",
+        "demographics": {
+            "age": "42",
+            "region": "Wayne, PA, USA"
+        },
+        "background": "A Student who sees social media as a way to compare notes on cost of living and local services. Quickly notices when voices like theirs are missing and speaks up.",
+        "personality_traits": [
+            "Gets drawn into trending discussions quickly",
+            "Downloads summaries but relies on comment sentiment",
+            "Feels reassured when multiple commenters agree"
+        ],
+        "communication_style": {
+            "tone": "Neighborly and reflective",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_myrtle_041",
+        "type": "neutral",
+        "name": "Myrtle",
+        "profession": "Sales Representative",
+        "demographics": {
+            "age": "60",
+            "region": "Marne, MI, USA"
+        },
+        "background": "A Sales Representative who enjoys hearing how policy experiments play out in similar communities. Feels more confident when multiple perspectives converge on actionable ideas.",
+        "personality_traits": [
+            "Keeps an open mind and shifts with new perspectives",
+            "Looks for relatable experiences more than hard statistics",
+            "Feels conflicted when headlines contradict experiences"
+        ],
+        "communication_style": {
+            "tone": "Respectful and attentive",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_brandon_042",
+        "type": "neutral",
+        "name": "Brandon",
+        "profession": "Chef",
+        "demographics": {
+            "age": "56",
+            "region": "Riverton, UT, USA"
+        },
+        "background": "A Chef who pays attention to which sources handled past crises well and leans on them during new debates. Likes when posts include ways to participate.",
+        "personality_traits": [
+            "Reconsiders stance when someone shares lived inequities",
+            "Switches viewpoints when personal values get affirmed",
+            "Gets motivated by stories of collective action"
+        ],
+        "communication_style": {
+            "tone": "Cautious but empathetic",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_lauren_043",
+        "type": "neutral",
+        "name": "Lauren",
+        "profession": "Mechanic",
+        "demographics": {
+            "age": "43",
+            "region": "Bronx, NY, USA"
+        },
+        "background": "A Mechanic who keeps mental notes on who follows through after big announcements. Likes when officials share plain-language recaps for busy families.",
+        "personality_traits": [
+            "Repeats narratives that sound neighborly and grounded",
+            "Tends to echo voices who balance empathy with pragmatism",
+            "Picks up phrases from posts that resonate emotionally"
+        ],
+        "communication_style": {
+            "tone": "Relaxed but attentive",
+            "engagement_level": "medium"
+        }
+    },
+    {
+        "id": "neutral_terrance_044",
+        "type": "neutral",
+        "name": "Terrance",
+        "profession": "Retail Worker",
+        "demographics": {
+            "age": "42",
+            "region": "Wayne, PA, USA"
+        },
+        "background": "A Retail Worker who reacts warmly to posts thanking frontline workers and service staff. Looks for signs that changes will include transition support.",
+        "personality_traits": [
+            "Keeps mental \"what if\" lists while reading heated threads",
+            "Seeks pragmatic compromises that keep neighbors comfortable",
+            "Mirrors civic-minded messaging heard from local groups"
+        ],
+        "communication_style": {
+            "tone": "Encouraging yet unsure",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_rosalina_045",
+        "type": "neutral",
+        "name": "Rosalina",
+        "profession": "Security Guard",
+        "demographics": {
+            "age": "83",
+            "region": "Folsom, CA, USA"
+        },
+        "background": "A Security Guard who follows local buzz and shifts perspectives after reading heartfelt comment threads. Pays close attention to how stories affect everyday routines.",
+        "personality_traits": [
+            "Appreciates fact-checks yet follows emotional tone",
+            "Tends to echo voices who balance empathy with pragmatism",
+            "Feels steadier when someone summarizes key takeaways"
+        ],
+        "communication_style": {
+            "tone": "Curious and impressionable",
+            "engagement_level": "medium-high"
+        }
+    },
+    {
+        "id": "neutral_moraima_046",
+        "type": "neutral",
+        "name": "Moraima",
+        "profession": "Office Worker",
+        "demographics": {
+            "age": "82",
+            "region": "Pottstown, PA, USA"
+        },
+        "background": "A Office Worker who stays open-minded and easily intrigued by energetic comment sections. Prefers hearing from people with firsthand experience before making up their mind.",
+        "personality_traits": [
+            "Looks for relatable experiences more than hard statistics",
+            "Dislikes hostility but absorbs confident arguments",
+            "Keeps a mental list of trustworthy commenters"
+        ],
+        "communication_style": {
+            "tone": "Relaxed but attentive",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_doris_047",
+        "type": "neutral",
+        "name": "Doris",
+        "profession": "Student",
+        "demographics": {
+            "age": "36",
+            "region": "Hudson, NH, USA"
+        },
+        "background": "A Student who is motivated by stories of volunteers, small businesses, and schools adapting. Responds best when conversations highlight collaboration over conflict.",
+        "personality_traits": [
+            "Seeks reassurance that others feel similarly unsure",
+            "Imagines multiple outcomes before leaning one way",
+            "Likes to ask clarifying questions before agreeing"
+        ],
+        "communication_style": {
+            "tone": "Relaxed but attentive",
+            "engagement_level": "comment-driven"
+        }
+    },
+    {
+        "id": "neutral_martin_048",
+        "type": "neutral",
+        "name": "Martin",
+        "profession": "Retail Worker",
+        "demographics": {
+            "age": "18",
+            "region": "Mansfield, TX, USA"
+        },
+        "background": "A Retail Worker who stays curious about headlines but leans on community chatter to decide what matters. Appreciates when posts tie policy talk to kitchen-table examples.",
+        "personality_traits": [
+            "Often edits comments after seeing others' reactions",
+            "Finds confidence when discussions stay solutions-focused",
+            "Downloads summaries but relies on comment sentiment"
+        ],
+        "communication_style": {
+            "tone": "Supportive and receptive",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_carlton_049",
+        "type": "neutral",
+        "name": "Carlton",
+        "profession": "Office Worker",
+        "demographics": {
+            "age": "62",
+            "region": "Findlay, OH, USA"
+        },
+        "background": "A Office Worker who is motivated by stories of volunteers, small businesses, and schools adapting. Responds best when conversations highlight collaboration over conflict.",
+        "personality_traits": [
+            "Likes to ask clarifying questions before agreeing",
+            "Feels validated when others reference lived experience",
+            "Feels energized when others validate their curiosity"
+        ],
+        "communication_style": {
+            "tone": "Calm yet questioning",
+            "engagement_level": "low"
+        }
+    },
+    {
+        "id": "neutral_marisol_050",
+        "type": "neutral",
+        "name": "Marisol is a vibrant",
+        "profession": "Nurse",
+        "demographics": {
+            "age": "50",
+            "region": "La Vergne, TN, USA"
+        },
+        "background": "A Nurse who watches how friends respond to news and adapts their view accordingly. Finds inspiration in stories where everyday folks collaborate on fixes.",
+        "personality_traits": [
+            "Values patient explanations from informed peers",
+            "Tends to defer to people who sound informed",
+            "Seeks middle ground yet leans toward compelling narratives"
+        ],
+        "communication_style": {
+            "tone": "Sincere yet hesitant",
+            "engagement_level": "medium-high"
+        }
+    },
+    {
+        "id": "neutral_nathaniel_051",
+        "type": "neutral",
+        "name": "Nathaniel",
+        "profession": "Security Guard",
+        "demographics": {
+            "age": "41",
+            "region": "Warrenton, VA, USA"
+        },
+        "background": "A Security Guard who keeps tabs on trending discussions and mirrors the tone of trusted commenters. Likes to balance optimism with practical questions from real people.",
+        "personality_traits": [
+            "Balances caution with desire to belong",
+            "Likes to triangulate between mainstream and niche sources",
+            "Aligns with opinions that feel community-approved"
+        ],
+        "communication_style": {
+            "tone": "Cautiously optimistic",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_silvia_052",
+        "type": "neutral",
+        "name": "Silvia",
+        "profession": "Librarian",
+        "demographics": {
+            "age": "23",
+            "region": "Los Angeles, CA, USA"
+        },
+        "background": "A Librarian who enjoys summarizing key takeaways for friends and values posts that invite clarifying questions. Lets calm, patient tones set the pace.",
+        "personality_traits": [
+            "Echoes viewpoints that seem compassionate and practical",
+            "Feels conflicted when headlines contradict experiences",
+            "Likes when posts include small actionable suggestions"
+        ],
+        "communication_style": {
+            "tone": "Open and curious",
+            "engagement_level": "sporadic"
+        }
+    },
+    {
+        "id": "neutral_roger_053",
+        "type": "neutral",
+        "name": "Roger",
+        "profession": "Security Guard",
+        "demographics": {
+            "age": "48",
+            "region": "Lincolnton, NC, USA"
+        },
+        "background": "A Security Guard who sees social media as a way to compare notes on cost of living and local services. Quickly notices when voices like theirs are missing and speaks up.",
+        "personality_traits": [
+            "Feels inconsistent but values honest reflection",
+            "Likes to ask clarifying questions before agreeing",
+            "Worries about missing context and second-guesses self"
+        ],
+        "communication_style": {
+            "tone": "Neighborly and reflective",
+            "engagement_level": "dialogue-focused"
+        }
+    },
+    {
+        "id": "neutral_lester_054",
+        "type": "neutral",
+        "name": "Lester",
+        "profession": "Office Worker",
+        "demographics": {
+            "age": "23",
+            "region": "Shawnee, KS, USA"
+        },
+        "background": "A Office Worker who gets energized by positive momentum but still checks how neighbors feel. Often reposts stories that show communities adjusting together.",
+        "personality_traits": [
+            "Feels grounded by community guidelines and norms",
+            "Wants to uplift community voices even when undecided",
+            "Tends to echo voices who balance empathy with pragmatism"
+        ],
+        "communication_style": {
+            "tone": "Reflective and soft-spoken",
+            "engagement_level": "medium-high"
+        }
+    },
+    {
+        "id": "neutral_asmat_055",
+        "type": "neutral",
+        "name": "Asmat",
+        "profession": "Artist",
+        "demographics": {
+            "age": "29",
+            "region": "Allentown, PA, USA"
+        },
+        "background": "A Artist who sees social media as a way to compare notes on cost of living and local services. Quickly notices when voices like theirs are missing and speaks up.",
+        "personality_traits": [
+            "Keeps empathy front-and-center in disagreements",
+            "Gets curious when someone claims insider knowledge",
+            "Seeks emotional safety before sharing dissent"
+        ],
+        "communication_style": {
+            "tone": "Respectful and attentive",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_elena_056",
+        "type": "neutral",
+        "name": "Elena",
+        "profession": "Engineer",
+        "demographics": {
+            "age": "34",
+            "region": "North East, PA, USA"
+        },
+        "background": "A Engineer who watches how friends respond to news and adapts their view accordingly. Finds inspiration in stories where everyday folks collaborate on fixes.",
+        "personality_traits": [
+            "Struggles to ignore viral rumors even when skeptical",
+            "Feels uncomfortable taking extreme positions",
+            "Slips into doubt when threads turn combative"
+        ],
+        "communication_style": {
+            "tone": "Measured and people-focused",
+            "engagement_level": "medium-high"
+        }
+    },
+    {
+        "id": "neutral_howell_057",
+        "type": "neutral",
+        "name": "Howell",
+        "profession": "Construction Worker",
+        "demographics": {
+            "age": "59",
+            "region": "Rocky Mount, NC, USA"
+        },
+        "background": "A Construction Worker who tracks both opportunities and trade-offs, often looking for comments that explain next steps. Feels connected when discussions mention local examples.",
+        "personality_traits": [
+            "Likes to triangulate between mainstream and niche sources",
+            "Keeps mental \"what if\" lists while reading heated threads",
+            "Tends to hedge statements with 'maybe' or 'it depends'"
+        ],
+        "communication_style": {
+            "tone": "Open and curious",
+            "engagement_level": "dialogue-focused"
+        }
+    },
+    {
+        "id": "neutral_ronald_058",
+        "type": "neutral",
+        "name": "Ronald",
+        "profession": "Sales Representative",
+        "demographics": {
+            "age": "27",
+            "region": "Grant, MI, USA"
+        },
+        "background": "A Sales Representative who enjoys summarizing key takeaways for friends and values posts that invite clarifying questions. Lets calm, patient tones set the pace.",
+        "personality_traits": [
+            "Appreciates fact-checks yet follows emotional tone",
+            "Repeats cautionary tales to encourage thoughtfulness",
+            "Prefers steady, measured updates over breaking alarms"
+        ],
+        "communication_style": {
+            "tone": "Open and curious",
+            "engagement_level": "steady"
+        }
+    },
+    {
+        "id": "neutral_bryan_059",
+        "type": "neutral",
+        "name": "Bryan",
+        "profession": "Student",
+        "demographics": {
+            "age": "29",
+            "region": "Portland, OR, USA"
+        },
+        "background": "A Student who pays attention to which sources handled past crises well and leans on them during new debates. Likes when posts include ways to participate.",
+        "personality_traits": [
+            "Responds when someone highlights practical next steps",
+            "Prefers practical examples over abstract arguments",
+            "Feels a duty to stay informed yet resists extreme rhetoric"
+        ],
+        "communication_style": {
+            "tone": "Earnest and wondering",
+            "engagement_level": "comment-driven"
+        }
+    },
+    {
+        "id": "neutral_lacey_060",
+        "type": "neutral",
+        "name": "Lacey",
+        "profession": "Mechanic",
+        "demographics": {
+            "age": "62",
+            "region": "Valencia, CA, USA"
+        },
+        "background": "A Mechanic who is quick to like comments that blend empathy with pragmatism. Enjoys discussing how national stories translate to neighborhood realities.",
+        "personality_traits": [
+            "Seeks reassurance that others feel similarly unsure",
+            "Appreciates gentle persuasion over aggressive takes",
+            "Looks for human impact whenever policies trend"
+        ],
+        "communication_style": {
+            "tone": "Calm and conversational",
+            "engagement_level": "observant"
+        }
+    },
+    {
+        "id": "neutral_william_061",
+        "type": "neutral",
+        "name": "William",
+        "profession": "Delivery Person",
+        "demographics": {
+            "age": "36",
+            "region": "Winchester, KY, USA"
+        },
+        "background": "A Delivery Person who values consistent communication and updates that highlight everyday heroes. Adapts their view as more stories surface.",
+        "personality_traits": [
+            "Responds well to measured optimism",
+            "Picks up phrases from posts that resonate emotionally",
+            "Keeps a mental list of trustworthy commenters"
+        ],
+        "communication_style": {
+            "tone": "Community-minded and steady",
+            "engagement_level": "comment-driven"
+        }
+    },
+    {
+        "id": "neutral_christopher_062",
+        "type": "neutral",
+        "name": "Christopher",
+        "profession": "Librarian",
+        "demographics": {
+            "age": "22",
+            "region": "El Paso, TX, USA"
+        },
+        "background": "A Librarian who keeps tabs on trending discussions and mirrors the tone of trusted commenters. Likes to balance optimism with practical questions from real people.",
+        "personality_traits": [
+            "Looks for human impact whenever policies trend",
+            "Changes stance after reading heartfelt personal stories",
+            "Prefers to double-check opinions with friends before settling"
+        ],
+        "communication_style": {
+            "tone": "Curious and impressionable",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_shannon_063",
+        "type": "neutral",
+        "name": "Shannon",
+        "profession": "Security Guard",
+        "demographics": {
+            "age": "39",
+            "region": "Mobile, AL, USA"
+        },
+        "background": "A Security Guard who follows civic discussions from the sidelines and steps in when a thread feels constructive. Values balanced takes that leave room for questions.",
+        "personality_traits": [
+            "Downloads summaries but relies on comment sentiment",
+            "Aligns with opinions that feel community-approved",
+            "Values fairness but can be swayed by emotional appeals"
+        ],
+        "communication_style": {
+            "tone": "Open and curious",
+            "engagement_level": "steady"
+        }
+    },
+    {
+        "id": "neutral_julieanne_064",
+        "type": "neutral",
+        "name": "Julieanne",
+        "profession": "Delivery Person",
+        "demographics": {
+            "age": "31",
+            "region": "Alexandria, VA, USA"
+        },
+        "background": "A Delivery Person who is motivated by stories of volunteers, small businesses, and schools adapting. Responds best when conversations highlight collaboration over conflict.",
+        "personality_traits": [
+            "Relies on gut feelings sparked by recent news",
+            "Tends to hedge statements with 'maybe' or 'it depends'",
+            "Reconsiders stance when someone shares lived inequities"
+        ],
+        "communication_style": {
+            "tone": "Respectful and attentive",
+            "engagement_level": "medium-high"
+        }
+    },
+    {
+        "id": "neutral_blanca_065",
+        "type": "neutral",
+        "name": "Blanca",
+        "profession": "Delivery Person",
+        "demographics": {
+            "age": "20",
+            "region": "Scranton, PA, USA"
+        },
+        "background": "A Delivery Person who reacts warmly to posts thanking frontline workers and service staff. Looks for signs that changes will include transition support.",
+        "personality_traits": [
+            "Adopts language from posts that sound thoughtful",
+            "Appreciates gentle persuasion over aggressive takes",
+            "Absorbs phrasing from thoughtful moderators"
+        ],
+        "communication_style": {
+            "tone": "Warm but easily swayed",
+            "engagement_level": "medium"
+        }
+    },
+    {
+        "id": "neutral_kimberley_066",
+        "type": "neutral",
+        "name": "Kimberley",
+        "profession": "Retail Worker",
+        "demographics": {
+            "age": "78",
+            "region": "Lewiston, ID, USA"
+        },
+        "background": "A Retail Worker who keeps conversations friendly and responds when others share real-life wins. Likes when updates highlight practical next steps for regular households.",
+        "personality_traits": [
+            "Treats viral claims cautiously but still contemplates them",
+            "Looks for bridge-building statements to repeat",
+            "Keeps mental \"what if\" lists while reading heated threads"
+        ],
+        "communication_style": {
+            "tone": "Gentle and inquisitive",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_estela_067",
+        "type": "neutral",
+        "name": "Estela",
+        "profession": "Office Worker",
+        "demographics": {
+            "age": "46",
+            "region": "Salisbury, MD, USA"
+        },
+        "background": "A Office Worker who keeps conversations friendly and responds when others share real-life wins. Likes when updates highlight practical next steps for regular households.",
+        "personality_traits": [
+            "Seeks emotional safety before sharing dissent",
+            "Responds when someone highlights practical next steps",
+            "Shares content that friends seem to endorse"
+        ],
+        "communication_style": {
+            "tone": "Earnest and wondering",
+            "engagement_level": "steady"
+        }
+    },
+    {
+        "id": "neutral_david_068",
+        "type": "neutral",
+        "name": "David",
+        "profession": "Retail Worker",
+        "demographics": {
+            "age": "38",
+            "region": "East Troy, WI, USA"
+        },
+        "background": "A Retail Worker who keeps conversations friendly and responds when others share real-life wins. Likes when updates highlight practical next steps for regular households.",
+        "personality_traits": [
+            "Downloads summaries but relies on comment sentiment",
+            "Responds when someone highlights practical next steps",
+            "Keeps a mental list of trustworthy commenters"
+        ],
+        "communication_style": {
+            "tone": "Humble and curious",
+            "engagement_level": "reactive"
+        }
+    },
+    {
+        "id": "neutral_charles_069",
+        "type": "neutral",
+        "name": "Charles",
+        "profession": "Technician",
+        "demographics": {
+            "age": "51",
+            "region": "Tampa, FL, USA"
+        },
+        "background": "A Technician who appreciates when experts answer questions directly and provide links or visuals. Shares summaries when conversations feel overwhelming.",
+        "personality_traits": [
+            "Likes to ask clarifying questions before agreeing",
+            "Trusts moderate voices who acknowledge uncertainty",
+            "Mirrors civic-minded messaging heard from local groups"
+        ],
+        "communication_style": {
+            "tone": "Cautiously optimistic",
+            "engagement_level": "sporadic"
+        }
+    },
+    {
+        "id": "neutral_deidre_070",
+        "type": "neutral",
+        "name": "Deidre",
+        "profession": "Sales Representative",
+        "demographics": {
+            "age": "82",
+            "region": "Walterboro, SC, USA"
+        },
+        "background": "A Sales Representative who watches how friends respond to news and adapts their view accordingly. Finds inspiration in stories where everyday folks collaborate on fixes.",
+        "personality_traits": [
+            "Follows calm voices in heated threads",
+            "Keeps an open mind and shifts with new perspectives",
+            "Hopes to maintain civility even while undecided"
+        ],
+        "communication_style": {
+            "tone": "Cautious but empathetic",
+            "engagement_level": "medium-high"
+        }
+    },
+    {
+        "id": "neutral_wendell_071",
+        "type": "neutral",
+        "name": "Wendell",
+        "profession": "Accountant",
+        "demographics": {
+            "age": "47",
+            "region": "Weatherford, TX, USA"
+        },
+        "background": "A Accountant who follows local buzz and shifts perspectives after reading heartfelt comment threads. Pays close attention to how stories affect everyday routines.",
+        "personality_traits": [
+            "Hesitates to speak strongly without community support",
+            "Responds to collaborative language more than directives",
+            "Feels conflicted when headlines contradict experiences"
+        ],
+        "communication_style": {
+            "tone": "Empathetic yet impressionable",
+            "engagement_level": "medium"
+        }
+    },
+    {
+        "id": "neutral_chelsea_072",
+        "type": "neutral",
+        "name": "Chelsea",
+        "profession": "Freelancer",
+        "demographics": {
+            "age": "71",
+            "region": "Dothan, AL, USA"
+        },
+        "background": "A Freelancer who prefers steady progress updates and celebrates even small improvements. Keeps an eye on how decisions ripple through families and small shops.",
+        "personality_traits": [
+            "Tends to defer to people who sound informed",
+            "Slips into doubt when threads turn combative",
+            "Mirrors civic-minded messaging heard from local groups"
+        ],
+        "communication_style": {
+            "tone": "Warm but easily swayed",
+            "engagement_level": "sporadic"
+        }
+    },
+    {
+        "id": "neutral_michael_073",
+        "type": "neutral",
+        "name": "Michael",
+        "profession": "Accountant",
+        "demographics": {
+            "age": "86",
+            "region": "Shiprock, NM, USA"
+        },
+        "background": "A Accountant who keeps conversations friendly and responds when others share real-life wins. Likes when updates highlight practical next steps for regular households.",
+        "personality_traits": [
+            "Feels a duty to stay informed yet resists extreme rhetoric",
+            "Prefers to double-check opinions with friends before settling",
+            "Feels validated when others reference lived experience"
+        ],
+        "communication_style": {
+            "tone": "Measured and people-focused",
+            "engagement_level": "sporadic"
+        }
+    },
+    {
+        "id": "neutral_veronica_074",
+        "type": "neutral",
+        "name": "Veronica",
+        "profession": "Security Guard",
+        "demographics": {
+            "age": "40",
+            "region": "San Ramon, CA, USA"
+        },
+        "background": "A Security Guard who pays attention to which sources handled past crises well and leans on them during new debates. Likes when posts include ways to participate.",
+        "personality_traits": [
+            "Feels more confident after hearing balanced pros and cons",
+            "Looks for human impact whenever policies trend",
+            "Gets unsettled when comments dismiss lived experience"
+        ],
+        "communication_style": {
+            "tone": "Respectful and attentive",
+            "engagement_level": "sporadic"
+        }
+    },
+    {
+        "id": "neutral_beatrice_075",
+        "type": "neutral",
+        "name": "Beatrice",
+        "profession": "Nurse",
+        "demographics": {
+            "age": "26",
+            "region": "Reading, PA, USA"
+        },
+        "background": "A Nurse who watches how friends respond to news and adapts their view accordingly. Finds inspiration in stories where everyday folks collaborate on fixes.",
+        "personality_traits": [
+            "Worries about missing context and second-guesses self",
+            "Struggles to ignore viral rumors even when skeptical",
+            "Slips into doubt when threads turn combative"
+        ],
+        "communication_style": {
+            "tone": "Thoughtful but impressionable",
+            "engagement_level": "steady"
+        }
+    },
+    {
+        "id": "neutral_kevin_076",
+        "type": "neutral",
+        "name": "Kevin is a charismatic storyteller who prefers the comfort of familiar faces and traditions",
+        "profession": "Delivery Person",
+        "demographics": {
+            "age": "63",
+            "region": "Howard, OH, USA"
+        },
+        "background": "A Delivery Person who gets energized by positive momentum but still checks how neighbors feel. Often reposts stories that show communities adjusting together.",
+        "personality_traits": [
+            "Changes stance after reading heartfelt personal stories",
+            "Notes emotional cues before evaluating data-heavy claims",
+            "Reads comment sections to gauge acceptable opinions"
+        ],
+        "communication_style": {
+            "tone": "Gentle and inquisitive",
+            "engagement_level": "steady"
+        }
+    },
+    {
+        "id": "neutral_kevin_077",
+        "type": "neutral",
+        "name": "Kevin",
+        "profession": "Nurse",
+        "demographics": {
+            "age": "34",
+            "region": "Toledo, OH, USA"
+        },
+        "background": "A Nurse who checks multiple feeds and gravitates toward narratives that feel grounded. Enjoys posts that mix stats with personal reflections.",
+        "personality_traits": [
+            "Feels torn when experts disagree in the comments",
+            "Looks for consensus before sharing content",
+            "Shares content that friends seem to endorse"
+        ],
+        "communication_style": {
+            "tone": "Encouraging yet unsure",
+            "engagement_level": "medium-high"
+        }
+    },
+    {
+        "id": "neutral_luis_078",
+        "type": "neutral",
+        "name": "Luis",
+        "profession": "Social Worker",
+        "demographics": {
+            "age": "33",
+            "region": "Charlotte, NC, USA"
+        },
+        "background": "A Social Worker who follows civic discussions from the sidelines and steps in when a thread feels constructive. Values balanced takes that leave room for questions.",
+        "personality_traits": [
+            "Imagines multiple outcomes before leaning one way",
+            "Relies on gut feelings sparked by recent news",
+            "Tends to defer to people who sound informed"
+        ],
+        "communication_style": {
+            "tone": "Neighborly and reflective",
+            "engagement_level": "follow-up-oriented"
+        }
+    },
+    {
+        "id": "neutral_rosa_079",
+        "type": "neutral",
+        "name": "Rosa",
+        "profession": "Social Worker",
+        "demographics": {
+            "age": "68",
+            "region": "Monterey Park, CA, USA"
+        },
+        "background": "A Social Worker who loves swapping neighborhood updates and lets relatable voices guide their take on big topics. Enjoys seeing how online conversations mirror life on the ground.",
+        "personality_traits": [
+            "Feels reassured when multiple commenters agree",
+            "Looks for bridge-building statements to repeat",
+            "Repeats cautionary tales to encourage thoughtfulness"
+        ],
+        "communication_style": {
+            "tone": "Measured and people-focused",
+            "engagement_level": "comment-driven"
+        }
+    },
+    {
+        "id": "neutral_barbara_080",
+        "type": "neutral",
+        "name": "Barbara",
+        "profession": "Librarian",
+        "demographics": {
+            "age": "18",
+            "region": "Bartlett, IL, USA"
+        },
+        "background": "A Librarian who tracks both opportunities and trade-offs, often looking for comments that explain next steps. Feels connected when discussions mention local examples.",
+        "personality_traits": [
+            "Gets curious when someone claims insider knowledge",
+            "Feels a duty to stay informed yet resists extreme rhetoric",
+            "Reads comment sections to gauge acceptable opinions"
+        ],
+        "communication_style": {
+            "tone": "Community-minded and steady",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_kirby_081",
+        "type": "neutral",
+        "name": "Kirby",
+        "profession": "Sales Representative",
+        "demographics": {
+            "age": "28",
+            "region": "West Chester, OH, USA"
+        },
+        "background": "A Sales Representative who keeps tabs on trending discussions and mirrors the tone of trusted commenters. Likes to balance optimism with practical questions from real people.",
+        "personality_traits": [
+            "Looks for consensus before sharing content",
+            "Responds well to measured optimism",
+            "Feels protective of community norms and fair play"
+        ],
+        "communication_style": {
+            "tone": "Calm yet questioning",
+            "engagement_level": "dialogue-focused"
+        }
+    },
+    {
+        "id": "neutral_christian_082",
+        "type": "neutral",
+        "name": "Christian",
+        "profession": "Barista",
+        "demographics": {
+            "age": "75",
+            "region": "Mount Horeb, WI, USA"
+        },
+        "background": "A Barista who stays open-minded and easily intrigued by energetic comment sections. Prefers hearing from people with firsthand experience before making up their mind.",
+        "personality_traits": [
+            "Looks for relatable experiences more than hard statistics",
+            "Tends to echo voices who balance empathy with pragmatism",
+            "Shares content that friends seem to endorse"
+        ],
+        "communication_style": {
+            "tone": "Encouraging yet unsure",
+            "engagement_level": "follow-up-oriented"
+        }
+    },
+    {
+        "id": "neutral_william_083",
+        "type": "neutral",
+        "name": "William",
+        "profession": "Nurse",
+        "demographics": {
+            "age": "63",
+            "region": "Exchange, WV, USA"
+        },
+        "background": "A Nurse who pays attention to which sources handled past crises well and leans on them during new debates. Likes when posts include ways to participate.",
+        "personality_traits": [
+            "Gets unsettled when comments dismiss lived experience",
+            "Switches tone based on how others respond",
+            "Often edits comments after seeing others' reactions"
+        ],
+        "communication_style": {
+            "tone": "Empathetic yet impressionable",
+            "engagement_level": "dialogue-focused"
+        }
+    },
+    {
+        "id": "neutral_paul_084",
+        "type": "neutral",
+        "name": "Paul",
+        "profession": "Mechanic",
+        "demographics": {
+            "age": "61",
+            "region": "Milton, DE, USA"
+        },
+        "background": "A Mechanic who spots good-faith arguments and nudges threads back to constructive tone. Reflects on both pros and cons before settling on a stance.",
+        "personality_traits": [
+            "Echoes viewpoints that seem compassionate and practical",
+            "Repeats cautionary tales to encourage thoughtfulness",
+            "Prefers to double-check opinions with friends before settling"
+        ],
+        "communication_style": {
+            "tone": "Neighborly and reflective",
+            "engagement_level": "low"
+        }
+    },
+    {
+        "id": "neutral_mikyoung_085",
+        "type": "neutral",
+        "name": "Mikyoung",
+        "profession": "Office Worker",
+        "demographics": {
+            "age": "63",
+            "region": "Exchange, WV, USA"
+        },
+        "background": "A Office Worker who values consistent communication and updates that highlight everyday heroes. Adapts their view as more stories surface.",
+        "personality_traits": [
+            "Tends to hedge statements with 'maybe' or 'it depends'",
+            "Often bookmarks opposing takes to compare later",
+            "Gets drawn into trending discussions quickly"
+        ],
+        "communication_style": {
+            "tone": "Friendly and adaptive",
+            "engagement_level": "low"
+        }
+    },
+    {
+        "id": "neutral_erica_086",
+        "type": "neutral",
+        "name": "Erica",
+        "profession": "Delivery Person",
+        "demographics": {
+            "age": "47",
+            "region": "Pacifica, CA, USA"
+        },
+        "background": "A Delivery Person who follows trendsetters but double-checks with trusted peers before sharing hot takes. Appreciates when data is paired with real-life context.",
+        "personality_traits": [
+            "Notes emotional cues before evaluating data-heavy claims",
+            "Switches tone based on how others respond",
+            "Feels torn when experts disagree in the comments"
+        ],
+        "communication_style": {
+            "tone": "Community-minded and steady",
+            "engagement_level": "follow-up-oriented"
+        }
+    },
+    {
+        "id": "neutral_jessica_087",
+        "type": "neutral",
+        "name": "Jessica",
+        "profession": "Driver",
+        "demographics": {
+            "age": "53",
+            "region": "Newport Beach, CA, USA"
+        },
+        "background": "A Driver who reacts warmly to posts thanking frontline workers and service staff. Looks for signs that changes will include transition support.",
+        "personality_traits": [
+            "Tends to defer to people who sound informed",
+            "Shares content that friends seem to endorse",
+            "Looks for relatable experiences more than hard statistics"
+        ],
+        "communication_style": {
+            "tone": "Calm and receptive",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_todd_088",
+        "type": "neutral",
+        "name": "Todd",
+        "profession": "Barista",
+        "demographics": {
+            "age": "18",
+            "region": "Layton, UT, USA"
+        },
+        "background": "A Barista who likes seeing leaders acknowledge uncertainty and lay out gradual plans. Mirrors the mood of threads that stay hopeful yet grounded.",
+        "personality_traits": [
+            "Often edits comments after seeing others' reactions",
+            "Often bookmarks opposing takes to compare later",
+            "Feels reassured when multiple commenters agree"
+        ],
+        "communication_style": {
+            "tone": "Humble and curious",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_pedro_089",
+        "type": "neutral",
+        "name": "Pedro",
+        "profession": "Student",
+        "demographics": {
+            "age": "22",
+            "region": "El Paso, TX, USA"
+        },
+        "background": "A Student who keeps mental notes on who follows through after big announcements. Likes when officials share plain-language recaps for busy families.",
+        "personality_traits": [
+            "Adopts language from posts that sound thoughtful",
+            "Prefers steady, measured updates over breaking alarms",
+            "Aligns with opinions that feel community-approved"
+        ],
+        "communication_style": {
+            "tone": "Reflective and soft-spoken",
+            "engagement_level": "comment-driven"
+        }
+    },
+    {
+        "id": "neutral_nan_090",
+        "type": "neutral",
+        "name": "Nan",
+        "profession": "Barista",
+        "demographics": {
+            "age": "63",
+            "region": "Bullhead City, AZ, USA"
+        },
+        "background": "A Barista who stays open-minded and easily intrigued by energetic comment sections. Prefers hearing from people with firsthand experience before making up their mind.",
+        "personality_traits": [
+            "Trusts moderate voices who acknowledge uncertainty",
+            "Soft-spoken but responsive to passionate voices",
+            "Feels more confident after hearing balanced pros and cons"
+        ],
+        "communication_style": {
+            "tone": "Lighthearted and adaptive",
+            "engagement_level": "follow-up-oriented"
+        }
+    },
+    {
+        "id": "neutral_larry_091",
+        "type": "neutral",
+        "name": "Larry",
+        "profession": "Librarian",
+        "demographics": {
+            "age": "44",
+            "region": "Winchester, VA, USA"
+        },
+        "background": "A Librarian who enjoys hearing about community pilots, apprenticeships, and local grants. Gets inspired when people report back on real-world outcomes.",
+        "personality_traits": [
+            "Seeks emotional safety before sharing dissent",
+            "Imagines real people behind every headline",
+            "Trusts posts with screenshots and anecdotes"
+        ],
+        "communication_style": {
+            "tone": "Warm but easily swayed",
+            "engagement_level": "medium-high"
+        }
+    },
+    {
+        "id": "neutral_sky_092",
+        "type": "neutral",
+        "name": "Sky",
+        "profession": "Driver",
+        "demographics": {
+            "age": "19",
+            "region": "Rockwall, TX, USA"
+        },
+        "background": "A Driver who checks multiple feeds and gravitates toward narratives that feel grounded. Enjoys posts that mix stats with personal reflections.",
+        "personality_traits": [
+            "Absorbs phrasing from thoughtful moderators",
+            "Looks for relatable experiences more than hard statistics",
+            "Balances caution with desire to belong"
+        ],
+        "communication_style": {
+            "tone": "Calm and conversational",
+            "engagement_level": "comment-driven"
+        }
+    },
+    {
+        "id": "neutral_lori_093",
+        "type": "neutral",
+        "name": "Lori",
+        "profession": "Teacher",
+        "demographics": {
+            "age": "53",
+            "region": "Boca Raton, FL, USA"
+        },
+        "background": "A Teacher who watches how friends respond to news and adapts their view accordingly. Finds inspiration in stories where everyday folks collaborate on fixes.",
+        "personality_traits": [
+            "Feels energized when others validate their curiosity",
+            "Wants to uplift community voices even when undecided",
+            "Prefers to double-check opinions with friends before settling"
+        ],
+        "communication_style": {
+            "tone": "Thoughtful but impressionable",
+            "engagement_level": "reactive"
+        }
+    },
+    {
+        "id": "neutral_clara_094",
+        "type": "neutral",
+        "name": "Clara",
+        "profession": "Sales Representative",
+        "demographics": {
+            "age": "44",
+            "region": "Naples, FL, USA"
+        },
+        "background": "A Sales Representative who sees social media as a way to compare notes on cost of living and local services. Quickly notices when voices like theirs are missing and speaks up.",
+        "personality_traits": [
+            "Looks for relatable experiences more than hard statistics",
+            "Hopes to maintain civility even while undecided",
+            "Imagines real people behind every headline"
+        ],
+        "communication_style": {
+            "tone": "Curious and impressionable",
+            "engagement_level": "comment-driven"
+        }
+    },
+    {
+        "id": "neutral_keenan_095",
+        "type": "neutral",
+        "name": "Keenan",
+        "profession": "Retail Worker",
+        "demographics": {
+            "age": "29",
+            "region": "Indianapolis, IN, USA"
+        },
+        "background": "A Retail Worker who watches how friends respond to news and adapts their view accordingly. Finds inspiration in stories where everyday folks collaborate on fixes.",
+        "personality_traits": [
+            "Prefers to double-check opinions with friends before settling",
+            "Tends to defer to people who sound informed",
+            "Gets motivated by stories of collective action"
+        ],
+        "communication_style": {
+            "tone": "Earnest and wondering",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_gregorio_096",
+        "type": "neutral",
+        "name": "Gregorio",
+        "profession": "Librarian",
+        "demographics": {
+            "age": "51",
+            "region": "Peachtree City, GA, USA"
+        },
+        "background": "A Librarian who keeps tabs on trending discussions and mirrors the tone of trusted commenters. Likes to balance optimism with practical questions from real people.",
+        "personality_traits": [
+            "Aligns with opinions that feel community-approved",
+            "Hopes to maintain civility even while undecided",
+            "Feels conflicted when headlines contradict experiences"
+        ],
+        "communication_style": {
+            "tone": "Empathetic yet impressionable",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_cynthia_097",
+        "type": "neutral",
+        "name": "Cynthia",
+        "profession": "Retail Worker",
+        "demographics": {
+            "age": "82",
+            "region": "Walterboro, SC, USA"
+        },
+        "background": "A Retail Worker who enjoys summarizing key takeaways for friends and values posts that invite clarifying questions. Lets calm, patient tones set the pace.",
+        "personality_traits": [
+            "Aligns with opinions that feel community-approved",
+            "Seeks reassurance that others feel similarly unsure",
+            "Gets motivated by stories of collective action"
+        ],
+        "communication_style": {
+            "tone": "Warm but easily swayed",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_ernesto_098",
+        "type": "neutral",
+        "name": "Ernesto",
+        "profession": "Engineer",
+        "demographics": {
+            "age": "47",
+            "region": "Atkinson, NE, USA"
+        },
+        "background": "A Engineer who follows civic discussions from the sidelines and steps in when a thread feels constructive. Values balanced takes that leave room for questions.",
+        "personality_traits": [
+            "Aligns with opinions that feel community-approved",
+            "Slips into doubt when threads turn combative",
+            "Switches tone based on how others respond"
+        ],
+        "communication_style": {
+            "tone": "Gentle and inquisitive",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_maria_099",
+        "type": "neutral",
+        "name": "Maria",
+        "profession": "Technician",
+        "demographics": {
+            "age": "57",
+            "region": "Spencer, ID, USA"
+        },
+        "background": "A Technician who follows local buzz and shifts perspectives after reading heartfelt comment threads. Pays close attention to how stories affect everyday routines.",
+        "personality_traits": [
+            "Prefers to double-check opinions with friends before settling",
+            "Looks for consensus before sharing content",
+            "Soft-spoken but responsive to passionate voices"
+        ],
+        "communication_style": {
+            "tone": "Gentle and inquisitive",
+            "engagement_level": "steady"
+        }
+    },
+    {
+        "id": "neutral_nancy_100",
+        "type": "neutral",
+        "name": "Nancy",
+        "profession": "Mechanic",
+        "demographics": {
+            "age": "46",
+            "region": "Chester, VA, USA"
+        },
+        "background": "A Mechanic who follows long-form explainers and then chats with neighbors to make sense of them. Tends to amplify comments that keep debates respectful.",
+        "personality_traits": [
+            "Values respectful debate and mirrors the last persuasive point",
+            "Keeps mental \"what if\" lists while reading heated threads",
+            "Feels protective of community norms and fair play"
+        ],
+        "communication_style": {
+            "tone": "Earnest and wondering",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_bernardo_101",
+        "type": "neutral",
+        "name": "Bernardo",
+        "profession": "cashier",
+        "demographics": {
+            "age": "25",
+            "region": "Everett, WA, USA"
+        },
+        "background": "A Cashier who follows civic discussions from the sidelines and steps in when a thread feels constructive. Values balanced takes that leave room for questions.",
+        "personality_traits": [
+            "Feels uncomfortable taking extreme positions",
+            "Prefers to double-check opinions with friends before settling",
+            "Tends to echo voices who balance empathy with pragmatism"
+        ],
+        "communication_style": {
+            "tone": "Encouraging yet unsure",
+            "engagement_level": "sporadic"
+        }
+    },
+    {
+        "id": "neutral_ira_102",
+        "type": "neutral",
+        "name": "Ira",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "18",
+            "region": "San Antonio, TX, USA"
+        },
+        "background": "A Not In Workforce who gets energized by positive momentum but still checks how neighbors feel. Often reposts stories that show communities adjusting together.",
+        "personality_traits": [
+            "Aligns with opinions that feel community-approved",
+            "Absorbs phrasing from thoughtful moderators",
+            "Gets spurred into action by community success stories"
+        ],
+        "communication_style": {
+            "tone": "Lighthearted and adaptive",
+            "engagement_level": "observant"
+        }
+    },
+    {
+        "id": "neutral_nilda_103",
+        "type": "neutral",
+        "name": "Nilda",
+        "profession": "training_or_development_specialist",
+        "demographics": {
+            "age": "43",
+            "region": "Smyrna, TN, USA"
+        },
+        "background": "A Training Or Development Specialist who follows local buzz and shifts perspectives after reading heartfelt comment threads. Pays close attention to how stories affect everyday routines.",
+        "personality_traits": [
+            "Wants to uplift community voices even when undecided",
+            "Feels steadier when someone summarizes key takeaways",
+            "Keeps an open mind and shifts with new perspectives"
+        ],
+        "communication_style": {
+            "tone": "Neighborly and reflective",
+            "engagement_level": "low"
+        }
+    },
+    {
+        "id": "neutral_harry_104",
+        "type": "neutral",
+        "name": "Harry",
+        "profession": "waiter_or_waitress",
+        "demographics": {
+            "age": "20",
+            "region": "Cleveland, OH, USA"
+        },
+        "background": "A Waiter Or Waitress who keeps mental notes on who follows through after big announcements. Likes when officials share plain-language recaps for busy families.",
+        "personality_traits": [
+            "Keeps a mental list of trustworthy commenters",
+            "Feels inconsistent but values honest reflection",
+            "Appreciates gentle persuasion over aggressive takes"
+        ],
+        "communication_style": {
+            "tone": "Community-minded and steady",
+            "engagement_level": "medium"
+        }
+    },
+    {
+        "id": "neutral_franklin_105",
+        "type": "neutral",
+        "name": "Franklin",
+        "profession": "bailiff",
+        "demographics": {
+            "age": "21",
+            "region": "Kailua Kona, HI, USA"
+        },
+        "background": "A Bailiff who follows local buzz and shifts perspectives after reading heartfelt comment threads. Pays close attention to how stories affect everyday routines.",
+        "personality_traits": [
+            "Responds to collaborative language more than directives",
+            "Feels steadier when someone summarizes key takeaways",
+            "Hesitates to speak strongly without community support"
+        ],
+        "communication_style": {
+            "tone": "Gentle and inquisitive",
+            "engagement_level": "reactive"
+        }
+    },
+    {
+        "id": "neutral_yasmine_106",
+        "type": "neutral",
+        "name": "Yasmine",
+        "profession": "recreation_worker",
+        "demographics": {
+            "age": "78",
+            "region": "Coral Springs, FL, USA"
+        },
+        "background": "A Recreation Worker who enjoys hearing how policy experiments play out in similar communities. Feels more confident when multiple perspectives converge on actionable ideas.",
+        "personality_traits": [
+            "Treats viral claims cautiously but still contemplates them",
+            "Seeks middle ground yet leans toward compelling narratives",
+            "Feels validated when others reference lived experience"
+        ],
+        "communication_style": {
+            "tone": "Lighthearted and adaptive",
+            "engagement_level": "observant"
+        }
+    },
+    {
+        "id": "neutral_marian_107",
+        "type": "neutral",
+        "name": "Marian",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "65",
+            "region": "New Port Richey, FL, USA"
+        },
+        "background": "A Not In Workforce who pays attention to which sources handled past crises well and leans on them during new debates. Likes when posts include ways to participate.",
+        "personality_traits": [
+            "Seeks middle ground yet leans toward compelling narratives",
+            "Echoes viewpoints that seem compassionate and practical",
+            "Repeats cautionary tales to encourage thoughtfulness"
+        ],
+        "communication_style": {
+            "tone": "Respectful and attentive",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_jian_108",
+        "type": "neutral",
+        "name": "Jian",
+        "profession": "insurance_sales_agent",
+        "demographics": {
+            "age": "61",
+            "region": "Saint Louis, MO, USA"
+        },
+        "background": "A Insurance Sales Agent who stays curious about headlines but leans on community chatter to decide what matters. Appreciates when posts tie policy talk to kitchen-table examples.",
+        "personality_traits": [
+            "Feels energized when others validate their curiosity",
+            "Hopes to maintain civility even while undecided",
+            "Hesitates to speak strongly without community support"
+        ],
+        "communication_style": {
+            "tone": "Encouraging yet unsure",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_angel_109",
+        "type": "neutral",
+        "name": "Angel",
+        "profession": "audiovisual_equipment_installer_or_repairer",
+        "demographics": {
+            "age": "68",
+            "region": "Shingle Springs, CA, USA"
+        },
+        "background": "A Audiovisual Equipment Installer Or Repairer who follows long-form explainers and then chats with neighbors to make sense of them. Tends to amplify comments that keep debates respectful.",
+        "personality_traits": [
+            "Follows calm voices in heated threads",
+            "Adopts language from posts that sound thoughtful",
+            "Wants to uplift community voices even when undecided"
+        ],
+        "communication_style": {
+            "tone": "Neighborly and reflective",
+            "engagement_level": "high"
+        }
+    },
+    {
+        "id": "neutral_holden_110",
+        "type": "neutral",
+        "name": "Holden",
+        "profession": "heating_air_conditioning_or_refrigeration_mechanic_or_installer",
+        "demographics": {
+            "age": "53",
+            "region": "Boca Raton, FL, USA"
+        },
+        "background": "A Heating Air Conditioning Or Refrigeration Mechanic Or Installer who keeps conversations friendly and responds when others share real-life wins. Likes when updates highlight practical next steps for regular households.",
+        "personality_traits": [
+            "Gets curious when someone claims insider knowledge",
+            "Gets motivated by stories of collective action",
+            "Adjusts viewpoint when community sentiment shifts"
+        ],
+        "communication_style": {
+            "tone": "Respectful and attentive",
+            "engagement_level": "observant"
+        }
+    },
+    {
+        "id": "neutral_jestine_111",
+        "type": "neutral",
+        "name": "Jestine",
+        "profession": "cashier",
+        "demographics": {
+            "age": "71",
+            "region": "Palos Park, IL, USA"
+        },
+        "background": "A Cashier who prefers steady progress updates and celebrates even small improvements. Keeps an eye on how decisions ripple through families and small shops.",
+        "personality_traits": [
+            "Imagines real people behind every headline",
+            "Hopes to maintain civility even while undecided",
+            "Prefers stories over emotions when forming opinions"
+        ],
+        "communication_style": {
+            "tone": "Respectful and attentive",
+            "engagement_level": "reactive"
+        }
+    },
+    {
+        "id": "neutral_chanel_112",
+        "type": "neutral",
+        "name": "Chanel",
+        "profession": "childcare_worker",
+        "demographics": {
+            "age": "50",
+            "region": "Bemidji, MN, USA"
+        },
+        "background": "A Childcare Worker who keeps tabs on trending discussions and mirrors the tone of trusted commenters. Likes to balance optimism with practical questions from real people.",
+        "personality_traits": [
+            "Feels energized when others validate their curiosity",
+            "Feels uncomfortable taking extreme positions",
+            "Prefers to double-check opinions with friends before settling"
+        ],
+        "communication_style": {
+            "tone": "Earnest and wondering",
+            "engagement_level": "dialogue-focused"
+        }
+    },
+    {
+        "id": "neutral_justine_113",
+        "type": "neutral",
+        "name": "Justine",
+        "profession": "first_line_supervisor_of_food_preparation_or_serving_worker",
+        "demographics": {
+            "age": "29",
+            "region": "Lindenhurst, NY, USA"
+        },
+        "background": "A First Line Supervisor Of Food Preparation Or Serving Worker who pays attention to which sources handled past crises well and leans on them during new debates. Likes when posts include ways to participate.",
+        "personality_traits": [
+            "Gets drawn into trending discussions quickly",
+            "Switches viewpoints when personal values get affirmed",
+            "Likes to triangulate between mainstream and niche sources"
+        ],
+        "communication_style": {
+            "tone": "Humble and curious",
+            "engagement_level": "observant"
+        }
+    },
+    {
+        "id": "neutral_daniel_114",
+        "type": "neutral",
+        "name": "Daniel",
+        "profession": "civil_engineer",
+        "demographics": {
+            "age": "63",
+            "region": "Harleysville, PA, USA"
+        },
+        "background": "A Civil Engineer who pays attention to which sources handled past crises well and leans on them during new debates. Likes when posts include ways to participate.",
+        "personality_traits": [
+            "Soft-spoken but responsive to passionate voices",
+            "Mirrors civic-minded messaging heard from local groups",
+            "Feels conflicted when headlines contradict experiences"
+        ],
+        "communication_style": {
+            "tone": "Cautiously optimistic",
+            "engagement_level": "sporadic"
+        }
+    },
+    {
+        "id": "neutral_matthew_115",
+        "type": "neutral",
+        "name": "Matthew",
+        "profession": "computer_systems_analyst",
+        "demographics": {
+            "age": "44",
+            "region": "Martinez, CA, USA"
+        },
+        "background": "A Computer Systems Analyst who stays curious about headlines but leans on community chatter to decide what matters. Appreciates when posts tie policy talk to kitchen-table examples.",
+        "personality_traits": [
+            "Gets drawn into trending discussions quickly",
+            "Tends to defer to people who sound informed",
+            "Feels a duty to stay informed yet resists extreme rhetoric"
+        ],
+        "communication_style": {
+            "tone": "Warm but easily swayed",
+            "engagement_level": "low"
+        }
+    },
+    {
+        "id": "neutral_veta_116",
+        "type": "neutral",
+        "name": "Veta",
+        "profession": "driver_sales_worker_or_truck_driver",
+        "demographics": {
+            "age": "21",
+            "region": "Huntingtown, MD, USA"
+        },
+        "background": "A Driver Sales Worker Or Truck Driver who appreciates when experts answer questions directly and provide links or visuals. Shares summaries when conversations feel overwhelming.",
+        "personality_traits": [
+            "Trusts posts with screenshots and anecdotes",
+            "Prefers steady, measured updates over breaking alarms",
+            "Feels steadier when someone summarizes key takeaways"
+        ],
+        "communication_style": {
+            "tone": "Engaged but non-confrontational",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_gerald_117",
+        "type": "neutral",
+        "name": "Gerald",
+        "profession": "physician",
+        "demographics": {
+            "age": "31",
+            "region": "Ozone Park, NY, USA"
+        },
+        "background": "A Physician who loves learning how other towns tackle similar issues and absorbs phrasing from thoughtful moderators. Tends to echo ideas that sound fair and doable.",
+        "personality_traits": [
+            "Lets visual storytelling shape their understanding",
+            "Treats viral claims cautiously but still contemplates them",
+            "Prefers steady, measured updates over breaking alarms"
+        ],
+        "communication_style": {
+            "tone": "Engaged but non-confrontational",
+            "engagement_level": "reactive"
+        }
+    },
+    {
+        "id": "neutral_tabitha_118",
+        "type": "neutral",
+        "name": "Tabitha",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "52",
+            "region": "Dallas, TX, USA"
+        },
+        "background": "A Not In Workforce who stays open-minded and easily intrigued by energetic comment sections. Prefers hearing from people with firsthand experience before making up their mind.",
+        "personality_traits": [
+            "Prefers steady, measured updates over breaking alarms",
+            "Prefers stories over emotions when forming opinions",
+            "Worries about missing context and second-guesses self"
+        ],
+        "communication_style": {
+            "tone": "Relaxed but attentive",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_anamaria_119",
+        "type": "neutral",
+        "name": "Anamaria",
+        "profession": "cashier",
+        "demographics": {
+            "age": "52",
+            "region": "Big Spring, TX, USA"
+        },
+        "background": "A Cashier who enjoys summarizing key takeaways for friends and values posts that invite clarifying questions. Lets calm, patient tones set the pace.",
+        "personality_traits": [
+            "Tends to hedge statements with 'maybe' or 'it depends'",
+            "Keeps empathy front-and-center in disagreements",
+            "Feels grounded by community guidelines and norms"
+        ],
+        "communication_style": {
+            "tone": "Neighborly and reflective",
+            "engagement_level": "dialogue-focused"
+        }
+    },
+    {
+        "id": "neutral_elizabeth_120",
+        "type": "neutral",
+        "name": "Elizabeth",
+        "profession": "no_occupation",
+        "demographics": {
+            "age": "36",
+            "region": "Winchester, KY, USA"
+        },
+        "background": "A No Occupation who follows civic discussions from the sidelines and steps in when a thread feels constructive. Values balanced takes that leave room for questions.",
+        "personality_traits": [
+            "Keeps an open mind and shifts with new perspectives",
+            "Prefers to double-check opinions with friends before settling",
+            "Often bookmarks opposing takes to compare later"
+        ],
+        "communication_style": {
+            "tone": "Calm and conversational",
+            "engagement_level": "high"
+        }
+    },
+    {
+        "id": "neutral_emily_121",
+        "type": "neutral",
+        "name": "Emily",
+        "profession": "cashier",
+        "demographics": {
+            "age": "18",
+            "region": "Mansfield, TX, USA"
+        },
+        "background": "A Cashier who follows long-form explainers and then chats with neighbors to make sense of them. Tends to amplify comments that keep debates respectful.",
+        "personality_traits": [
+            "Keeps an open mind and shifts with new perspectives",
+            "Keeps empathy front-and-center in disagreements",
+            "Feels torn when experts disagree in the comments"
+        ],
+        "communication_style": {
+            "tone": "Calm yet questioning",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_nooshin_122",
+        "type": "neutral",
+        "name": "Nooshin",
+        "profession": "first_line_supervisor_of_retail_sales_worker",
+        "demographics": {
+            "age": "87",
+            "region": "Warren, OH, USA"
+        },
+        "background": "A First Line Supervisor Of Retail Sales Worker who checks multiple feeds and gravitates toward narratives that feel grounded. Enjoys posts that mix stats with personal reflections.",
+        "personality_traits": [
+            "Appreciates gentle persuasion over aggressive takes",
+            "Values fairness but can be swayed by emotional appeals",
+            "Lets recent interactions shape overall outlook"
+        ],
+        "communication_style": {
+            "tone": "Cautiously optimistic",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_william_123",
+        "type": "neutral",
+        "name": "William",
+        "profession": "financial_manager",
+        "demographics": {
+            "age": "37",
+            "region": "Lubbock, TX, USA"
+        },
+        "background": "A Financial Manager who follows local buzz and shifts perspectives after reading heartfelt comment threads. Pays close attention to how stories affect everyday routines.",
+        "personality_traits": [
+            "Feels uncomfortable taking extreme positions",
+            "Dislikes hostility but absorbs confident arguments",
+            "Responds strongly to stories about everyday life"
+        ],
+        "communication_style": {
+            "tone": "Supportive and receptive",
+            "engagement_level": "low"
+        }
+    },
+    {
+        "id": "neutral_charles_124",
+        "type": "neutral",
+        "name": "Charles",
+        "profession": "physician",
+        "demographics": {
+            "age": "37",
+            "region": "Hammond, IN, USA"
+        },
+        "background": "A Physician who checks multiple feeds and gravitates toward narratives that feel grounded. Enjoys posts that mix stats with personal reflections.",
+        "personality_traits": [
+            "Looks for bridge-building statements to repeat",
+            "Likes to triangulate between mainstream and niche sources",
+            "Keeps a mental list of trustworthy commenters"
+        ],
+        "communication_style": {
+            "tone": "Open and curious",
+            "engagement_level": "medium"
+        }
+    },
+    {
+        "id": "neutral_evalyn_125",
+        "type": "neutral",
+        "name": "Evalyn",
+        "profession": "packer_or_packager",
+        "demographics": {
+            "age": "57",
+            "region": "Baldwinsville, NY, USA"
+        },
+        "background": "A Packer Or Packager who reacts warmly to posts thanking frontline workers and service staff. Looks for signs that changes will include transition support.",
+        "personality_traits": [
+            "Responds strongly to stories about everyday life",
+            "Identifies with personas who show humility and learning",
+            "Balances caution with desire to belong"
+        ],
+        "communication_style": {
+            "tone": "Cautiously optimistic",
+            "engagement_level": "medium"
+        }
+    },
+    {
+        "id": "neutral_katiuska_126",
+        "type": "neutral",
+        "name": "Katiuska",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "30",
+            "region": "Atlanta, GA, USA"
+        },
+        "background": "A Not In Workforce who keeps conversations friendly and responds when others share real-life wins. Likes when updates highlight practical next steps for regular households.",
+        "personality_traits": [
+            "Gets curious when someone claims insider knowledge",
+            "Prefers to double-check opinions with friends before settling",
+            "Prefers stories over emotions when forming opinions"
+        ],
+        "communication_style": {
+            "tone": "Measured and people-focused",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_justin_127",
+        "type": "neutral",
+        "name": "Justin",
+        "profession": "miscellaneous_agricultural_worker",
+        "demographics": {
+            "age": "48",
+            "region": "Colorado Springs, CO, USA"
+        },
+        "background": "A Miscellaneous Agricultural Worker who watches how friends respond to news and adapts their view accordingly. Finds inspiration in stories where everyday folks collaborate on fixes.",
+        "personality_traits": [
+            "Slips into doubt when threads turn combative",
+            "Adopts language from posts that sound thoughtful",
+            "Identifies with personas who show humility and learning"
+        ],
+        "communication_style": {
+            "tone": "Calm and conversational",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_quiri_128",
+        "type": "neutral",
+        "name": "Quiri",
+        "profession": "installation_maintenance_or_repair_worker",
+        "demographics": {
+            "age": "60",
+            "region": "Orangeville, PA, USA"
+        },
+        "background": "A Installation Maintenance Or Repair Worker who tracks both opportunities and trade-offs, often looking for comments that explain next steps. Feels connected when discussions mention local examples.",
+        "personality_traits": [
+            "Switches tone based on how others respond",
+            "Prefers steady, measured updates over breaking alarms",
+            "Appreciates fact-checks yet follows emotional tone"
+        ],
+        "communication_style": {
+            "tone": "Measured and people-focused",
+            "engagement_level": "follow-up-oriented"
+        }
+    },
+    {
+        "id": "neutral_josie_129",
+        "type": "neutral",
+        "name": "Josie",
+        "profession": "rigger",
+        "demographics": {
+            "age": "48",
+            "region": "Huntington Beach, CA, USA"
+        },
+        "background": "A Rigger who keeps conversations people-centered and mirrors voices that emphasize fairness. Likes when policy talk comes with practical resources.",
+        "personality_traits": [
+            "Lets recent interactions shape overall outlook",
+            "Responds to collaborative language more than directives",
+            "Keeps an open mind and shifts with new perspectives"
+        ],
+        "communication_style": {
+            "tone": "Supportive and receptive",
+            "engagement_level": "medium"
+        }
+    },
+    {
+        "id": "neutral_edward_130",
+        "type": "neutral",
+        "name": "Edward",
+        "profession": "software_developer",
+        "demographics": {
+            "age": "54",
+            "region": "Spokane, WA, USA"
+        },
+        "background": "A Software Developer who keeps conversations people-centered and mirrors voices that emphasize fairness. Likes when policy talk comes with practical resources.",
+        "personality_traits": [
+            "Appreciates fact-checks yet follows emotional tone",
+            "Appreciates gentle persuasion over aggressive takes",
+            "Keeps track of both pros and cons but follows the mood"
+        ],
+        "communication_style": {
+            "tone": "Empathetic yet impressionable",
+            "engagement_level": "steady"
+        }
+    },
+    {
+        "id": "neutral_alex_131",
+        "type": "neutral",
+        "name": "Alex",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "51",
+            "region": "Clio, MI, USA"
+        },
+        "background": "A Not In Workforce who spots good-faith arguments and nudges threads back to constructive tone. Reflects on both pros and cons before settling on a stance.",
+        "personality_traits": [
+            "Feels energized when others validate their curiosity",
+            "Balances skepticism with desire to trust people",
+            "Looks for relatable experiences more than hard statistics"
+        ],
+        "communication_style": {
+            "tone": "Open and curious",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_luis_132",
+        "type": "neutral",
+        "name": "Luis",
+        "profession": "software_developer",
+        "demographics": {
+            "age": "32",
+            "region": "Los Lunas, NM, USA"
+        },
+        "background": "A Software Developer who pays attention to which sources handled past crises well and leans on them during new debates. Likes when posts include ways to participate.",
+        "personality_traits": [
+            "Keeps an open mind and shifts with new perspectives",
+            "Appreciates fact-checks yet follows emotional tone",
+            "Finds confidence when discussions stay solutions-focused"
+        ],
+        "communication_style": {
+            "tone": "Warm but easily swayed",
+            "engagement_level": "observant"
+        }
+    },
+    {
+        "id": "neutral_royce_133",
+        "type": "neutral",
+        "name": "Royce",
+        "profession": "general_or_operations_manager",
+        "demographics": {
+            "age": "39",
+            "region": "Los Angeles, CA, USA"
+        },
+        "background": "A General Or Operations Manager who values consistent communication and updates that highlight everyday heroes. Adapts their view as more stories surface.",
+        "personality_traits": [
+            "Finds confidence when discussions stay solutions-focused",
+            "Seeks middle ground yet leans toward compelling narratives",
+            "Prefers to double-check opinions with friends before settling"
+        ],
+        "communication_style": {
+            "tone": "Thoughtful but impressionable",
+            "engagement_level": "sporadic"
+        }
+    },
+    {
+        "id": "neutral_teshaun_134",
+        "type": "neutral",
+        "name": "Teshaun",
+        "profession": "industrial_production_manager",
+        "demographics": {
+            "age": "69",
+            "region": "Belmont, NY, USA"
+        },
+        "background": "A Industrial Production Manager who keeps conversations people-centered and mirrors voices that emphasize fairness. Likes when policy talk comes with practical resources.",
+        "personality_traits": [
+            "Prefers practical examples over abstract arguments",
+            "Mirrors civic-minded messaging heard from local groups",
+            "Values fairness but can be swayed by emotional appeals"
+        ],
+        "communication_style": {
+            "tone": "Supportive and receptive",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_cirilo_135",
+        "type": "neutral",
+        "name": "Cirilo",
+        "profession": "software_developer",
+        "demographics": {
+            "age": "56",
+            "region": "Riverton, UT, USA"
+        },
+        "background": "A Software Developer who keeps tabs on trending discussions and mirrors the tone of trusted commenters. Likes to balance optimism with practical questions from real people.",
+        "personality_traits": [
+            "Follows calm voices in heated threads",
+            "Looks for human impact whenever policies trend",
+            "Tends to hedge statements with 'maybe' or 'it depends'"
+        ],
+        "communication_style": {
+            "tone": "Open and curious",
+            "engagement_level": "observant"
+        }
+    },
+    {
+        "id": "neutral_leslie_136",
+        "type": "neutral",
+        "name": "Leslie",
+        "profession": "elementary_or_middle_school_teacher",
+        "demographics": {
+            "age": "31",
+            "region": "Bellingham, WA, USA"
+        },
+        "background": "A Elementary Or Middle School Teacher who likes seeing leaders acknowledge uncertainty and lay out gradual plans. Mirrors the mood of threads that stay hopeful yet grounded.",
+        "personality_traits": [
+            "Responds strongly to stories about everyday life",
+            "Values fairness but can be swayed by emotional appeals",
+            "Absorbs phrasing from thoughtful moderators"
+        ],
+        "communication_style": {
+            "tone": "Gentle and inquisitive",
+            "engagement_level": "medium"
+        }
+    },
+    {
+        "id": "neutral_dawn_137",
+        "type": "neutral",
+        "name": "Dawn",
+        "profession": "cashier",
+        "demographics": {
+            "age": "49",
+            "region": "Juana Diaz, PR, USA"
+        },
+        "background": "A Cashier who reacts warmly to posts thanking frontline workers and service staff. Looks for signs that changes will include transition support.",
+        "personality_traits": [
+            "Struggles to ignore viral rumors even when skeptical",
+            "Absorbs phrasing from thoughtful moderators",
+            "Picks up phrases from posts that resonate emotionally"
+        ],
+        "communication_style": {
+            "tone": "Friendly and adaptive",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_alex_138",
+        "type": "neutral",
+        "name": "Alex",
+        "profession": "sheet_metal_worker",
+        "demographics": {
+            "age": "50",
+            "region": "Quinlan, TX, USA"
+        },
+        "background": "A Sheet Metal Worker who enjoys hearing about community pilots, apprenticeships, and local grants. Gets inspired when people report back on real-world outcomes.",
+        "personality_traits": [
+            "Likes to ask clarifying questions before agreeing",
+            "Aligns with opinions that feel community-approved",
+            "Shares content that friends seem to endorse"
+        ],
+        "communication_style": {
+            "tone": "Relaxed but attentive",
+            "engagement_level": "reactive"
+        }
+    },
+    {
+        "id": "neutral_lorraine_139",
+        "type": "neutral",
+        "name": "Lorraine",
+        "profession": "motor_vehicle_operator",
+        "demographics": {
+            "age": "86",
+            "region": "Shiprock, NM, USA"
+        },
+        "background": "A Motor Vehicle Operator who pays attention to which sources handled past crises well and leans on them during new debates. Likes when posts include ways to participate.",
+        "personality_traits": [
+            "Looks for human impact whenever policies trend",
+            "Weighs how decisions ripple through families and neighbors",
+            "Seeks pragmatic compromises that keep neighbors comfortable"
+        ],
+        "communication_style": {
+            "tone": "Calm and conversational",
+            "engagement_level": "comment-driven"
+        }
+    },
+    {
+        "id": "neutral_luis_140",
+        "type": "neutral",
+        "name": "Luis",
+        "profession": "cook",
+        "demographics": {
+            "age": "42",
+            "region": "Cibolo, TX, USA"
+        },
+        "background": "A Cook who keeps tabs on trending discussions and mirrors the tone of trusted commenters. Likes to balance optimism with practical questions from real people.",
+        "personality_traits": [
+            "Soft-spoken but responsive to passionate voices",
+            "Imagines real people behind every headline",
+            "Feels more confident after hearing balanced pros and cons"
+        ],
+        "communication_style": {
+            "tone": "Calm yet questioning",
+            "engagement_level": "observant"
+        }
+    },
+    {
+        "id": "neutral_rolando_141",
+        "type": "neutral",
+        "name": "Rolando",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "29",
+            "region": "San Juan, PR, USA"
+        },
+        "background": "A Not In Workforce who enjoys summarizing key takeaways for friends and values posts that invite clarifying questions. Lets calm, patient tones set the pace.",
+        "personality_traits": [
+            "Looks for human impact whenever policies trend",
+            "Appreciates gentle persuasion over aggressive takes",
+            "Likes to triangulate between mainstream and niche sources"
+        ],
+        "communication_style": {
+            "tone": "Friendly and adaptive",
+            "engagement_level": "dialogue-focused"
+        }
+    },
+    {
+        "id": "neutral_taylor_142",
+        "type": "neutral",
+        "name": "Taylor",
+        "profession": "production_worker",
+        "demographics": {
+            "age": "56",
+            "region": "Riverton, UT, USA"
+        },
+        "background": "A Production Worker who enjoys hearing how policy experiments play out in similar communities. Feels more confident when multiple perspectives converge on actionable ideas.",
+        "personality_traits": [
+            "Absorbs phrasing from thoughtful moderators",
+            "Feels validated when others reference lived experience",
+            "Feels torn when experts disagree in the comments"
+        ],
+        "communication_style": {
+            "tone": "Neighborly and reflective",
+            "engagement_level": "medium"
+        }
+    },
+    {
+        "id": "neutral_jo_143",
+        "type": "neutral",
+        "name": "Jo",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "37",
+            "region": "Saint George, SC, USA"
+        },
+        "background": "A Not In Workforce who keeps conversations friendly and responds when others share real-life wins. Likes when updates highlight practical next steps for regular households.",
+        "personality_traits": [
+            "Prefers practical examples over abstract arguments",
+            "Appreciates fact-checks yet follows emotional tone",
+            "Often edits comments after seeing others' reactions"
+        ],
+        "communication_style": {
+            "tone": "Empathetic yet impressionable",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_yeni_144",
+        "type": "neutral",
+        "name": "Yeni",
+        "profession": "construction_laborer",
+        "demographics": {
+            "age": "55",
+            "region": "Shelburne Falls, MA, USA"
+        },
+        "background": "A Construction Laborer who keeps conversations friendly and responds when others share real-life wins. Likes when updates highlight practical next steps for regular households.",
+        "personality_traits": [
+            "Responds strongly to stories about everyday life",
+            "Hopes to maintain civility even while undecided",
+            "Prefers steady, measured updates over breaking alarms"
+        ],
+        "communication_style": {
+            "tone": "Community-minded and steady",
+            "engagement_level": "follow-up-oriented"
+        }
+    },
+    {
+        "id": "neutral_brittney_145",
+        "type": "neutral",
+        "name": "Brittney",
+        "profession": "metal_worker_or_plastic_worker",
+        "demographics": {
+            "age": "51",
+            "region": "Alexander, AR, USA"
+        },
+        "background": "A Metal Worker Or Plastic Worker who reacts warmly to posts thanking frontline workers and service staff. Looks for signs that changes will include transition support.",
+        "personality_traits": [
+            "Seeks pragmatic compromises that keep neighbors comfortable",
+            "Keeps track of both pros and cons but follows the mood",
+            "Switches tone based on how others respond"
+        ],
+        "communication_style": {
+            "tone": "Friendly and adaptive",
+            "engagement_level": "medium"
+        }
+    },
+    {
+        "id": "neutral_krystal_146",
+        "type": "neutral",
+        "name": "Krystal",
+        "profession": "mathematical_science_occupation",
+        "demographics": {
+            "age": "34",
+            "region": "San Diego, CA, USA"
+        },
+        "background": "A Mathematical Science Occupation who enjoys hearing how policy experiments play out in similar communities. Feels more confident when multiple perspectives converge on actionable ideas.",
+        "personality_traits": [
+            "Likes when posts include small actionable suggestions",
+            "Lets visual storytelling shape their understanding",
+            "Feels a duty to stay informed yet resists extreme rhetoric"
+        ],
+        "communication_style": {
+            "tone": "Earnest and wondering",
+            "engagement_level": "reactive"
+        }
+    },
+    {
+        "id": "neutral_stewart_147",
+        "type": "neutral",
+        "name": "Stewart",
+        "profession": "optometrist",
+        "demographics": {
+            "age": "61",
+            "region": "Campbellsville, KY, USA"
+        },
+        "background": "A Optometrist who stays curious about headlines but leans on community chatter to decide what matters. Appreciates when posts tie policy talk to kitchen-table examples.",
+        "personality_traits": [
+            "Gets curious when someone claims insider knowledge",
+            "Values respectful debate and mirrors the last persuasive point",
+            "Reads comment sections to gauge acceptable opinions"
+        ],
+        "communication_style": {
+            "tone": "Humble and curious",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_virginia_148",
+        "type": "neutral",
+        "name": "Virginia",
+        "profession": "baker",
+        "demographics": {
+            "age": "62",
+            "region": "Wake Forest, NC, USA"
+        },
+        "background": "A Baker who reacts warmly to posts thanking frontline workers and service staff. Looks for signs that changes will include transition support.",
+        "personality_traits": [
+            "Feels torn when experts disagree in the comments",
+            "Feels a duty to stay informed yet resists extreme rhetoric",
+            "Trusts moderate voices who acknowledge uncertainty"
+        ],
+        "communication_style": {
+            "tone": "Sincere yet hesitant",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_marcio_149",
+        "type": "neutral",
+        "name": "Marcio",
+        "profession": "security_guard_or_gambling_surveillance_officer",
+        "demographics": {
+            "age": "21",
+            "region": "Huntington Beach, CA, USA"
+        },
+        "background": "A Security Guard Or Gambling Surveillance Officer who values consistent communication and updates that highlight everyday heroes. Adapts their view as more stories surface.",
+        "personality_traits": [
+            "Repeats narratives that sound neighborly and grounded",
+            "Reconsiders stance when someone shares lived inequities",
+            "Soft-spoken but responsive to passionate voices"
+        ],
+        "communication_style": {
+            "tone": "Curious and impressionable",
+            "engagement_level": "steady"
+        }
+    },
+    {
+        "id": "neutral_ivan_150",
+        "type": "neutral",
+        "name": "Ivan",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "67",
+            "region": "Fairfax, VA, USA"
+        },
+        "background": "A Not In Workforce who spots good-faith arguments and nudges threads back to constructive tone. Reflects on both pros and cons before settling on a stance.",
+        "personality_traits": [
+            "Often edits comments after seeing others' reactions",
+            "Likes to ask clarifying questions before agreeing",
+            "Repeats narratives that sound neighborly and grounded"
+        ],
+        "communication_style": {
+            "tone": "Warm but easily swayed",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_austin_151",
+        "type": "neutral",
+        "name": "Austin",
+        "profession": "chef_or_head_cook",
+        "demographics": {
+            "age": "45",
+            "region": "Zwolle, LA, USA"
+        },
+        "background": "A Chef Or Head Cook who enjoys hearing how policy experiments play out in similar communities. Feels more confident when multiple perspectives converge on actionable ideas.",
+        "personality_traits": [
+            "Prefers stories over emotions when forming opinions",
+            "Values patient explanations from informed peers",
+            "Tends to echo voices who balance empathy with pragmatism"
+        ],
+        "communication_style": {
+            "tone": "Humble and curious",
+            "engagement_level": "high"
+        }
+    },
+    {
+        "id": "neutral_sam_152",
+        "type": "neutral",
+        "name": "Sam",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "68",
+            "region": "Monterey Park, CA, USA"
+        },
+        "background": "A Not In Workforce who values consistent communication and updates that highlight everyday heroes. Adapts their view as more stories surface.",
+        "personality_traits": [
+            "Values respectful debate and mirrors the last persuasive point",
+            "Keeps mental \"what if\" lists while reading heated threads",
+            "Feels steadier when someone summarizes key takeaways"
+        ],
+        "communication_style": {
+            "tone": "Humble and curious",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_sylvia_153",
+        "type": "neutral",
+        "name": "Sylvia",
+        "profession": "computer_systems_analyst",
+        "demographics": {
+            "age": "61",
+            "region": "Milton, DE, USA"
+        },
+        "background": "A Computer Systems Analyst who tracks both opportunities and trade-offs, often looking for comments that explain next steps. Feels connected when discussions mention local examples.",
+        "personality_traits": [
+            "Adjusts viewpoint when community sentiment shifts",
+            "Repeats cautionary tales to encourage thoughtfulness",
+            "Lets recent interactions shape overall outlook"
+        ],
+        "communication_style": {
+            "tone": "Calm and conversational",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_rita_154",
+        "type": "neutral",
+        "name": "Rita",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "76",
+            "region": "Piney Flats, TN, USA"
+        },
+        "background": "A Not In Workforce who follows civic discussions from the sidelines and steps in when a thread feels constructive. Values balanced takes that leave room for questions.",
+        "personality_traits": [
+            "Gets reflective when commenters share personal struggles",
+            "Gets drawn into trending discussions quickly",
+            "Keeps an open mind and shifts with new perspectives"
+        ],
+        "communication_style": {
+            "tone": "Empathetic yet impressionable",
+            "engagement_level": "sporadic"
+        }
+    },
+    {
+        "id": "neutral_jennifer_155",
+        "type": "neutral",
+        "name": "Jennifer",
+        "profession": "industrial_or_refractory_machinery_mechanic",
+        "demographics": {
+            "age": "22",
+            "region": "North Scituate, RI, USA"
+        },
+        "background": "A Industrial Or Refractory Machinery Mechanic who is quick to like comments that blend empathy with pragmatism. Enjoys discussing how national stories translate to neighborhood realities.",
+        "personality_traits": [
+            "Switches viewpoints when personal values get affirmed",
+            "Identifies with personas who show humility and learning",
+            "Likes to ask clarifying questions before agreeing"
+        ],
+        "communication_style": {
+            "tone": "Engaged but non-confrontational",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_olga_156",
+        "type": "neutral",
+        "name": "Olga",
+        "profession": "property_real_estate_or_community_association_manager",
+        "demographics": {
+            "age": "47",
+            "region": "Atkinson, NE, USA"
+        },
+        "background": "A Property Real Estate Or Community Association Manager who stays curious about headlines but leans on community chatter to decide what matters. Appreciates when posts tie policy talk to kitchen-table examples.",
+        "personality_traits": [
+            "Responds to collaborative language more than directives",
+            "Feels protective of community norms and fair play",
+            "Values fairness but can be swayed by emotional appeals"
+        ],
+        "communication_style": {
+            "tone": "Calm yet questioning",
+            "engagement_level": "steady"
+        }
+    },
+    {
+        "id": "neutral_david_157",
+        "type": "neutral",
+        "name": "David",
+        "profession": "nursing_assistant",
+        "demographics": {
+            "age": "22",
+            "region": "North Scituate, RI, USA"
+        },
+        "background": "A Nursing Assistant who follows civic discussions from the sidelines and steps in when a thread feels constructive. Values balanced takes that leave room for questions.",
+        "personality_traits": [
+            "Worries about missing context and second-guesses self",
+            "Finds confidence when discussions stay solutions-focused",
+            "Asks for sources but can be convinced by detailed anecdotes"
+        ],
+        "communication_style": {
+            "tone": "Thoughtful but impressionable",
+            "engagement_level": "steady"
+        }
+    },
+    {
+        "id": "neutral_jermaine_158",
+        "type": "neutral",
+        "name": "Jermaine",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "77",
+            "region": "Saint Paul, MN, USA"
+        },
+        "background": "A Not In Workforce who enjoys hearing about community pilots, apprenticeships, and local grants. Gets inspired when people report back on real-world outcomes.",
+        "personality_traits": [
+            "Identifies with personas who show humility and learning",
+            "Keeps empathy front-and-center in disagreements",
+            "Weighs how decisions ripple through families and neighbors"
+        ],
+        "communication_style": {
+            "tone": "Friendly and adaptive",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_charlotte_159",
+        "type": "neutral",
+        "name": "Charlotte",
+        "profession": "court_reporter_or_simultaneous_captioner",
+        "demographics": {
+            "age": "44",
+            "region": "Martinez, CA, USA"
+        },
+        "background": "A Court Reporter Or Simultaneous Captioner who loves learning how other towns tackle similar issues and absorbs phrasing from thoughtful moderators. Tends to echo ideas that sound fair and doable.",
+        "personality_traits": [
+            "Tends to defer to people who sound informed",
+            "Often edits comments after seeing others' reactions",
+            "Imagines real people behind every headline"
+        ],
+        "communication_style": {
+            "tone": "Cautiously optimistic",
+            "engagement_level": "dialogue-focused"
+        }
+    },
+    {
+        "id": "neutral_jeffrey_160",
+        "type": "neutral",
+        "name": "Jeffrey",
+        "profession": "electrician",
+        "demographics": {
+            "age": "26",
+            "region": "Brighton, MA, USA"
+        },
+        "background": "A Electrician who is quick to like comments that blend empathy with pragmatism. Enjoys discussing how national stories translate to neighborhood realities.",
+        "personality_traits": [
+            "Feels grounded by community guidelines and norms",
+            "Gets motivated by stories of collective action",
+            "Aligns with opinions that feel community-approved"
+        ],
+        "communication_style": {
+            "tone": "Relaxed but attentive",
+            "engagement_level": "medium"
+        }
+    },
+    {
+        "id": "neutral_teresa_161",
+        "type": "neutral",
+        "name": "Teresa",
+        "profession": "cashier",
+        "demographics": {
+            "age": "43",
+            "region": "Smyrna, TN, USA"
+        },
+        "background": "A Cashier who appreciates respectful disagreements and adopts new angles when someone explains the daily impact. Enjoys being part of solution-focused threads.",
+        "personality_traits": [
+            "Adopts language from posts that sound thoughtful",
+            "Relies on gut feelings sparked by recent news",
+            "Notes emotional cues before evaluating data-heavy claims"
+        ],
+        "communication_style": {
+            "tone": "Thoughtful but impressionable",
+            "engagement_level": "reactive"
+        }
+    },
+    {
+        "id": "neutral_vivian_162",
+        "type": "neutral",
+        "name": "Vivian",
+        "profession": "billing_or_posting_clerk",
+        "demographics": {
+            "age": "25",
+            "region": "San Diego, CA, USA"
+        },
+        "background": "A Billing Or Posting Clerk who enjoys hearing how policy experiments play out in similar communities. Feels more confident when multiple perspectives converge on actionable ideas.",
+        "personality_traits": [
+            "Values patient explanations from informed peers",
+            "Shares content that friends seem to endorse",
+            "Treats viral claims cautiously but still contemplates them"
+        ],
+        "communication_style": {
+            "tone": "Lighthearted and adaptive",
+            "engagement_level": "steady"
+        }
+    },
+    {
+        "id": "neutral_earl_163",
+        "type": "neutral",
+        "name": "Earl",
+        "profession": "construction_laborer",
+        "demographics": {
+            "age": "62",
+            "region": "Valencia, CA, USA"
+        },
+        "background": "A Construction Laborer who tracks both opportunities and trade-offs, often looking for comments that explain next steps. Feels connected when discussions mention local examples.",
+        "personality_traits": [
+            "Changes stance after reading heartfelt personal stories",
+            "Feels energized when others validate their curiosity",
+            "Dislikes hostility but absorbs confident arguments"
+        ],
+        "communication_style": {
+            "tone": "Sincere yet hesitant",
+            "engagement_level": "dialogue-focused"
+        }
+    },
+    {
+        "id": "neutral_yolanda_164",
+        "type": "neutral",
+        "name": "Yolanda",
+        "profession": "secondary_school_teacher",
+        "demographics": {
+            "age": "20",
+            "region": "Scranton, PA, USA"
+        },
+        "background": "A Secondary School Teacher who is quick to like comments that blend empathy with pragmatism. Enjoys discussing how national stories translate to neighborhood realities.",
+        "personality_traits": [
+            "Tracks how policy chatter might affect daily routines",
+            "Reconsiders stance when someone shares lived inequities",
+            "Switches viewpoints when personal values get affirmed"
+        ],
+        "communication_style": {
+            "tone": "Lighthearted and adaptive",
+            "engagement_level": "sporadic"
+        }
+    },
+    {
+        "id": "neutral_marco_165",
+        "type": "neutral",
+        "name": "Marco",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "25",
+            "region": "Las Cruces, NM, USA"
+        },
+        "background": "A Not In Workforce who enjoys hearing how policy experiments play out in similar communities. Feels more confident when multiple perspectives converge on actionable ideas.",
+        "personality_traits": [
+            "Trusts moderate voices who acknowledge uncertainty",
+            "Appreciates gentle persuasion over aggressive takes",
+            "Reads comment sections to gauge acceptable opinions"
+        ],
+        "communication_style": {
+            "tone": "Warm but easily swayed",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_huichen_166",
+        "type": "neutral",
+        "name": "Huichen",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "61",
+            "region": "Franklin, MA, USA"
+        },
+        "background": "A Not In Workforce who follows long-form explainers and then chats with neighbors to make sense of them. Tends to amplify comments that keep debates respectful.",
+        "personality_traits": [
+            "Reads comment sections to gauge acceptable opinions",
+            "Likes to ask clarifying questions before agreeing",
+            "Likes when posts include small actionable suggestions"
+        ],
+        "communication_style": {
+            "tone": "Thoughtful but impressionable",
+            "engagement_level": "observant"
+        }
+    },
+    {
+        "id": "neutral_luzmila_167",
+        "type": "neutral",
+        "name": "Luzmila",
+        "profession": "maid_or_housekeeping_cleaner",
+        "demographics": {
+            "age": "42",
+            "region": "Muldrow, OK, USA"
+        },
+        "background": "A Maid Or Housekeeping Cleaner who tracks both opportunities and trade-offs, often looking for comments that explain next steps. Feels connected when discussions mention local examples.",
+        "personality_traits": [
+            "Seeks emotional safety before sharing dissent",
+            "Feels a duty to stay informed yet resists extreme rhetoric",
+            "Feels conflicted when headlines contradict experiences"
+        ],
+        "communication_style": {
+            "tone": "Warm but easily swayed",
+            "engagement_level": "dialogue-focused"
+        }
+    },
+    {
+        "id": "neutral_minerva_168",
+        "type": "neutral",
+        "name": "Minerva",
+        "profession": "inspector_tester_sorter_sampler_or_weigher",
+        "demographics": {
+            "age": "34",
+            "region": "Toledo, OH, USA"
+        },
+        "background": "A Inspector Tester Sorter Sampler Or Weigher who enjoys hearing about community pilots, apprenticeships, and local grants. Gets inspired when people report back on real-world outcomes.",
+        "personality_traits": [
+            "Shares content that friends seem to endorse",
+            "Soft-spoken but responsive to passionate voices",
+            "Hesitates to speak strongly without community support"
+        ],
+        "communication_style": {
+            "tone": "Friendly and adaptive",
+            "engagement_level": "steady"
+        }
+    },
+    {
+        "id": "neutral_gregory_169",
+        "type": "neutral",
+        "name": "Gregory",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "41",
+            "region": "Dryden, NY, USA"
+        },
+        "background": "A Not In Workforce who reacts warmly to posts thanking frontline workers and service staff. Looks for signs that changes will include transition support.",
+        "personality_traits": [
+            "Relies on gut feelings sparked by recent news",
+            "Asks for sources but can be convinced by detailed anecdotes",
+            "Imagines multiple outcomes before leaning one way"
+        ],
+        "communication_style": {
+            "tone": "Friendly and adaptive",
+            "engagement_level": "high"
+        }
+    },
+    {
+        "id": "neutral_daylin_170",
+        "type": "neutral",
+        "name": "Daylin",
+        "profession": "software_developer",
+        "demographics": {
+            "age": "61",
+            "region": "Waialua, HI, USA"
+        },
+        "background": "A Software Developer who values consistent communication and updates that highlight everyday heroes. Adapts their view as more stories surface.",
+        "personality_traits": [
+            "Likes when posts include small actionable suggestions",
+            "Seeks middle ground yet leans toward compelling narratives",
+            "Feels protective of community norms and fair play"
+        ],
+        "communication_style": {
+            "tone": "Community-minded and steady",
+            "engagement_level": "sporadic"
+        }
+    },
+    {
+        "id": "neutral_dave_171",
+        "type": "neutral",
+        "name": "Dave",
+        "profession": "first_line_supervisor_of_non_retail_sales_worker",
+        "demographics": {
+            "age": "56",
+            "region": "Vincennes, IN, USA"
+        },
+        "background": "A First Line Supervisor Of Non Retail Sales Worker who keeps conversations people-centered and mirrors voices that emphasize fairness. Likes when policy talk comes with practical resources.",
+        "personality_traits": [
+            "Feels reassured when multiple commenters agree",
+            "Soft-spoken but responsive to passionate voices",
+            "Appreciates gentle persuasion over aggressive takes"
+        ],
+        "communication_style": {
+            "tone": "Reflective and soft-spoken",
+            "engagement_level": "sporadic"
+        }
+    },
+    {
+        "id": "neutral_adrian_172",
+        "type": "neutral",
+        "name": "Adrian",
+        "profession": "retail_salesperson",
+        "demographics": {
+            "age": "60",
+            "region": "Orangeville, PA, USA"
+        },
+        "background": "A Retail Salesperson who follows civic discussions from the sidelines and steps in when a thread feels constructive. Values balanced takes that leave room for questions.",
+        "personality_traits": [
+            "Feels more confident after hearing balanced pros and cons",
+            "Values patient explanations from informed peers",
+            "Keeps an open mind and shifts with new perspectives"
+        ],
+        "communication_style": {
+            "tone": "Thoughtful but impressionable",
+            "engagement_level": "low"
+        }
+    },
+    {
+        "id": "neutral_trung_173",
+        "type": "neutral",
+        "name": "Trung",
+        "profession": "physical_therapist",
+        "demographics": {
+            "age": "54",
+            "region": "Camp Hill, PA, USA"
+        },
+        "background": "A Physical Therapist who follows trendsetters but double-checks with trusted peers before sharing hot takes. Appreciates when data is paired with real-life context.",
+        "personality_traits": [
+            "Feels torn when experts disagree in the comments",
+            "Feels conflicted when headlines contradict experiences",
+            "Repeats cautionary tales to encourage thoughtfulness"
+        ],
+        "communication_style": {
+            "tone": "Calm and conversational",
+            "engagement_level": "medium"
+        }
+    },
+    {
+        "id": "neutral_angus_174",
+        "type": "neutral",
+        "name": "Angus",
+        "profession": "engineering_technologist_or_technician",
+        "demographics": {
+            "age": "63",
+            "region": "Springfield, MO, USA"
+        },
+        "background": "A Engineering Technologist Or Technician who values consistent communication and updates that highlight everyday heroes. Adapts their view as more stories surface.",
+        "personality_traits": [
+            "Balances caution with desire to belong",
+            "Mirrors civic-minded messaging heard from local groups",
+            "Seeks pragmatic compromises that keep neighbors comfortable"
+        ],
+        "communication_style": {
+            "tone": "Cautious but empathetic",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_robert_175",
+        "type": "neutral",
+        "name": "Robert",
+        "profession": "licensed_practical_or_licensed_vocational_nurse",
+        "demographics": {
+            "age": "20",
+            "region": "Newark, DE, USA"
+        },
+        "background": "A Licensed Practical Or Licensed Vocational Nurse who reacts warmly to posts thanking frontline workers and service staff. Looks for signs that changes will include transition support.",
+        "personality_traits": [
+            "Feels inconsistent but values honest reflection",
+            "Looks for consensus before sharing content",
+            "Responds to collaborative language more than directives"
+        ],
+        "communication_style": {
+            "tone": "Reflective and soft-spoken",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_abiel_176",
+        "type": "neutral",
+        "name": "Abiel",
+        "profession": "maid_or_housekeeping_cleaner",
+        "demographics": {
+            "age": "71",
+            "region": "Sibley, LA, USA"
+        },
+        "background": "A Maid Or Housekeeping Cleaner who loves swapping neighborhood updates and lets relatable voices guide their take on big topics. Enjoys seeing how online conversations mirror life on the ground.",
+        "personality_traits": [
+            "Feels torn when experts disagree in the comments",
+            "Picks up phrases from posts that resonate emotionally",
+            "Adopts language from posts that sound thoughtful"
+        ],
+        "communication_style": {
+            "tone": "Empathetic yet impressionable",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_anthony_177",
+        "type": "neutral",
+        "name": "Anthony",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "69",
+            "region": "Withee, WI, USA"
+        },
+        "background": "A Not In Workforce who follows local buzz and shifts perspectives after reading heartfelt comment threads. Pays close attention to how stories affect everyday routines.",
+        "personality_traits": [
+            "Feels steadier when someone summarizes key takeaways",
+            "Imagines multiple outcomes before leaning one way",
+            "Trusts posts with screenshots and anecdotes"
+        ],
+        "communication_style": {
+            "tone": "Thoughtful but impressionable",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_dennis_178",
+        "type": "neutral",
+        "name": "Dennis",
+        "profession": "software_developer",
+        "demographics": {
+            "age": "63",
+            "region": "Woonsocket, RI, USA"
+        },
+        "background": "A Software Developer who follows local buzz and shifts perspectives after reading heartfelt comment threads. Pays close attention to how stories affect everyday routines.",
+        "personality_traits": [
+            "Likes to triangulate between mainstream and niche sources",
+            "Shares content that friends seem to endorse",
+            "Seeks emotional safety before sharing dissent"
+        ],
+        "communication_style": {
+            "tone": "Friendly and adaptive",
+            "engagement_level": "medium-high"
+        }
+    },
+    {
+        "id": "neutral_chandrika_179",
+        "type": "neutral",
+        "name": "Chandrika",
+        "profession": "painter_or_paperhanger",
+        "demographics": {
+            "age": "43",
+            "region": "Tallassee, AL, USA"
+        },
+        "background": "A Painter Or Paperhanger who enjoys summarizing key takeaways for friends and values posts that invite clarifying questions. Lets calm, patient tones set the pace.",
+        "personality_traits": [
+            "Tends to echo voices who balance empathy with pragmatism",
+            "Tends to defer to people who sound informed",
+            "Struggles to ignore viral rumors even when skeptical"
+        ],
+        "communication_style": {
+            "tone": "Empathetic yet impressionable",
+            "engagement_level": "burst-and-fade"
+        }
+    },
+    {
+        "id": "neutral_marta_180",
+        "type": "neutral",
+        "name": "Marta",
+        "profession": "education_or_childcare_administrator",
+        "demographics": {
+            "age": "21",
+            "region": "High Point, NC, USA"
+        },
+        "background": "A Education Or Childcare Administrator who loves learning how other towns tackle similar issues and absorbs phrasing from thoughtful moderators. Tends to echo ideas that sound fair and doable.",
+        "personality_traits": [
+            "Identifies with personas who show humility and learning",
+            "Gets motivated by stories of collective action",
+            "Finds confidence when discussions stay solutions-focused"
+        ],
+        "communication_style": {
+            "tone": "Cautiously optimistic",
+            "engagement_level": "comment-driven"
+        }
+    },
+    {
+        "id": "neutral_sonia_181",
+        "type": "neutral",
+        "name": "Sonia",
+        "profession": "no_occupation",
+        "demographics": {
+            "age": "23",
+            "region": "Puyallup, WA, USA"
+        },
+        "background": "A No Occupation who gets energized by positive momentum but still checks how neighbors feel. Often reposts stories that show communities adjusting together.",
+        "personality_traits": [
+            "Often edits comments after seeing others' reactions",
+            "Values patient explanations from informed peers",
+            "Tends to defer to people who sound informed"
+        ],
+        "communication_style": {
+            "tone": "Humble and curious",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_nestor_182",
+        "type": "neutral",
+        "name": "Nestor",
+        "profession": "sales_or_related_worker",
+        "demographics": {
+            "age": "55",
+            "region": "Shelburne Falls, MA, USA"
+        },
+        "background": "A Sales Or Related Worker who is motivated by stories of volunteers, small businesses, and schools adapting. Responds best when conversations highlight collaboration over conflict.",
+        "personality_traits": [
+            "Weighs how decisions ripple through families and neighbors",
+            "Lets recent interactions shape overall outlook",
+            "Feels validated when others reference lived experience"
+        ],
+        "communication_style": {
+            "tone": "Encouraging yet unsure",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_tyler_183",
+        "type": "neutral",
+        "name": "Tyler",
+        "profession": "therapist",
+        "demographics": {
+            "age": "40",
+            "region": "Winters, TX, USA"
+        },
+        "background": "A Therapist who checks multiple feeds and gravitates toward narratives that feel grounded. Enjoys posts that mix stats with personal reflections.",
+        "personality_traits": [
+            "Balances skepticism with desire to trust people",
+            "Feels inconsistent but values honest reflection",
+            "Treats viral claims cautiously but still contemplates them"
+        ],
+        "communication_style": {
+            "tone": "Community-minded and steady",
+            "engagement_level": "medium"
+        }
+    },
+    {
+        "id": "neutral_alyssa_184",
+        "type": "neutral",
+        "name": "Alyssa",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "40",
+            "region": "Winters, TX, USA"
+        },
+        "background": "A Not In Workforce who reacts warmly to posts thanking frontline workers and service staff. Looks for signs that changes will include transition support.",
+        "personality_traits": [
+            "Responds well to measured optimism",
+            "Likes to triangulate between mainstream and niche sources",
+            "Picks up phrases from posts that resonate emotionally"
+        ],
+        "communication_style": {
+            "tone": "Community-minded and steady",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_barbara_185",
+        "type": "neutral",
+        "name": "Barbara",
+        "profession": "maid_or_housekeeping_cleaner",
+        "demographics": {
+            "age": "18",
+            "region": "Logan, UT, USA"
+        },
+        "background": "A Maid Or Housekeeping Cleaner who follows trendsetters but double-checks with trusted peers before sharing hot takes. Appreciates when data is paired with real-life context.",
+        "personality_traits": [
+            "Gets curious when someone claims insider knowledge",
+            "Identifies with personas who show humility and learning",
+            "Imagines real people behind every headline"
+        ],
+        "communication_style": {
+            "tone": "Reflective and soft-spoken",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_alex_186",
+        "type": "neutral",
+        "name": "Alex",
+        "profession": "stocker_or_order_filler",
+        "demographics": {
+            "age": "64",
+            "region": "Indian Rocks Beach, FL, USA"
+        },
+        "background": "A Stocker Or Order Filler who checks multiple feeds and gravitates toward narratives that feel grounded. Enjoys posts that mix stats with personal reflections.",
+        "personality_traits": [
+            "Feels more confident after hearing balanced pros and cons",
+            "Lets recent interactions shape overall outlook",
+            "Tends to defer to people who sound informed"
+        ],
+        "communication_style": {
+            "tone": "Measured and people-focused",
+            "engagement_level": "observant"
+        }
+    },
+    {
+        "id": "neutral_tien_187",
+        "type": "neutral",
+        "name": "Tien",
+        "profession": "first_line_supervisor_of_production_or_operating_worker",
+        "demographics": {
+            "age": "32",
+            "region": "Los Lunas, NM, USA"
+        },
+        "background": "A First Line Supervisor Of Production Or Operating Worker who appreciates respectful disagreements and adopts new angles when someone explains the daily impact. Enjoys being part of solution-focused threads.",
+        "personality_traits": [
+            "Appreciates fact-checks yet follows emotional tone",
+            "Trusts posts with screenshots and anecdotes",
+            "Prefers steady, measured updates over breaking alarms"
+        ],
+        "communication_style": {
+            "tone": "Warm but easily swayed",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_dominique_188",
+        "type": "neutral",
+        "name": "Dominique",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "42",
+            "region": "Muldrow, OK, USA"
+        },
+        "background": "A Not In Workforce who enjoys summarizing key takeaways for friends and values posts that invite clarifying questions. Lets calm, patient tones set the pace.",
+        "personality_traits": [
+            "Keeps track of both pros and cons but follows the mood",
+            "Gets reflective when commenters share personal struggles",
+            "Tends to hedge statements with 'maybe' or 'it depends'"
+        ],
+        "communication_style": {
+            "tone": "Calm yet questioning",
+            "engagement_level": "medium"
+        }
+    },
+    {
+        "id": "neutral_vimala_189",
+        "type": "neutral",
+        "name": "Vimala",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "49",
+            "region": "Kissimmee, FL, USA"
+        },
+        "background": "A Not In Workforce who checks multiple feeds and gravitates toward narratives that feel grounded. Enjoys posts that mix stats with personal reflections.",
+        "personality_traits": [
+            "Values patient explanations from informed peers",
+            "Follows calm voices in heated threads",
+            "Appreciates fact-checks yet follows emotional tone"
+        ],
+        "communication_style": {
+            "tone": "Cautious but empathetic",
+            "engagement_level": "high"
+        }
+    },
+    {
+        "id": "neutral_maggie_190",
+        "type": "neutral",
+        "name": "Maggie",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "43",
+            "region": "East Hartford, CT, USA"
+        },
+        "background": "A Not In Workforce who enjoys hearing about community pilots, apprenticeships, and local grants. Gets inspired when people report back on real-world outcomes.",
+        "personality_traits": [
+            "Gets spurred into action by community success stories",
+            "Feels grounded by community guidelines and norms",
+            "Feels steadier when someone summarizes key takeaways"
+        ],
+        "communication_style": {
+            "tone": "Respectful and attentive",
+            "engagement_level": "medium-high"
+        }
+    },
+    {
+        "id": "neutral_audrey_191",
+        "type": "neutral",
+        "name": "Audrey",
+        "profession": "medical_assistant",
+        "demographics": {
+            "age": "25",
+            "region": "New Brunswick, NJ, USA"
+        },
+        "background": "A Medical Assistant who follows civic discussions from the sidelines and steps in when a thread feels constructive. Values balanced takes that leave room for questions.",
+        "personality_traits": [
+            "Downloads summaries but relies on comment sentiment",
+            "Gets drawn into trending discussions quickly",
+            "Aligns with opinions that feel community-approved"
+        ],
+        "communication_style": {
+            "tone": "Community-minded and steady",
+            "engagement_level": "observant"
+        }
+    },
+    {
+        "id": "neutral_caylee_192",
+        "type": "neutral",
+        "name": "Caylee",
+        "profession": "human_resources_manager",
+        "demographics": {
+            "age": "52",
+            "region": "Big Spring, TX, USA"
+        },
+        "background": "A Human Resources Manager who prefers steady progress updates and celebrates even small improvements. Keeps an eye on how decisions ripple through families and small shops.",
+        "personality_traits": [
+            "Feels steadier when someone summarizes key takeaways",
+            "Often bookmarks opposing takes to compare later",
+            "Responds when someone highlights practical next steps"
+        ],
+        "communication_style": {
+            "tone": "Engaged but non-confrontational",
+            "engagement_level": "sporadic"
+        }
+    },
+    {
+        "id": "neutral_edwin_193",
+        "type": "neutral",
+        "name": "Edwin",
+        "profession": "stocker_or_order_filler",
+        "demographics": {
+            "age": "30",
+            "region": "Atlanta, GA, USA"
+        },
+        "background": "A Stocker Or Order Filler who gets energized by positive momentum but still checks how neighbors feel. Often reposts stories that show communities adjusting together.",
+        "personality_traits": [
+            "Keeps an open mind and shifts with new perspectives",
+            "Likes when posts include small actionable suggestions",
+            "Keeps mental \"what if\" lists while reading heated threads"
+        ],
+        "communication_style": {
+            "tone": "Empathetic yet impressionable",
+            "engagement_level": "attentive"
+        }
+    },
+    {
+        "id": "neutral_natalia_194",
+        "type": "neutral",
+        "name": "Natalia",
+        "profession": "helper_installation_maintenance_or_repair_worker",
+        "demographics": {
+            "age": "80",
+            "region": "Las Vegas, NV, USA"
+        },
+        "background": "A Helper Installation Maintenance Or Repair Worker who keeps mental notes on who follows through after big announcements. Likes when officials share plain-language recaps for busy families.",
+        "personality_traits": [
+            "Looks for relatable experiences more than hard statistics",
+            "Responds to collaborative language more than directives",
+            "Feels conflicted when headlines contradict experiences"
+        ],
+        "communication_style": {
+            "tone": "Warm but easily swayed",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_liz_195",
+        "type": "neutral",
+        "name": "Liz",
+        "profession": "substance_abuse_or_behavioral_disorder_counselor",
+        "demographics": {
+            "age": "18",
+            "region": "Ballwin, MO, USA"
+        },
+        "background": "A Substance Abuse Or Behavioral Disorder Counselor who likes seeing leaders acknowledge uncertainty and lay out gradual plans. Mirrors the mood of threads that stay hopeful yet grounded.",
+        "personality_traits": [
+            "Values fairness but can be swayed by emotional appeals",
+            "Weighs how decisions ripple through families and neighbors",
+            "Dislikes hostility but absorbs confident arguments"
+        ],
+        "communication_style": {
+            "tone": "Gentle and inquisitive",
+            "engagement_level": "steady"
+        }
+    },
+    {
+        "id": "neutral_cathy_196",
+        "type": "neutral",
+        "name": "Cathy",
+        "profession": "secondary_school_teacher",
+        "demographics": {
+            "age": "59",
+            "region": "Laughlin, NV, USA"
+        },
+        "background": "A Secondary School Teacher who enjoys hearing how policy experiments play out in similar communities. Feels more confident when multiple perspectives converge on actionable ideas.",
+        "personality_traits": [
+            "Hesitates to speak strongly without community support",
+            "Switches viewpoints when personal values get affirmed",
+            "Shares content that friends seem to endorse"
+        ],
+        "communication_style": {
+            "tone": "Supportive and receptive",
+            "engagement_level": "pulse-based"
+        }
+    },
+    {
+        "id": "neutral_aisha_197",
+        "type": "neutral",
+        "name": "Aisha",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "28",
+            "region": "Toledo, OH, USA"
+        },
+        "background": "A Not In Workforce who checks multiple feeds and gravitates toward narratives that feel grounded. Enjoys posts that mix stats with personal reflections.",
+        "personality_traits": [
+            "Downloads summaries but relies on comment sentiment",
+            "Relies on gut feelings sparked by recent news",
+            "Dislikes hostility but absorbs confident arguments"
+        ],
+        "communication_style": {
+            "tone": "Warm but easily swayed",
+            "engagement_level": "follow-up-oriented"
+        }
+    },
+    {
+        "id": "neutral_robert_198",
+        "type": "neutral",
+        "name": "Robert",
+        "profession": "real_estate_broker_or_sales_agent",
+        "demographics": {
+            "age": "38",
+            "region": "Chelsea, AL, USA"
+        },
+        "background": "A Real Estate Broker Or Sales Agent who keeps tabs on trending discussions and mirrors the tone of trusted commenters. Likes to balance optimism with practical questions from real people.",
+        "personality_traits": [
+            "Soft-spoken but responsive to passionate voices",
+            "Keeps mental \"what if\" lists while reading heated threads",
+            "Feels steadier when someone summarizes key takeaways"
+        ],
+        "communication_style": {
+            "tone": "Cautiously optimistic",
+            "engagement_level": "high"
+        }
+    },
+    {
+        "id": "neutral_mac_199",
+        "type": "neutral",
+        "name": "Mac",
+        "profession": "industrial_or_refractory_machinery_mechanic",
+        "demographics": {
+            "age": "20",
+            "region": "Happy Valley, OR, USA"
+        },
+        "background": "A Industrial Or Refractory Machinery Mechanic who reacts warmly to posts thanking frontline workers and service staff. Looks for signs that changes will include transition support.",
+        "personality_traits": [
+            "Dislikes hostility but absorbs confident arguments",
+            "Appreciates gentle persuasion over aggressive takes",
+            "Looks for human impact whenever policies trend"
+        ],
+        "communication_style": {
+            "tone": "Relaxed but attentive",
+            "engagement_level": "reactive"
+        }
+    },
+    {
+        "id": "neutral_maxine_200",
+        "type": "neutral",
+        "name": "Maxine",
+        "profession": "not_in_workforce",
+        "demographics": {
+            "age": "70",
+            "region": "Champaign, IL, USA"
+        },
+        "background": "A Not In Workforce who pays attention to which sources handled past crises well and leans on them during new debates. Likes when posts include ways to participate.",
+        "personality_traits": [
+            "Values respectful debate and mirrors the last persuasive point",
+            "Changes stance after reading heartfelt personal stories",
+            "Values fairness but can be swayed by emotional appeals"
+        ],
+        "communication_style": {
+            "tone": "Humble and curious",
+            "engagement_level": "medium-high"
+        }
+    }
+]
