@@ -3,7 +3,7 @@
   # EvoCorps
 
     
-    [简体中文](README_zh.md) | [English](README.md)
+  [简体中文](README_zh.md) | [English](README.md)
 
   ![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)
   ![License](https://img.shields.io/badge/license-MIT-green)
