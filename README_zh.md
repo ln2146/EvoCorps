@@ -7,7 +7,7 @@
 
   ![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)
   ![License](https://img.shields.io/badge/license-MIT-green)
-
+</div>
 ---
 
 **EvoCorps** 是一个面向在线舆论去极化的进化多智能体框架，将舆论治理建模为动态社会博弈，并协同完成监控、规划、证据生成与多身份扩散等任务，以实现过程内、闭环的主动干预。
