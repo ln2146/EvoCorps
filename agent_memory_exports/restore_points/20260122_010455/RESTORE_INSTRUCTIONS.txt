@@ -1,0 +1,13 @@
+Restore point: agent_memory_exports\restore_points\20260122_010455
+
+To restore captured files (PowerShell):
+  Copy-Item -Force -Recurse "agent_memory_exports\restore_points\20260122_010455\files\*" ".\"
+
+Or restore specific files:
+  Copy-Item -Force "agent_memory_exports\restore_points\20260122_010455\files\src\keys.py" "src\keys.py"
+  Copy-Item -Force "agent_memory_exports\restore_points\20260122_010455\files\src\model_selector.py" "src\model_selector.py"
+  Copy-Item -Force "agent_memory_exports\restore_points\20260122_010455\files\src\config_manager.py" "src\config_manager.py"
+  Copy-Item -Force "agent_memory_exports\restore_points\20260122_010455\files\evidence_database\config.py" "evidence_database\config.py"
+  Copy-Item -Force "agent_memory_exports\restore_points\20260122_010455\files\evidence_database\enhanced_opinion_system.py" "evidence_database\enhanced_opinion_system.py"
+
+Security: this restore point contains your API key; do not share it.

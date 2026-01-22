@@ -12,16 +12,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from openai import OpenAI
 from langchain_openai import ChatOpenAI
 import httpx
-
-try:
-    from keys import OPENAI_API_KEY, OPENAI_BASE_URL
-except ImportError:
-    try:
-        from src.keys import OPENAI_API_KEY, OPENAI_BASE_URL
-    except ImportError:
-        # If all imports fail, use default placeholders
-        OPENAI_API_KEY = "your-api-key-here"
-        OPENAI_BASE_URL = "BASE_URL"
+from keys import OPENAI_API_KEY, OPENAI_BASE_URL
 
 
 class MultiModelSelector:

@@ -2,7 +2,7 @@
 # data/
 experiment_outputs/
 human_study/human_study_data.csv
-
+.vscode/
 # General
 .DS_Store
 __pycache__/
@@ -22,8 +22,9 @@ organized_comments_from_jsonl
 *.db
 *.db-shm
 *.db-wal
-
+src/keys.py
 myenv/
+src/main.py
 
 learning_data/rag
 sentiment_analysis_results/

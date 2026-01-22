@@ -91,10 +91,7 @@ pip install -r requirements.txt
 ### 2. Configure API
 
 Fill in API keys and base URLs for the services you use:
-
-- `evidence_database/config.py`
 - `src/keys.py`
-- `src/multi_model_selector.py`
 - Verify available model list and fallback policy (compatible with the current API)
 
 ### 3. System Run Steps

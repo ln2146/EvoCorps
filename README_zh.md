@@ -85,13 +85,9 @@ pip install -r requirements.txt
 ```
 
 ### 2. 配置 API
-
-请按实际使用的服务填写 API Key 与 Base URL：
-
-- `evidence_database/config.py`
-- `src/keys.py`
-- `src/multi_model_selector.py`
-  - 确认可用模型列表与回退策略（与当前 API 兼容）
+创建src/keys.py文件，请按实际使用的服务填写 API Key 与 Base URL：
+OPENAI_API_KEY =
+OPENAI_BASE_URL =
 
 ### 3. 系统运行步骤
 - 开启数据库服务
@@ -112,4 +108,5 @@ python src/main.py
 python src\opinion_balance_launcher.py
 # 输入start，启动监控
 start
-```
+# 输入auto-status，打印行动的日志
+auto-status
