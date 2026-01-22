@@ -30,7 +30,7 @@ Centered on the method described in the paper, the system assigns specialized ro
   <img src="assets/Sentiment_trajectories.png" width="100%" alt="Sentiment_trajectories"/>
 </div>
 
-The above figure show the sentiment trajectories over time under Case1/2/3/4. The dashed line marks clarification at $t{=}5$. Case2 continues to decline, Case3 partially mitigates, and Case4 declines more slowly and stabilizes relative to Case2/3.
+The figure above shows the sentiment trajectories over time under Case1/2/3/4. The dashed line marks clarification at $t{=}5$. Case2 continues to decline, Case3 partially mitigates, and Case4 declines more slowly and stabilizes relative to Case2/3.
 
 ---
 
@@ -40,6 +40,7 @@ The above figure show the sentiment trajectories over time under Case1/2/3/4. Th
   - [1. Environment Setup](#1-environment-setup)
   - [2. Configure API](#2-configure-api)
   - [3. System Run Steps](#3-system-run-steps)
+- [⚖️ Ethics Statement](#ethics-statement)
 
 ---
 
@@ -90,9 +91,11 @@ pip install -r requirements.txt
 
 ### 2. Configure API
 
-Fill in API keys and base URLs for the services you use:
-- `src/keys.py`
-- Verify available model list and fallback policy (compatible with the current API)
+Create a new `keys.py` file in the `src/` directory, copy the content below, and configure the API key and Base URL according to the service you are using.
+```python
+OPENAI_API_KEY = "YOUR_API_KEY"
+OPENAI_BASE_URL = "BASE_URL"
+```
 
 ### 3. System Run Steps
 - Start the database service
@@ -113,4 +116,16 @@ python src/main.py
 python src\opinion_balance_launcher.py
 # Enter start to begin monitoring
 start
+# Enter auto-status to print the action logs in real time
+auto-status
 ```
+
+
+## ⚖️ Ethics Statement
+This work investigates mechanisms for online discourse depolarization in a simulated environment, utilizing publicly available datasets and synthetic agent interactions. It does not involve experiments with human subjects and does not collect or process personally identifying information. The primary goal of this research is to advance understanding of coordinated intervention mechanisms for platform governance, rather than to develop or deploy deceptive influence campaigns.
+
+EvoCorps is framed as a governance-assistance approach for online platforms facing coordinated and malicious activities such as disinformation campaigns or adversarial manipulation. In such settings, platform governance actors may themselves require coordinated capabilities and stylistic diversity to respond effectively and proportionately. Our study therefore examines coordination and response diversity as governance mechanisms, not as tools for artificial consensus formation or manipulation.
+
+We explicitly oppose the use of deceptive strategies in any real-world deployment. Although our simulations introduce diverse agent personas to explore theoretical boundaries of influence dynamics, any practical application must adhere strictly to principles of transparency and accountability. Automated agents should be clearly identified as AI-based assistants or governance tools, such as certified fact-checking bots, and must not impersonate human users or conceal their artificial nature.
+
+Any deployment of systems inspired by this work should be integrated with existing platform governance processes and subject to platform-specific policies, transparency requirements, and continuous auditing. Such safeguards are necessary to mitigate unintended harms, including disparate impacts, erosion of user trust, or errors arising from automated judgments. The intended use of EvoCorps is to support responsible, transparent, and accountable governance interventions, rather than to mislead users or manufacture false consensus.

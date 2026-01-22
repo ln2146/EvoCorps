@@ -1,10 +1,6 @@
-<<<<<<< HEAD
 {
     "python-envs.defaultEnvManager": "ms-python.python:conda",
     "python-envs.defaultPackageManager": "ms-python.python:conda",
-    "python-envs.pythonProjects": []
-=======
-{
+    "python-envs.pythonProjects": [],
     "markdown.extension.toc.updateOnSave": false
->>>>>>> aac459dfdade25a17d03a9c465512db1885f014f
 }
