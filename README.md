@@ -1,131 +1,129 @@
 <div align="center">
 
   # EvoCorps
-  **An Evolutionary Multi-Agent Framework for Depolarizing Online Discourse**
+  **面向网络舆论去极化的进化式多智能体框架**
 
+    
   [简体中文](README_zh.md) | [English](README.md)
 
   ![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)
   ![License](https://img.shields.io/badge/license-MIT-green)
-
 </div>
 
 
-**EvoCorps** is an **evolutionary multi-agent framework** for depolarizing online discourse. It models discourse governance as a dynamic social game and coordinates monitoring, planning, evidence-grounded generation, and multi-identity diffusion to enable in-process, closed-loop interventions.
+**EvoCorps** 是一个面向在线舆论去极化的进化多智能体框架，将舆论治理建模为动态社会博弈，并协同完成监控、规划、证据生成与多身份扩散等任务，以实现过程内、闭环的主动干预。
 
-Centered on the method described in the paper, the system assigns specialized roles (Analyst, Strategist, Leader, Amplifier) and integrates a retrieval-augmented collective cognition core (evidence knowledge base + action-outcome memory). Closed-loop evolutionary learning adapts strategies as the environment and adversaries evolve. EvoCorps is implemented on the MOSAIC social simulation platform and evaluated under adversarial injection and amplification in a multi-source news stream, improving emotional polarization, viewpoint extremity, and argumentative rationality.
+本项目以论文中的方法为核心，采用 Analyst、Strategist、Leader、Amplifier 的角色分工，并结合检索增强的集体认知内核（证据知识库 + 行动-结果记忆），通过闭环进化式学习在环境与对手变化下持续调整策略。系统已在 MOSAIC 社交模拟平台上实现，并在多源新闻流的对抗注入与放大场景中验证了对情绪极化、观点极端化与论证理性度的改善效果。
 
 <div align="center">
   <img src="assets/framework.png" width="100%" alt="EvoCorps Framework"/>
 </div>
 
+### ✨ 主要特性：
+- **♟️ 具有角色协调的动态团队**: 以 Analyst、Strategist、Leader、Amplifier 的角色分工形成协同干预管线，建模为动态社会博弈中的多角色决策与执行。
+- **🧠 检索增强集体认知核心**: 结合证据知识库与行动-结果记忆，实现事实支撑、长期记忆与策略复用。
+- **🧬 闭环自适应进化学习系统**: 基于反馈评估持续更新知识与策略，在对抗注入与环境变化下自适应演化。
 
-### ✨ Key Features:
-- **♟️ Dynamic game team with role coordination**: A coordinated pipeline of Analyst, Strategist, Leader, and Amplifier that models multi-role decision and execution in a dynamic social game.
-- **🧠 Retrieval-Augmented Collective Cognition Core**: Combines an evidence knowledge base with action-outcome memory for grounding, long-term memory, and strategy reuse.
-- **🧬 Closed-loop adaptive evolutionary learning system**: Continuously updates knowledge and strategies via feedback to adapt under adversarial injection and environment shifts.
 
-### Effect of system intervention
+### 系统干预效果
+
 <div align="center">
   <img src="assets/Sentiment_trajectories.png" width="100%" alt="Sentiment_trajectories"/>
 </div>
 
-The figure above shows the sentiment trajectories over time under Case1/2/3/4. The dashed line marks clarification at $t{=}5$. Case2 continues to decline, Case3 partially mitigates, and Case4 declines more slowly and stabilizes relative to Case2/3.
+上述图表展示了在情况 1/2/3/4 下随着时间推移的情绪变化轨迹。虚线标记了在时间点 t = 5 时的情绪趋于稳定。情况 2 继续下降，情况 3 有所缓解，而情况 4 的下降速度较慢，并且相对于情况 2/3 来说趋于稳定。
 
 ---
 
-## 📖 Table of Contents
-- [📂 Directory Structure](#-directory-structure)
-- [🚀 Quick Start](#-quick-start)
-  - [1. Environment Setup](#1-environment-setup)
-  - [2. Configure API](#2-configure-api)
-  - [3. System Run Steps](#3-system-run-steps)
-- [⚖️ Ethics Statement](#ethics-statement)
+## 📖 目录
+- [📂 目录结构](#-目录结构)
+- [🚀 快速开始](#-快速开始)
+  - [1. 环境配置](#1-环境配置)
+  - [2. 配置 API](#2-配置-api)
+  - [3. 系统运行步骤](#3-系统运行步骤)
+- [⚖️ 伦理声明](#️-伦理声明)
 
 ---
 
-## 📂 Directory Structure
+## 📂 目录结构
 
 ```text
 EvoCorps/
-├── agent_memory_exports/           # Exported agent memory analysis
-├── cognitive_memory/               # Cognitive memory traces
-├── config/                         # Runtime configuration
-├── configs/                        # Experiment and system configs
-├── data/                           # Data and samples
-├── database/                       # SQLite database
-├── evidence_database/              # Evidence database and retrieval config
-├── exported_content/               # Exported content and graphs
-├── human_study/                    # Human study data and analysis
-├── models/                         # Models and weights
-├── negative_news_heat/             # Negative news heat analysis
-├── personas/                       # Personas and roles
-├── result/                         # Result outputs
-├── scripts/                        # Helper scripts
-├── src/                            # Core code
-│   ├── agents/                     # Agent implementations
-│   ├── config/                     # Configuration module
-│   ├── database/                   # Database-related modules
-│   ├── retriver/                   # Retrieval-related modules
-│   ├── utils_package/              # Utility package
-│   ├── main.py                     # System main entry
-│   ├── start_database_service.py   # Start database service
-│   ├── keys.py                     # API key configuration
-│   ├── opinion_balance_launcher.py # Standalone opinion balance launcher
-├── rebuild_faiss_from_db.py        # Rebuild vector index
-├── requirements.txt                # Dependencies
-├── safety_prompts.json             # Safety prompt config
+├── agent_memory_exports/           # 导出的智能体记忆分析
+├── cognitive_memory/               # 认知记忆轨迹
+├── config/                         # 运行配置
+├── configs/                        # 实验与系统配置
+├── data/                           # 数据与样例
+├── database/                       # SQLite 数据库
+├── evidence_database/              # 证据数据库与检索配置
+├── exported_content/               # 导出内容与图表
+├── human_study/                    # 人类研究数据与分析
+├── models/                         # 模型与权重
+├── personas/                       # 人设与角色
+├── result/                         # 结果输出
+├── scripts/                        # 辅助脚本
+├── src/                            # 核心代码
+│   ├── agents/                     # Agent 实现
+│   ├── config/                     # 配置模块
+│   ├── database/                   # 数据库相关模块
+│   ├── retriver/                   # 检索相关模块
+│   ├── utils_package/              # 工具包
+│   ├── main.py                     # 系统主入口
+│   ├── start_database_service.py   # 启动数据库服务
+│   ├── keys.py                     # API 密钥配置
+│   ├── opinion_balance_launcher.py # 独立启动舆论平衡系统
+├── requirements.txt                # 依赖列表
 ├── LICENSE
 └── README.md
 ```
 
-## 🚀 Quick Start
+## 🚀 快速开始
 
-### 1. Environment Setup
+### 1. 环境配置
 
-Python 3.9+ is recommended:
+建议使用 Python 3.9+：
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure API
-
-Create a new `keys.py` file in the `src/` directory, copy the content below, and configure the API key and Base URL according to the service you are using.
+### 2. 配置 API
+在src\文件夹下新建keys.py文件，复制以下内容，并按实际使用的服务填写 API Key 与 Base URL：
 ```python
 OPENAI_API_KEY = "YOUR_API_KEY"
 OPENAI_BASE_URL = "BASE_URL"
 ```
 
-### 3. System Run Steps
-- Start the database service
+### 3. 系统运行步骤
+- 开启数据库服务
 ```bash
-# New terminal
+# 新建终端
 python src/start_database_service.py
 ```
 
-- Start the main program and follow the terminal prompts to select the runtime scenario
+- 启动主程序，按照终端提示信息选择运行场景
 ```bash
-# New terminal
+# 新建终端
 python src/main.py
 ```
 
-- If you need to use the opinion balance system, follow the prompts and do the following
+- 如果需要使用舆论平衡系统,可按照提示执行以下操作
 ```bash
-# New terminal
+# 新建终端
 python src\opinion_balance_launcher.py
-# Enter start to begin monitoring
+# 输入start，启动监控
 start
-# Enter auto-status to print the action logs in real time
+# 输入auto-status，实时打印行动的日志
 auto-status
 ```
 
+## ⚖️ 伦理声明
 
-## ⚖️ Ethics Statement
-This work investigates mechanisms for online discourse depolarization in a simulated environment, utilizing publicly available datasets and synthetic agent interactions. It does not involve experiments with human subjects and does not collect or process personally identifying information. The primary goal of this research is to advance understanding of coordinated intervention mechanisms for platform governance, rather than to develop or deploy deceptive influence campaigns.
+本研究在模拟环境中探讨在线讨论去极化的机制，使用的是公开可获取的数据集以及合成智能体之间的交互过程。研究过程中不涉及任何人类受试者实验，也不收集或处理任何可识别个人身份的信息。本研究的主要目标在于加深对平台治理中协调式干预机制的理解，而非开发或部署具有欺骗性的影响行动。
 
-EvoCorps is framed as a governance-assistance approach for online platforms facing coordinated and malicious activities such as disinformation campaigns or adversarial manipulation. In such settings, platform governance actors may themselves require coordinated capabilities and stylistic diversity to respond effectively and proportionately. Our study therefore examines coordination and response diversity as governance mechanisms, not as tools for artificial consensus formation or manipulation.
+EvoCorps 被定位为一种治理辅助方法，旨在帮助在线平台应对诸如虚假信息传播或对抗性操纵等有组织、恶意的行为。在此类情境下，平台治理主体本身可能需要具备协同能力和风格多样性，以实现有效且适度的响应。因此，本研究将协调能力与响应多样性视为治理机制进行考察，而非将其作为制造人为共识或操纵舆论的工具。
 
-We explicitly oppose the use of deceptive strategies in any real-world deployment. Although our simulations introduce diverse agent personas to explore theoretical boundaries of influence dynamics, any practical application must adhere strictly to principles of transparency and accountability. Automated agents should be clearly identified as AI-based assistants or governance tools, such as certified fact-checking bots, and must not impersonate human users or conceal their artificial nature.
+我们明确反对在任何现实世界部署中使用欺骗性策略。尽管本研究的模拟引入了多样化的智能体角色，用以探索影响力动态的理论边界，但任何实际应用都必须严格遵循透明性与问责原则。自动化智能体应被清晰标识为基于人工智能的助手或治理工具（例如经认证的事实核查机器人），不得冒充人类用户，也不得隐瞒其人工属性。
 
-Any deployment of systems inspired by this work should be integrated with existing platform governance processes and subject to platform-specific policies, transparency requirements, and continuous auditing. Such safeguards are necessary to mitigate unintended harms, including disparate impacts, erosion of user trust, or errors arising from automated judgments. The intended use of EvoCorps is to support responsible, transparent, and accountable governance interventions, rather than to mislead users or manufacture false consensus.
+任何受本研究启发的系统部署，都应当与现有的平台治理流程相结合，并遵循平台特定的政策、透明性要求以及持续审计机制。这些保障措施对于降低潜在的非预期危害至关重要，包括差异化影响、用户信任受损，或由自动化判断引发的错误。本研究中 EvoCorps 的预期用途在于支持负责任、透明且可问责的治理干预，而非误导用户或制造虚假共识。
+
