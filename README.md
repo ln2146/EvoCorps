@@ -2,12 +2,15 @@
 
   # EvoCorps
   **面向网络舆论去极化的进化式多智能体框架**
-
-    
-  [简体中文](README_zh.md) | [English](README.md)
+  <div align="center">
+    <img src="assets/logo.png" width="100%" alt="EvoCorps logo"/>
+  </div>
 
   ![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)
   ![License](https://img.shields.io/badge/license-MIT-green)
+
+  [简体中文](README.md) | [English](README_EN.md)
+
 </div>
 
 
