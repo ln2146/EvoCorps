@@ -27,7 +27,7 @@
 Centered on the method described in the paper, the system assigns specialized roles (Analyst, Strategist, Leader, Amplifier) and integrates a retrieval-augmented collective cognition core (evidence knowledge base + action-outcome memory). Closed-loop evolutionary learning adapts strategies as the environment and adversaries evolve. EvoCorps is implemented on the MOSAIC social simulation platform and evaluated under adversarial injection and amplification in a multi-source news stream, improving emotional polarization, viewpoint extremity, and argumentative rationality.
 
 <div align="center">
-  <img src="assets/framework.png" width="100%" alt="EvoCorps Framework"/>
+  <img src="assets/framework.svg" width="100%" alt="EvoCorps Framework"/>
 </div>
 
 

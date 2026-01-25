@@ -50,7 +50,7 @@ EvoCorps 的目标，是让舆论干预从“发现问题再处理”转向“�
 本项目采用 **Analyst / Strategist / Leader / Amplifier** 的角色分工，将“规划—生成—传播—反馈”串联为协同干预流程，并在检索增强的集体认知内核支持下复用论据与历史经验。
 
 <div align="center">
-  <img src="assets/framework.png" width="100%" alt="EvoCorps Framework"/>
+  <img src="assets/framework.svg" width="100%" alt="EvoCorps Framework"/>
 </div>
 
 ### ✨ 主要特性：
