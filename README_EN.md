@@ -49,9 +49,10 @@ The figure above shows the sentiment trajectories over time under Case1/2/3/4. T
 ## 📖 Table of Contents
 - [📂 Directory Structure](#-directory-structure)
 - [🚀 Quick Start](#-quick-start)
-  - [1. Environment Setup](#1-environment-setup)
-  - [2. Configure API](#2-configure-api)
-  - [3. System Run Steps](#3-system-run-steps)
+  - [1. Create Environment](#1-create-environment)
+  - [2. Install Dependencies](#2-install-dependencies)
+  - [3. Configure API](#3-configure-api)
+  - [4. System Run Steps](#4-system-run-steps)
 - [⚖️ Ethics Statement](#ethics-statement)
 
 ---
@@ -91,7 +92,17 @@ EvoCorps/
 
 ## 🚀 Quick Start
 
-### 1. Environment Setup
+### 1. Create Environment
+
+If you use Conda:
+
+```bash
+# Create a conda environment
+conda create -n your_conda_name python=3.12
+conda activate your_conda_name
+```
+
+### 2. Install Dependencies
 
 Python 3.9+ is recommended:
 
@@ -99,7 +110,7 @@ Python 3.9+ is recommended:
 pip install -r requirements.txt
 ```
 
-### 2. Configure API
+### 3. Configure API
 
 Create a new `keys.py` file in the `src/` directory, copy the content below, and configure the API key and Base URL according to the service you are using.
 ```python
@@ -107,7 +118,7 @@ OPENAI_API_KEY = "YOUR_API_KEY"
 OPENAI_BASE_URL = "BASE_URL"
 ```
 
-### 3. System Run Steps
+### 4. System Run Steps
 - Start the database service
 ```bash
 # New terminal

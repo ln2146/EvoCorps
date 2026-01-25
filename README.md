@@ -27,6 +27,14 @@
 <a id="problem"></a>
 ## 🧩 我们试图解决的问题
 
+在线社交平台的讨论，往往会在“同质性互动 + 推荐机制”的共同作用下逐步分化；当有组织的恶意账号在早期注入并放大情绪化叙事时，这种分化会被进一步加速。
+
+<div align="center">
+  <img src="assets/background.svg" width="100%" alt="Motivation: from normal communication to polarization under malicious attack, where passive detection and post-hoc intervention are often belated and weak"/>
+</div>
+
+该图概括了我们关注的动机：从正常交流出发，在恶意攻击介入后，群体讨论可能演化为难以调和的对立。由于情绪传播往往快于事实澄清，等到仅依赖被动检测、事后标记、删除时，讨论轨迹常已经固定，干预效果有限。
+
 现有网络舆论相关技术普遍存在以下局限：
 
 1. 以事后检测为主，响应滞后，难以影响传播过程
@@ -35,18 +43,12 @@
 
 EvoCorps 的目标，是让舆论干预从“发现问题再处理”转向“在传播过程中持续调节”。
 
-<div align="center">
-  <img src="assets/background.png" width="100%" alt="Motivation: from normal communication to polarization under malicious attack, where passive detection and post-hoc intervention are often belated and weak"/>
-</div>
-
-上图展示了舆论去极化的核心动机：在线社交平台在同质性网络互动与参与度导向的算法推荐共同作用下，讨论更容易分化为彼此隔离的阵营，情绪化、单一叙事在圈层内被不断强化，而温和观点被边缘化。更进一步，现实平台中还存在恶意且高度协同的多身份集体，它们能够在早期通过情绪感染、算法反馈与协同行为进行注入与放大，加速将讨论推向对抗性极化。在这种情境下，情绪信号往往先于事实核查与纠错扩散，早期叙事一旦锁定，后续纠偏就更难奏效。因此，若仅依赖被动检测或事后删除/标记等诊断式治理手段，通常会因响应滞后、干预离散且缺乏闭环自适应而效果有限，难以真正改变极化的演化轨迹。
-
 <a id="how-it-works"></a>
 ## 🛠️ EvoCorps 如何工作
 
 舆论监测 → 局势建模 → 干预策略规划 → 基于事实的内容生成 → 多角色传播 → 效果反馈与策略进化
 
-本项目以论文方法为核心实现，采用 **Analyst / Strategist / Leader / Amplifier** 的角色分工，将“规划—生成—传播—反馈”串联为协同干预管线，并在检索增强的集体认知内核支持下复用证据与历史经验。
+本项目采用 **Analyst / Strategist / Leader / Amplifier** 的角色分工，将“规划—生成—传播—反馈”串联为协同干预管线，并在检索增强的集体认知内核支持下复用证据与历史经验。
 
 <div align="center">
   <img src="assets/framework.png" width="100%" alt="EvoCorps Framework"/>
@@ -69,7 +71,7 @@ EvoCorps 的目标，是让舆论干预从“发现问题再处理”转向“�
   <img src="assets/Sentiment_trajectories.png" width="100%" alt="Sentiment_trajectories"/>
 </div>
 
-上述图表对比了四种设置下的情绪随时间变化情况。虚线表示平台开始注入事实澄清的时间点（第 5 个时间步）；在对抗放大场景中，缺乏保护或仅事后干预的情绪更难恢复，而 EvoCorps 能更早拉住下滑趋势，使讨论更快趋于稳定。
+上述图表对比了四种设置下的情绪随时间变化情况：Case 1（仅普通用户自然讨论，无恶意水军也无干预）、Case 2（恶意水军/协同账号放大偏置信息，无防护）、Case 3（在Case 2 基础上采用事后审核/事实核查与处置）、Case 4（在Case 2 基础上由 EvoCorps 进行过程内、角色协同的主动干预）。虚线表示平台开始注入事实澄清的时间点（第5个时间步）；在对抗放大场景中，缺乏保护或仅事后干预的情绪更难恢复，而 EvoCorps 能更早拉住下滑趋势，使讨论更快趋于稳定。
 
 ---
 
@@ -80,9 +82,10 @@ EvoCorps 的目标，是让舆论干预从“发现问题再处理”转向“�
 - [📊 实验验证](#evaluation)
 - [📂 目录结构](#-目录结构)
 - [🚀 快速开始](#-快速开始)
-  - [1. 环境配置](#1-环境配置)
-  - [2. 配置 API](#2-配置-api)
-  - [3. 系统运行步骤](#3-系统运行步骤)
+  - [1. 创建环境](#1-创建环境)
+  - [2. 安装依赖包](#2-安装依赖包)
+  - [3. 配置 API](#3-配置-api)
+  - [4. 系统运行步骤](#4-系统运行步骤)
 - [⚖️ 伦理声明](#ethics)
 
 ---
@@ -121,7 +124,17 @@ EvoCorps/
 
 ## 🚀 快速开始
 
-### 1. 环境配置
+### 1. 创建环境
+
+如果使用 Conda：
+
+```bash
+# 创建 conda 环境
+conda create -n your_conda_name python=3.12
+conda activate your_conda_name
+```
+
+### 2. 安装依赖包
 
 建议使用 Python 3.9+：
 
@@ -129,14 +142,14 @@ EvoCorps/
 pip install -r requirements.txt
 ```
 
-### 2. 配置 API
+### 3. 配置 API
 在 `src/` 文件夹下创建 `keys.py`文件，并将下列代码复制到其中，并根据实际使用的服务填写 API Key 与 Base URL：
 ```python
 OPENAI_API_KEY = "YOUR_API_KEY"
 OPENAI_BASE_URL = "BASE_URL"
 ```
 
-### 3. 系统运行步骤
+### 4. 系统运行步骤
 - 开启数据库服务
 ```bash
 # 新建终端
