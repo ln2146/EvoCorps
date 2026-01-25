@@ -21,7 +21,7 @@
 
 **EvoCorps** 是一个面向**网络舆论去极化**的**进化式多智能体框架**。它并非传统的舆情检测或事后治理工具，而是在模拟环境中将舆论干预建模为一个**持续演化的社会博弈过程**：系统在传播过程中进行过程内调节，**降低情绪对立、抑制极端观点扩散，并提升整体讨论的理性程度**。
 
-在 EvoCorps 中，**不同智能体分工协作**，模拟现实中的多角色舆论参与者，协同完成**舆论监测、局势建模、干预规划、基于事实的内容生成与多角色传播**等任务。框架内置**检索增强的集体认知机制（证据知识库 + 行动—结果记忆）**，并通过**基于反馈的进化式学习**，使系统能够随环境变化自适应优化干预策略。
+在 EvoCorps 中，**不同智能体分工协作**，模拟现实中的多角色舆论参与者，协同完成**舆论监测、局势建模、干预规划、基于事实的内容生成与多角色传播**等任务。框架内置**检索增强的集体认知机制（论据知识库 + 行动—结果记忆）**，并通过**基于反馈的进化式学习**，使系统能够随环境变化自适应优化干预策略。
 
 <a id="problem"></a>
 ## 🧩 我们试图解决的问题
@@ -29,7 +29,7 @@
 在线社交平台的讨论，往往会在“同质性互动 + 推荐机制”的共同作用下逐步分化；当有组织的恶意账号在早期注入并放大情绪化叙事时，这种分化会被进一步加速。
 
 <div align="center">
-  <img src="assets/background.svg" width="70%" alt="Motivation: from normal communication to polarization under malicious attack, where passive detection and post-hoc intervention are often belated and weak"/>
+  <img src="assets/background.svg" width="80%" alt="Motivation: from normal communication to polarization under malicious attack, where passive detection and post-hoc intervention are often belated and weak"/>
 </div>
 
 该图概括了我们关注的动机：从正常交流出发，在恶意攻击介入后，群体讨论可能演化为难以调和的对立。由于情绪传播往往快于事实澄清，等到仅依赖被动检测、事后标记、删除时，讨论轨迹常已经固定，干预效果有限。
@@ -47,7 +47,7 @@ EvoCorps 的目标，是让舆论干预从“发现问题再处理”转向“�
 
 舆论监测 → 局势建模 → 干预策略规划 → 基于事实的内容生成 → 多角色传播 → 效果反馈与策略进化
 
-本项目采用 **Analyst / Strategist / Leader / Amplifier** 的角色分工，将“规划—生成—传播—反馈”串联为协同干预管线，并在检索增强的集体认知内核支持下复用证据与历史经验。
+本项目采用 **Analyst / Strategist / Leader / Amplifier** 的角色分工，将“规划—生成—传播—反馈”串联为协同干预流程，并在检索增强的集体认知内核支持下复用论据与历史经验。
 
 <div align="center">
   <img src="assets/framework.png" width="100%" alt="EvoCorps Framework"/>
@@ -64,7 +64,7 @@ EvoCorps 的目标，是让舆论干预从“发现问题再处理”转向“�
 
 我们在 **MOSAIC** 社交模拟平台上对 EvoCorps 进行了系统评估，并在包含**负面新闻传播**与**恶意信息放大**的场景中进行测试。结果表明，在**情绪极化程度**、**观点极端化水平**与**论证理性**等关键指标上，EvoCorps 均优于事后干预方法。
 
-### 系统干预效果（示例）
+### 系统干预效果（示意图）
 
 <div align="center">
   <img src="assets/Sentiment_trajectories.png" width="100%" alt="Sentiment_trajectories"/>
@@ -161,7 +161,7 @@ python src/main.py
 - 如果需要使用舆论平衡系统,可按照提示执行以下操作
 ```bash
 # 新建终端
-python src\opinion_balance_launcher.py
+python src/opinion_balance_launcher.py
 # 输入start，启动监控
 start
 # 输入auto-status，实时打印行动的日志

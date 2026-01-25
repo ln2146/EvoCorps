@@ -134,7 +134,7 @@ python src/main.py
 - If you need to use the opinion balance system, follow the prompts and do the following
 ```bash
 # New terminal
-python src\opinion_balance_launcher.py
+python src/opinion_balance_launcher.py
 # Enter start to begin monitoring
 start
 # Enter auto-status to print the action logs in real time
