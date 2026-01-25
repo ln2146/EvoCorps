@@ -52,7 +52,7 @@ Monitoring → Situation modeling → Intervention planning → Evidence-grounde
 EvoCorps uses four roles—**Analyst, Strategist, Leader, Amplifier**—to connect “plan → generate → diffuse → evaluate” into an executable workflow, and to reuse arguments and experience through retrieval-augmented cognition.
 
 <div align="center">
-  <img src="assets/framework.png" width="100%" alt="EvoCorps Framework"/>
+  <img src="assets/framework.svg" width="100%" alt="EvoCorps Framework"/>
 </div>
 
 
