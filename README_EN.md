@@ -7,8 +7,15 @@
     <img src="assets/logo.png" width="100%" alt="EvoCorps logo"/>
   </div>
 
-  ![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)
-  ![License](https://img.shields.io/badge/license-MIT-green)
+  <p>
+    <img alt="Python Version" src="https://img.shields.io/badge/python-3.9%2B-blue" />
+    <img alt="License" src="https://img.shields.io/badge/license-MIT-green" />
+    <img alt="Multi-Agent" src="https://img.shields.io/badge/agents-multi--agent-8a2be2" />
+    <img alt="RAG" src="https://img.shields.io/badge/RAG-FAISS-orange" />
+    <img alt="Database" src="https://img.shields.io/badge/DB-SQLite-blue" />
+    <img alt="Platform" src="https://img.shields.io/badge/platform-MOSAIC-7b68ee" />
+    <img alt="Stage" src="https://img.shields.io/badge/stage-research%20prototype-lightgrey" />
+  </p>
 
   [简体中文](README.md) | [English](README_EN.md)
 
@@ -26,9 +33,9 @@ Centered on the method described in the paper, the system assigns specialized ro
 
 
 ### ✨ Key Features:
-- **♟️ Dynamic game team with role coordination**: A coordinated pipeline of Analyst, Strategist, Leader, and Amplifier that models multi-role decision and execution in a dynamic social game.
-- **🧠 Retrieval-Augmented Collective Cognition Core**: Combines an evidence knowledge base with action-outcome memory for grounding, long-term memory, and strategy reuse.
-- **🧬 Closed-loop adaptive evolutionary learning system**: Continuously updates knowledge and strategies via feedback to adapt under adversarial injection and environment shifts.
+- **♟️ Clear role division with closed-loop coordination**: A four-role team (Analyst, Strategist, Leader, Amplifier) runs as a loop—monitor & assess → plan → generate → diffuse via multiple personas → evaluate—so interventions can be adjusted continuously during propagation.
+- **🧠 Retrieval-augmented grounding with evidence and experience**: EvoCorps maintains an evidence base and records what each intervention led to. It prioritizes verifiable facts/arguments and reuses patterns that worked better in past rounds, improving reliability and team consistency.
+- **🧬 Feedback-driven adaptation over time**: After each round, the system checks whether discussions become calmer and more moderate, then strengthens effective strategies and deemphasizes ineffective ones, helping it adapt as adversarial behaviors and conditions change.
 
 ### Effect of system intervention
 <div align="center">
