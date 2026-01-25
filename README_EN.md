@@ -22,7 +22,6 @@
 
 </div>
 
-
 **EvoCorps** is an **evolutionary multi-agent framework** for depolarizing online discourse. It models discourse governance as a dynamic social game and coordinates monitoring, planning, evidence-grounded generation, and multi-identity diffusion to enable in-process, closed-loop interventions.
 
 Centered on the method described in the paper, the system assigns specialized roles (Analyst, Strategist, Leader, Amplifier) and integrates a retrieval-augmented collective cognition core (evidence knowledge base + action-outcome memory). Closed-loop evolutionary learning adapts strategies as the environment and adversaries evolve. EvoCorps is implemented on the MOSAIC social simulation platform and evaluated under adversarial injection and amplification in a multi-source news stream, improving emotional polarization, viewpoint extremity, and argumentative rationality.
@@ -47,7 +46,7 @@ The figure above shows the sentiment trajectories over time under Case1/2/3/4. T
 ---
 
 ## 📖 Table of Contents
-- [📂 Directory Structure](#-directory-structure)
+- [📂 Project Structure](#project-structure)
 - [🚀 Quick Start](#-quick-start)
   - [1. Create Environment](#1-create-environment)
   - [2. Install Dependencies](#2-install-dependencies)
@@ -57,7 +56,8 @@ The figure above shows the sentiment trajectories over time under Case1/2/3/4. T
 
 ---
 
-## 📂 Directory Structure
+<a id="project-structure"></a>
+## 📂 Project Structure
 
 ```text
 EvoCorps/

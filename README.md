@@ -10,7 +10,6 @@
     <img alt="Python Version" src="https://img.shields.io/badge/python-3.9%2B-blue" />
     <img alt="License" src="https://img.shields.io/badge/license-MIT-green" />
     <img alt="Multi-Agent" src="https://img.shields.io/badge/agents-multi--agent-8a2be2" />
-
   </p>
 
   [简体中文](README.md) | [English](README_EN.md)
@@ -30,7 +29,7 @@
 在线社交平台的讨论，往往会在“同质性互动 + 推荐机制”的共同作用下逐步分化；当有组织的恶意账号在早期注入并放大情绪化叙事时，这种分化会被进一步加速。
 
 <div align="center">
-  <img src="assets/background.svg" width="100%" alt="Motivation: from normal communication to polarization under malicious attack, where passive detection and post-hoc intervention are often belated and weak"/>
+  <img src="assets/background.svg" width="70%" alt="Motivation: from normal communication to polarization under malicious attack, where passive detection and post-hoc intervention are often belated and weak"/>
 </div>
 
 该图概括了我们关注的动机：从正常交流出发，在恶意攻击介入后，群体讨论可能演化为难以调和的对立。由于情绪传播往往快于事实澄清，等到仅依赖被动检测、事后标记、删除时，讨论轨迹常已经固定，干预效果有限。
@@ -63,7 +62,7 @@ EvoCorps 的目标，是让舆论干预从“发现问题再处理”转向“�
 <a id="evaluation"></a>
 ## 📊 实验验证
 
-我们在 **MOSAIC** 社交模拟平台上对 EvoCorps 进行了系统评估，并在包含**负面新闻传播**与**恶意信息干扰/放大**的场景中进行测试。结果表明，在**情绪极化程度**、**观点极端化水平**与**论证理性**等关键指标上，EvoCorps 均优于事后干预方法。
+我们在 **MOSAIC** 社交模拟平台上对 EvoCorps 进行了系统评估，并在包含**负面新闻传播**与**恶意信息放大**的场景中进行测试。结果表明，在**情绪极化程度**、**观点极端化水平**与**论证理性**等关键指标上，EvoCorps 均优于事后干预方法。
 
 ### 系统干预效果（示例）
 
@@ -71,16 +70,12 @@ EvoCorps 的目标，是让舆论干预从“发现问题再处理”转向“�
   <img src="assets/Sentiment_trajectories.png" width="100%" alt="Sentiment_trajectories"/>
 </div>
 
-上述图表对比了四种设置下的情绪随时间变化情况：Case 1（仅普通用户自然讨论，无恶意水军也无干预）、Case 2（恶意水军/协同账号放大偏置信息，无防护）、Case 3（在Case 2 基础上采用事后审核/事实核查与处置）、Case 4（在Case 2 基础上由 EvoCorps 进行过程内、角色协同的主动干预）。虚线表示平台开始注入事实澄清的时间点（第5个时间步）；在对抗放大场景中，缺乏保护或仅事后干预的情绪更难恢复，而 EvoCorps 能更早拉住下滑趋势，使讨论更快趋于稳定。
+上述图表对比了四种设置下的情绪随时间变化情况：Case 1（仅普通用户自然讨论，无恶意水军也无干预）、Case 2（恶意水军/协同账号放大偏置信息，无防护）、Case 3（在 Case 2 基础上采用事后审核/事实核查与处置）、Case 4（在 Case 2 基础上由 EvoCorps 进行过程内、角色协同的主动干预）。虚线表示平台开始注入事实澄清的时间点（第 5 个时间步）；在对抗放大场景中，缺乏保护或仅事后干预的情绪更难恢复，而 EvoCorps 能更早拉住下滑趋势，使讨论更快趋于稳定。
 
 ---
 
 ## 📖 目录
-- [⚡ 项目概述](#overview)
-- [🧩 我们试图解决的问题](#problem)
-- [🛠️ EvoCorps 如何工作](#how-it-works)
-- [📊 实验验证](#evaluation)
-- [📂 目录结构](#-目录结构)
+- [📂 项目结构](#project-structure)
 - [🚀 快速开始](#-快速开始)
   - [1. 创建环境](#1-创建环境)
   - [2. 安装依赖包](#2-安装依赖包)
@@ -90,7 +85,8 @@ EvoCorps 的目标，是让舆论干预从“发现问题再处理”转向“�
 
 ---
 
-## 📂 目录结构
+<a id="project-structure"></a>
+## 📂 项目结构
 
 ```text
 EvoCorps/
@@ -126,7 +122,7 @@ EvoCorps/
 
 ### 1. 创建环境
 
-如果使用 Conda：
+使用 Conda：
 
 ```bash
 # 创建 conda 环境
@@ -136,7 +132,7 @@ conda activate your_conda_name
 
 ### 2. 安装依赖包
 
-建议使用 Python 3.9+：
+基础依赖安装：
 
 ```bash
 pip install -r requirements.txt
