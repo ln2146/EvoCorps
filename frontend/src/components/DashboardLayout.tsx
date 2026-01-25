@@ -1,22 +1,24 @@
 import { ReactNode, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Home, Server, Activity, FlaskConical, BarChart3, Settings, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Home, Server, Activity, FlaskConical, BarChart3, Settings, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
-interface LayoutProps {
+interface DashboardLayoutProps {
   children: ReactNode
 }
 
 const navItems = [
-  { path: '/', label: '主页', icon: Home },
-  { path: '/service', label: '服务管理', icon: Server },
-  { path: '/monitoring', label: '数据监控', icon: Activity },
-  { path: '/experiment', label: '实验管理', icon: FlaskConical },
-  { path: '/visualization', label: '数据可视化', icon: BarChart3 },
-  { path: '/config', label: '配置', icon: Settings },
+  { path: '/dashboard', label: '主页', icon: Home },
+  { path: '/dashboard/service', label: '服务管理', icon: Server },
+  { path: '/dashboard/monitoring', label: '数据监控', icon: Activity },
+  { path: '/dashboard/experiment', label: '实验管理', icon: FlaskConical },
+  { path: '/dashboard/visualization', label: '数据可视化', icon: BarChart3 },
+  { path: '/dashboard/config', label: '配置', icon: Settings },
 ]
 
-export default function Layout({ children }: LayoutProps) {
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const location = useLocation()
+  const navigate = useNavigate()
   const [isCollapsed, setIsCollapsed] = useState(false)
 
   return (
@@ -40,7 +42,7 @@ export default function Layout({ children }: LayoutProps) {
         </button>
 
         {/* Logo */}
-        <div className="p-6 border-b border-white/20 flex items-center justify-between">
+        <div className="p-6 border-b border-white/20">
           {!isCollapsed && (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-r from-blue-500 to-green-500 flex items-center justify-center shadow-lg">
@@ -50,7 +52,7 @@ export default function Layout({ children }: LayoutProps) {
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
                   EvoCorps
                 </h1>
-                <p className="text-xs text-slate-500">舆论平衡系统</p>
+                <p className="text-xs text-slate-500">静态演示</p>
               </div>
             </div>
           )}
@@ -82,13 +84,27 @@ export default function Layout({ children }: LayoutProps) {
           })}
         </nav>
 
-        {/* 底部信息 */}
+        {/* 底部返回首页按钮 */}
         {!isCollapsed && (
           <div className="p-4 border-t border-white/20">
-            <div className="glass-card p-4">
-              <p className="text-xs text-slate-600 mb-1">系统版本</p>
-              <p className="text-sm font-semibold text-slate-800">v1.0.0</p>
-            </div>
+            <button
+              onClick={() => navigate('/')}
+              className="w-full glass-card p-4 hover:bg-white/80 transition-all flex items-center justify-center gap-2 text-slate-700 font-medium"
+            >
+              <ArrowLeft size={20} />
+              <span>返回首页</span>
+            </button>
+          </div>
+        )}
+        {isCollapsed && (
+          <div className="p-4 border-t border-white/20">
+            <button
+              onClick={() => navigate('/')}
+              className="w-full glass-card p-3 hover:bg-white/80 transition-all flex items-center justify-center text-slate-700"
+              title="返回首页"
+            >
+              <ArrowLeft size={20} />
+            </button>
           </div>
         )}
       </aside>

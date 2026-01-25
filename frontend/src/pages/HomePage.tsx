@@ -48,9 +48,11 @@ export default function HomePage() {
               面向网络舆论去极化的进化式多智能体框架
             </p>
           </div>
-          <div className="w-24 h-24 rounded-3xl bg-gradient-to-r from-blue-500 to-green-500 flex items-center justify-center shadow-2xl">
-            <Activity size={48} className="text-white" />
-          </div>
+          <img 
+            src="/logot.png" 
+            alt="EvoCorps Icon" 
+            className="h-24 w-auto drop-shadow-xl"
+          />
         </div>
       </div>
 
