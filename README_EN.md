@@ -11,10 +11,6 @@
     <img alt="Python Version" src="https://img.shields.io/badge/python-3.9%2B-blue" />
     <img alt="License" src="https://img.shields.io/badge/license-MIT-green" />
     <img alt="Multi-Agent" src="https://img.shields.io/badge/agents-multi--agent-8a2be2" />
-    <img alt="RAG" src="https://img.shields.io/badge/RAG-FAISS-orange" />
-    <img alt="Database" src="https://img.shields.io/badge/DB-SQLite-blue" />
-    <img alt="Platform" src="https://img.shields.io/badge/platform-MOSAIC-7b68ee" />
-    <img alt="Stage" src="https://img.shields.io/badge/stage-research%20prototype-lightgrey" />
   </p>
 
   [简体中文](README.md) | [English](README_EN.md)
@@ -22,9 +18,38 @@
 
 </div>
 
-**EvoCorps** is an **evolutionary multi-agent framework** for depolarizing online discourse. It models discourse governance as a dynamic social game and coordinates monitoring, planning, evidence-grounded generation, and multi-identity diffusion to enable in-process, closed-loop interventions.
+<a id="overview"></a>
+## ⚡ Overview
 
-Centered on the method described in the paper, the system assigns specialized roles (Analyst, Strategist, Leader, Amplifier) and integrates a retrieval-augmented collective cognition core (evidence knowledge base + action-outcome memory). Closed-loop evolutionary learning adapts strategies as the environment and adversaries evolve. EvoCorps is implemented on the MOSAIC social simulation platform and evaluated under adversarial injection and amplification in a multi-source news stream, improving emotional polarization, viewpoint extremity, and argumentative rationality.
+**EvoCorps** is an evolutionary multi-agent framework for depolarizing online discourse. Rather than focusing only on detection or post-hoc moderation, it treats interventions as a continuing process and supports in-process adjustments during propagation—reducing affective confrontation, curbing the spread of extreme viewpoints, and improving the overall rationality of discussion in a simulated environment.
+
+EvoCorps organizes heterogeneous agents to simulate real-world roles in discourse participation, covering monitoring, situation modeling, intervention planning, evidence-grounded response generation, and multi-persona diffusion. It is supported by a retrieval-augmented cognition core (argument knowledge base + action–outcome memory) and improved via feedback-driven evolutionary learning, so strategies can adapt as the environment changes.
+
+<a id="problem"></a>
+## 🧩 Problem We Target
+
+Online discourse can gradually split under homophilous interactions and engagement-driven recommendation. When coordinated malicious accounts inject and amplify emotionally charged narratives early, polarization accelerates.
+
+<div align="center">
+  <img src="assets/background.svg" width="80%" alt="Motivation: from normal communication to polarization under malicious attack, where passive detection and post-hoc intervention are often belated and weak"/>
+</div>
+
+This figure summarizes our motivation: starting from normal communication, malicious injection can push discussions toward an irreconcilable divide. Because emotional signals often spread faster than factual clarification, relying only on passive detection or post-hoc labeling/removal is frequently too late to change the trajectory.
+
+Common limitations in existing approaches include:
+
+1. Post-hoc detection dominates, with inherent response latency
+2. Static strategies struggle against organized and evolving adversaries
+3. Weak closed-loop feedback makes it hard to tell whether interventions truly change outcomes
+
+EvoCorps aims to shift from “detect, then react” to “continuously regulate during propagation.”
+
+<a id="how-it-works"></a>
+## 🛠️ How EvoCorps Works
+
+Monitoring → Situation modeling → Intervention planning → Evidence-grounded generation → Multi-persona diffusion → Feedback and strategy evolution
+
+EvoCorps uses four roles—**Analyst, Strategist, Leader, Amplifier**—to connect “plan → generate → diffuse → evaluate” into an executable workflow, and to reuse arguments and experience through retrieval-augmented cognition.
 
 <div align="center">
   <img src="assets/framework.png" width="100%" alt="EvoCorps Framework"/>
@@ -32,16 +57,21 @@ Centered on the method described in the paper, the system assigns specialized ro
 
 
 ### ✨ Key Features:
-- **♟️ Clear role division with closed-loop coordination**: A four-role team (Analyst, Strategist, Leader, Amplifier) runs as a loop—monitor & assess → plan → generate → diffuse via multiple personas → evaluate—so interventions can be adjusted continuously during propagation.
-- **🧠 Retrieval-augmented grounding with evidence and experience**: EvoCorps maintains an evidence base and records what each intervention led to. It prioritizes verifiable facts/arguments and reuses patterns that worked better in past rounds, improving reliability and team consistency.
-- **🧬 Feedback-driven adaptation over time**: After each round, the system checks whether discussions become calmer and more moderate, then strengthens effective strategies and deemphasizes ineffective ones, helping it adapt as adversarial behaviors and conditions change.
+- **♟️ Clear role division with closed-loop coordination**: A four-role team runs as a loop—monitor & assess → plan → generate → diffuse → evaluate—so interventions can be adjusted continuously during propagation.
+- **🧠 Evidence- and experience-grounded responses**: The system maintains an argument/evidence base and records what each intervention led to, prioritizing verifiable points and reusing patterns that worked better in past rounds.
+- **🧬 Feedback-driven adaptation**: After each round, EvoCorps evaluates whether discussions become calmer and more moderate, then strengthens effective strategies and weakens ineffective ones over time.
 
-### Effect of system intervention
+<a id="evaluation"></a>
+## 📊 Evaluation
+
+We evaluate EvoCorps on the **MOSAIC** social simulation platform under scenarios with negative news streams and adversarial amplification. Results show that EvoCorps improves key indicators including emotional polarization, viewpoint extremity, and argumentative rationality compared to post-hoc baselines.
+
+### Intervention Effect (Illustration)
 <div align="center">
   <img src="assets/Sentiment_trajectories.png" width="100%" alt="Sentiment_trajectories"/>
 </div>
 
-The figure above shows the sentiment trajectories over time under Case1/2/3/4. The dashed line marks clarification at $t{=}5$. Case2 continues to decline, Case3 partially mitigates, and Case4 declines more slowly and stabilizes relative to Case2/3.
+The figure compares sentiment trajectories over time under four settings: Case 1 (only ordinary users; no adversary and no intervention), Case 2 (coordinated malicious amplification; no protection), Case 3 (post-hoc review on top of Case 2), and Case 4 (EvoCorps proactive, role-coordinated in-process intervention on top of Case 2). The dashed line marks when factual clarification starts to be injected (time step 5). Under adversarial amplification, sentiment is harder to recover with no protection or post-hoc intervention only, while EvoCorps stabilizes earlier and trends more steadily.
 
 ---
 
@@ -85,7 +115,6 @@ EvoCorps/
 │   ├── keys.py                     # API key configuration
 │   ├── opinion_balance_launcher.py # Standalone opinion balance launcher
 ├── requirements.txt                # Dependencies
-├── safety_prompts.json             # Safety prompt config
 ├── LICENSE
 └── README.md
 ```
@@ -94,7 +123,7 @@ EvoCorps/
 
 ### 1. Create Environment
 
-If you use Conda:
+Using Conda:
 
 ```bash
 # Create a conda environment
@@ -104,7 +133,7 @@ conda activate your_conda_name
 
 ### 2. Install Dependencies
 
-Python 3.9+ is recommended:
+Base dependency installation:
 
 ```bash
 pip install -r requirements.txt
@@ -143,6 +172,7 @@ auto-status
 
 
 ## ⚖️ Ethics Statement
+<a id="ethics-statement"></a>
 This work investigates mechanisms for online discourse depolarization in a simulated environment, utilizing publicly available datasets and synthetic agent interactions. It does not involve experiments with human subjects and does not collect or process personally identifying information. The primary goal of this research is to advance understanding of coordinated intervention mechanisms for platform governance, rather than to develop or deploy deceptive influence campaigns.
 
 EvoCorps is framed as a governance-assistance approach for online platforms facing coordinated and malicious activities such as disinformation campaigns or adversarial manipulation. In such settings, platform governance actors may themselves require coordinated capabilities and stylistic diversity to respond effectively and proportionately. Our study therefore examines coordination and response diversity as governance mechanisms, not as tools for artificial consensus formation or manipulation.
