@@ -21,6 +21,7 @@ import glob
 import subprocess
 import signal
 import psutil
+import json
 
 app = Flask(__name__)
 CORS(app)
@@ -465,6 +466,10 @@ def start_service(service_name):
         if service_name not in ['database', 'platform', 'balance']:
             return jsonify({'error': 'Invalid service name'}), 400
         
+        # 获取conda环境名称（如果提供）
+        data = request.get_json() or {}
+        conda_env = data.get('conda_env', '').strip()
+        
         # 根据服务名称启动对应的脚本
         scripts = {
             'database': 'src/start_database_service.py',
@@ -502,11 +507,21 @@ def start_service(service_name):
         # 启动进程 - 在新的终端窗口中运行，使用/K保持窗口打开
         if os.name == 'nt':  # Windows
             title = f"EvoCorps-{service_name}"
-            # 使用cmd /c start命令，注意引号的使用
-            cmd = f'cmd /c start "{title}" cmd /k python {script_path}'
+            # 如果提供了conda环境，先激活环境
+            if conda_env:
+                # Windows上使用conda run命令，这是最可靠的方式
+                # conda run会自动处理环境激活
+                cmd = f'cmd /c start "{title}" cmd /k "conda run -n {conda_env} python {script_path}"'
+            else:
+                cmd = f'cmd /c start "{title}" cmd /k python {script_path}'
             subprocess.Popen(cmd, shell=True)
         else:  # Linux/Mac
-            subprocess.Popen(['python', script_path])
+            if conda_env:
+                # Linux/Mac上使用conda run
+                cmd = f'conda run -n {conda_env} python {script_path}'
+                subprocess.Popen(cmd, shell=True, executable='/bin/bash')
+            else:
+                subprocess.Popen(['python', script_path])
         
         return jsonify({'message': f'Service {service_name} started'})
         
@@ -1171,6 +1186,47 @@ def get_opinion_balance_data(db_name):
     except Exception as e:
         import traceback
         traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/config/experiment', methods=['GET'])
+def get_experiment_config():
+    """获取实验配置"""
+    try:
+        config_path = 'configs/experiment_config.json'
+        if not os.path.exists(config_path):
+            return jsonify({'error': 'Config file not found'}), 404
+        
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        return jsonify(config)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/config/experiment', methods=['POST'])
+def save_experiment_config():
+    """保存实验配置"""
+    try:
+        config_path = 'configs/experiment_config.json'
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # 备份原配置
+        if os.path.exists(config_path):
+            import shutil
+            backup_path = config_path + '.backup'
+            shutil.copy(config_path, backup_path)
+        
+        # 保存新配置
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+        
+        return jsonify({'message': 'Config saved successfully'})
+        
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

@@ -8,7 +8,6 @@ export default function DataVisualization() {
   const [selectedDb, setSelectedDb] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const graphRef = useRef<any>()
-  const containerRef = useRef<HTMLDivElement>(null)
   
   // 过滤选项
   const [showUsers, setShowUsers] = useState(true)
@@ -433,7 +432,7 @@ export default function DataVisualization() {
         <>
           {/* 关系网络图 */}
           {graphData.nodes && graphData.nodes.length > 0 ? (
-            <div className="glass-card p-6" ref={containerRef}>
+            <div className="glass-card p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-slate-800">关系图谱</h2>
                 <div className="flex items-center gap-6">

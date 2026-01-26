@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import DashboardLayout from './components/DashboardLayout'
 import WelcomePage from './pages/WelcomePage'
 import HomePage from './pages/HomePage'
-import ServiceManagement from './pages/ServiceManagement'
+import ExperimentSettings from './pages/ExperimentSettings'
 import DataMonitoring from './pages/DataMonitoring'
 import ExperimentManagement from './pages/ExperimentManagement'
 import DataVisualization from './pages/DataVisualization'
@@ -28,7 +28,7 @@ function App() {
           <DashboardLayout>
             <Routes>
               <Route path="/" element={<HomePage />} />
-              <Route path="/service" element={<ServiceManagement />} />
+              <Route path="/service" element={<ExperimentSettings />} />
               <Route path="/monitoring" element={<DataMonitoring />} />
               <Route path="/experiment" element={<ExperimentManagement />} />
               <Route path="/visualization" element={<DataVisualization />} />
