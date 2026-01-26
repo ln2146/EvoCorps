@@ -170,6 +170,35 @@ start
 auto-status
 ```
 
+### 5. Launch Frontend Visualization Interface
+
+- Start the backend API service
+```bash
+# New terminal
+python frontend_api.py
+```
+
+- Start the frontend development server
+```bash
+# New terminal, navigate to frontend directory
+cd frontend
+npm install  # Install dependencies on first run
+npm run dev
+```
+
+- Access the frontend interface
+
+Open your browser and visit `http://localhost:3000` or `http://localhost:3001` (check the port shown in terminal)
+
+The frontend interface provides the following features:
+- **Home**: System overview and quick navigation
+- **Experiment Settings**: Configure experiment parameters and launch services
+- **Data Monitoring**: Real-time system status and statistics
+- **Experiment Management**: Save and load experiment snapshots
+- **Relationship Graph**: Visualize the network of users, posts, and comments
+- **Interview Feature**: Send questionnaires to simulated users and collect responses
+
+
 
 ## ⚖️ Ethics Statement
 <a id="ethics-statement"></a>

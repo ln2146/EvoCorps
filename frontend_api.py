@@ -1229,7 +1229,246 @@ def save_experiment_config():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/interview/send', methods=['POST'])
+def send_interview():
+    """向选中的用户发送采访问题并获取回答"""
+    try:
+        data = request.get_json()
+        database = data.get('database')
+        user_ids = data.get('user_ids', [])
+        question = data.get('question', '')
+        
+        if not database or not user_ids or not question:
+            return jsonify({'error': 'Missing required parameters'}), 400
+        
+        db_path = os.path.join(DATABASE_DIR, database)
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database not found'}), 404
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        responses = []
+        
+        for user_id in user_ids:
+            # 获取用户信息
+            cursor.execute("""
+                SELECT user_id, persona, background_labels
+                FROM users
+                WHERE user_id = ?
+            """, (user_id,))
+            
+            user_row = cursor.fetchone()
+            if not user_row:
+                continue
+            
+            user_persona = user_row[1]
+            background = user_row[2] if user_row[2] else ''
+            
+            # 模拟AI回答
+            answer = generate_interview_answer(user_persona, background, question)
+            
+            responses.append({
+                'user_id': user_id,
+                'question': question,
+                'answer': answer,
+                'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'message': 'Interview sent successfully',
+            'responses': responses
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+def generate_interview_answer(persona, background, question):
+    """根据用户persona生成采访回答"""
+    answers_templates = [
+        f"作为{persona}，我认为{question}这个问题很有意思。基于我的背景和经验，我的看法是...",
+        f"从我的角度来看，{question}涉及到多个方面。作为{persona}，我特别关注...",
+        f"这是一个很好的问题。{persona}的我会这样回答：...",
+        f"根据我的理解和{background}的背景，对于{question}，我的观点是...",
+    ]
+    
+    import random
+    base_answer = random.choice(answers_templates)
+    
+    if '喜欢' in question or '偏好' in question:
+        base_answer += "我个人比较倾向于那些能够带来实际价值的选择。"
+    elif '看法' in question or '观点' in question or '认为' in question:
+        base_answer += "我觉得这需要从多个角度来考虑，不能一概而论。"
+    elif '经验' in question or '经历' in question:
+        base_answer += "在我过去的经历中，我遇到过类似的情况，那次经验让我学到了很多。"
+    elif '建议' in question or '推荐' in question:
+        base_answer += "我建议可以先从小处着手，逐步积累经验。"
+    else:
+        base_answer += "总的来说，我认为保持开放的心态和持续学习是很重要的。"
+    
+    return base_answer
+
+@app.route('/api/interview/users/<db_name>', methods=['GET'])
+def get_all_users_for_interview(db_name):
+    """获取所有用户用于采访（不限制数量）"""
+    try:
+        db_path = os.path.join(DATABASE_DIR, db_name)
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database not found'}), 404
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT user_id, persona, creation_time, influence_score, follower_count
+            FROM users
+            ORDER BY influence_score DESC
+        """)
+        
+        users = []
+        for row in cursor.fetchall():
+            users.append({
+                'user_id': row[0],
+                'persona': row[1],
+                'creation_time': row[2],
+                'influence_score': row[3] or 0,
+                'follower_count': row[4] or 0
+            })
+        
+        conn.close()
+        return jsonify({'users': users})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     print("Starting EvoCorps Frontend API Server...")
     print("Database directory:", os.path.abspath(DATABASE_DIR))
     app.run(host='127.0.0.1', port=5001, debug=True)
+
+
+@app.route('/api/interview/send', methods=['POST'])
+def send_interview():
+    """向选中的用户发送采访问题并获取回答"""
+    try:
+        data = request.get_json()
+        database = data.get('database')
+        user_ids = data.get('user_ids', [])
+        question = data.get('question', '')
+        
+        if not database or not user_ids or not question:
+            return jsonify({'error': 'Missing required parameters'}), 400
+        
+        db_path = os.path.join(DATABASE_DIR, database)
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database not found'}), 404
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        responses = []
+        
+        for user_id in user_ids:
+            # 获取用户信息
+            cursor.execute("""
+                SELECT user_id, persona, background_labels
+                FROM users
+                WHERE user_id = ?
+            """, (user_id,))
+            
+            user_row = cursor.fetchone()
+            if not user_row:
+                continue
+            
+            user_persona = user_row[1]
+            background = user_row[2] if user_row[2] else ''
+            
+            # 模拟AI回答（这里可以接入真实的AI模型）
+            # 根据用户的persona生成回答
+            answer = generate_interview_answer(user_persona, background, question)
+            
+            responses.append({
+                'user_id': user_id,
+                'question': question,
+                'answer': answer,
+                'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'message': 'Interview sent successfully',
+            'responses': responses
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+def generate_interview_answer(persona, background, question):
+    """根据用户persona生成采访回答"""
+    # 这是一个简化的模拟回答生成器
+    # 在实际应用中，这里应该调用AI模型（如GPT、Claude等）
+    
+    # 简单的模板回答
+    answers_templates = [
+        f"作为{persona}，我认为{question}这个问题很有意思。基于我的背景和经验，我的看法是...",
+        f"从我的角度来看，{question}涉及到多个方面。作为{persona}，我特别关注...",
+        f"这是一个很好的问题。{persona}的我会这样回答：...",
+        f"根据我的理解和{background}的背景，对于{question}，我的观点是...",
+    ]
+    
+    import random
+    base_answer = random.choice(answers_templates)
+    
+    # 根据问题关键词生成更具体的回答
+    if '喜欢' in question or '偏好' in question:
+        base_answer += "我个人比较倾向于那些能够带来实际价值的选择。"
+    elif '看法' in question or '观点' in question or '认为' in question:
+        base_answer += "我觉得这需要从多个角度来考虑，不能一概而论。"
+    elif '经验' in question or '经历' in question:
+        base_answer += "在我过去的经历中，我遇到过类似的情况，那次经验让我学到了很多。"
+    elif '建议' in question or '推荐' in question:
+        base_answer += "我建议可以先从小处着手，逐步积累经验。"
+    else:
+        base_answer += "总的来说，我认为保持开放的心态和持续学习是很重要的。"
+    
+    return base_answer
+
+@app.route('/api/interview/users/<db_name>', methods=['GET'])
+def get_all_users_for_interview(db_name):
+    """获取所有用户用于采访（不限制数量）"""
+    try:
+        db_path = os.path.join(DATABASE_DIR, db_name)
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database not found'}), 404
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT user_id, persona, creation_time, influence_score, follower_count
+            FROM users
+            ORDER BY influence_score DESC
+        """)
+        
+        users = []
+        for row in cursor.fetchall():
+            users.append({
+                'user_id': row[0],
+                'persona': row[1],
+                'creation_time': row[2],
+                'influence_score': row[3] or 0,
+                'follower_count': row[4] or 0
+            })
+        
+        conn.close()
+        return jsonify({'users': users})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

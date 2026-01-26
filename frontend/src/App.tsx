@@ -9,6 +9,7 @@ import DataVisualization from './pages/DataVisualization'
 import ConfigPage from './pages/ConfigPage'
 import DynamicDemo from './pages/DynamicDemo'
 import TestGraph from './pages/TestGraph'
+import InterviewPage from './pages/InterviewPage'
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
               <Route path="/monitoring" element={<DataMonitoring />} />
               <Route path="/experiment" element={<ExperimentManagement />} />
               <Route path="/visualization" element={<DataVisualization />} />
+              <Route path="/interview" element={<InterviewPage />} />
               <Route path="/config" element={<ConfigPage />} />
             </Routes>
           </DashboardLayout>
