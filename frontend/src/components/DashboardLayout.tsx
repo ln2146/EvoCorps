@@ -12,7 +12,7 @@ const navItems = [
   { path: '/dashboard/service', label: '服务管理', icon: Server },
   { path: '/dashboard/monitoring', label: '数据监控', icon: Activity },
   { path: '/dashboard/experiment', label: '实验管理', icon: FlaskConical },
-  { path: '/dashboard/visualization', label: '数据可视化', icon: BarChart3 },
+  { path: '/dashboard/visualization', label: '关系图谱', icon: BarChart3 },
   { path: '/dashboard/config', label: '配置', icon: Settings },
 ]
 

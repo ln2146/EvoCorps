@@ -166,4 +166,71 @@ export const getPostDetail = async (dbName: string, postId: string): Promise<Pos
   }
 }
 
+// Experiment Management APIs
+export interface Experiment {
+  experiment_id: string
+  experiment_name: string
+  scenario_type: string
+  database_name: string
+  timestamp: string
+  saved_at: string
+  database_saved: boolean
+  emotion_data_saved: boolean
+}
+
+export const getExperiments = async (): Promise<Experiment[]> => {
+  try {
+    const response = await api.get('/experiments')
+    return response.data.experiments || []
+  } catch (error) {
+    console.error('Failed to fetch experiments:', error)
+    return []
+  }
+}
+
+export const saveExperiment = async (data: {
+  experiment_name: string
+  scenario_type: string
+  database_name: string
+}) => {
+  const response = await api.post('/experiments/save', data)
+  return response.data
+}
+
+export const loadExperiment = async (experimentId: string) => {
+  const response = await api.post(`/experiments/${experimentId}/load`)
+  return response.data
+}
+
+export const deleteExperiment = async (experimentId: string) => {
+  const response = await api.delete(`/experiments/${experimentId}`)
+  return response.data
+}
+
+// Visualization APIs
+export const getEmotionData = async (dbName: string) => {
+  const response = await api.get(`/visualization/${dbName}/emotion`)
+  return response.data
+}
+
+export const getTopUsers = async (dbName: string) => {
+  const response = await api.get(`/visualization/${dbName}/top-users`)
+  return response.data
+}
+
+export const getNetworkData = async (dbName: string) => {
+  try {
+    const response = await api.get(`/visualization/${dbName}/network`)
+    return response.data
+  } catch (error) {
+    console.error('Failed to fetch network data:', error)
+    throw error
+  }
+}
+
+export const getOpinionBalanceData = async (dbName: string) => {
+  const response = await api.get(`/visualization/${dbName}/opinion-balance`)
+  return response.data
+}
+
 export default api

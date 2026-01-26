@@ -65,7 +65,7 @@ export default function HomePage() {
       gradient: 'from-cyan-500 to-green-500',
     },
     {
-      title: '数据可视化',
+      title: '关系图谱',
       description: '直观展示舆论走势和系统运行状态',
       icon: MessageSquare,
       gradient: 'from-green-500 to-emerald-500',

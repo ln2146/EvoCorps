@@ -8,6 +8,7 @@ import ExperimentManagement from './pages/ExperimentManagement'
 import DataVisualization from './pages/DataVisualization'
 import ConfigPage from './pages/ConfigPage'
 import DynamicDemo from './pages/DynamicDemo'
+import TestGraph from './pages/TestGraph'
 
 function App() {
   return (
@@ -15,6 +16,9 @@ function App() {
       <Routes>
         {/* 欢迎页 */}
         <Route path="/" element={<WelcomePage />} />
+        
+        {/* 测试页面 */}
+        <Route path="/test-graph" element={<TestGraph />} />
         
         {/* 动态演示 */}
         <Route path="/dynamic" element={<DynamicDemo />} />

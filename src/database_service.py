@@ -523,9 +523,17 @@ class DatabaseService:
         
         def run_server():
             try:
-                self.app.run(host='127.0.0.1', port=self.port, debug=False, use_reloader=False)
+                # 使用 werkzeug 的 serving 来避免 socket 问题
+                from werkzeug.serving import make_server
+                server = make_server('127.0.0.1', self.port, self.app, threaded=True)
+                print("🚀 Database service started")
+                print(f"   🌐 URL: http://127.0.0.1:{self.port}")
+                print(f"   📊 Health check: http://127.0.0.1:{self.port}/health")
+                server.serve_forever()
             except Exception as e:
                 print(f"❌ Failed to start database service: {e}")
+                import traceback
+                traceback.print_exc()
         
         self.server_thread = threading.Thread(target=run_server, daemon=True)
         self.server_thread.start()
@@ -534,9 +542,6 @@ class DatabaseService:
         time.sleep(2)
         
         self.is_running = True
-        print("🚀 Database service started")
-        print(f"   🌐 URL: http://127.0.0.1:{self.port}")
-        print(f"   📊 Health check: http://127.0.0.1:{self.port}/health")
     
     def stop(self):
         """Stop database service"""
