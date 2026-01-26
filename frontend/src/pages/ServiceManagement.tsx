@@ -15,6 +15,36 @@ export default function ServiceManagement() {
     balance: 'stopped'
   })
   const [loading, setLoading] = useState<string | null>(null)
+  const [condaEnv, setCondaEnv] = useState<string>('')
+  const [isEnvSaved, setIsEnvSaved] = useState<boolean>(false)
+
+  // 从localStorage加载conda环境名称
+  useEffect(() => {
+    const savedEnv = localStorage.getItem('condaEnv')
+    if (savedEnv) {
+      setCondaEnv(savedEnv)
+      setIsEnvSaved(true)
+    }
+  }, [])
+
+  // 保存conda环境名称
+  const saveCondaEnv = () => {
+    if (condaEnv.trim()) {
+      localStorage.setItem('condaEnv', condaEnv.trim())
+      setIsEnvSaved(true)
+      alert('Conda环境名称已保存！')
+    } else {
+      alert('请输入有效的环境名称')
+    }
+  }
+
+  // 清除conda环境名称
+  const clearCondaEnv = () => {
+    localStorage.removeItem('condaEnv')
+    setCondaEnv('')
+    setIsEnvSaved(false)
+    alert('Conda环境名称已清除！')
+  }
 
   const services = [
     {
@@ -63,7 +93,8 @@ export default function ServiceManagement() {
     setLoading(serviceId)
     try {
       console.log(`Starting service: ${serviceId}`)
-      const response = await axios.post(`/api/services/${serviceId}/start`)
+      const payload = condaEnv.trim() ? { conda_env: condaEnv.trim() } : {}
+      const response = await axios.post(`/api/services/${serviceId}/start`, payload)
       console.log('Start response:', response.data)
       await loadStatus()
       alert(`服务启动成功！请查看新打开的CMD窗口。`)
@@ -136,6 +167,52 @@ export default function ServiceManagement() {
             <Trash2 size={18} />
             {loading === 'cleanup' ? '清理中...' : '清理所有服务'}
           </button>
+        </div>
+      </div>
+
+      {/* Conda环境配置 */}
+      <div className="glass-card p-6 bg-gradient-to-br from-green-50 to-emerald-50">
+        <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
+          <span className="text-2xl">🐍</span>
+          Conda环境配置
+        </h3>
+        <div className="space-y-3">
+          <p className="text-sm text-slate-700">
+            如果您使用conda虚拟环境，请在此输入环境名称。启动服务时会自动执行 <code className="bg-slate-200 px-2 py-0.5 rounded text-xs">conda activate 环境名称</code>
+          </p>
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={condaEnv}
+              onChange={(e) => setCondaEnv(e.target.value)}
+              placeholder="例如: myenv 或 base"
+              className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+              disabled={isEnvSaved}
+            />
+            {!isEnvSaved ? (
+              <button
+                onClick={saveCondaEnv}
+                className="px-6 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+              >
+                保存
+              </button>
+            ) : (
+              <button
+                onClick={clearCondaEnv}
+                className="px-6 py-2 bg-gradient-to-r from-slate-500 to-slate-600 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+              >
+                修改
+              </button>
+            )}
+          </div>
+          {isEnvSaved && (
+            <p className="text-sm text-green-700 font-medium">
+              ✓ 已配置环境: <code className="bg-green-100 px-2 py-0.5 rounded">{condaEnv}</code>
+            </p>
+          )}
+          <p className="text-xs text-slate-500">
+            💡 提示: 如果不使用conda环境，可以留空。环境名称会保存在浏览器本地存储中。
+          </p>
         </div>
       </div>
 

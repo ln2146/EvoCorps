@@ -9,7 +9,7 @@ interface DashboardLayoutProps {
 
 const navItems = [
   { path: '/dashboard', label: '主页', icon: Home },
-  { path: '/dashboard/service', label: '服务管理', icon: Server },
+  { path: '/dashboard/service', label: '实验设置', icon: Settings },
   { path: '/dashboard/monitoring', label: '数据监控', icon: Activity },
   { path: '/dashboard/experiment', label: '实验管理', icon: FlaskConical },
   { path: '/dashboard/visualization', label: '关系图谱', icon: BarChart3 },
@@ -111,7 +111,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* 主内容区 */}
       <main className="flex-1 overflow-auto">
-        <div className="p-8">
+        <div className="p-6 pb-4">
           {children}
         </div>
       </main>
