@@ -1,11 +1,48 @@
-import { Activity, Users, MessageSquare, TrendingUp, Shield, Zap } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Users, MessageSquare, ThumbsUp, FileText, Activity, TrendingUp, Zap } from 'lucide-react'
+import { getDatabases, getDatabaseStats, DatabaseStats } from '../services/api'
 
 export default function HomePage() {
-  const stats = [
-    { label: '活跃用户', value: '1,234', icon: Users, color: 'from-blue-500 to-cyan-500' },
-    { label: '监控帖子', value: '5,678', icon: MessageSquare, color: 'from-purple-500 to-blue-500' },
-    { label: '干预次数', value: '89', icon: Shield, color: 'from-cyan-500 to-green-500' },
-    { label: '系统效率', value: '94%', icon: TrendingUp, color: 'from-green-500 to-emerald-500' },
+  const [databases, setDatabases] = useState<string[]>([])
+  const [selectedDb, setSelectedDb] = useState<string>('')
+  const [stats, setStats] = useState<DatabaseStats>({
+    activeUsers: 0,
+    totalPosts: 0,
+    totalComments: 0,
+    totalLikes: 0,
+  })
+  const [loading, setLoading] = useState(false)
+
+  // 加载数据库列表
+  useEffect(() => {
+    const loadDatabases = async () => {
+      const dbs = await getDatabases()
+      setDatabases(dbs)
+      if (dbs.length > 0) {
+        setSelectedDb(dbs[0])
+      }
+    }
+    loadDatabases()
+  }, [])
+
+  // 加载统计数据
+  useEffect(() => {
+    if (selectedDb) {
+      const loadStats = async () => {
+        setLoading(true)
+        const data = await getDatabaseStats(selectedDb)
+        setStats(data)
+        setLoading(false)
+      }
+      loadStats()
+    }
+  }, [selectedDb])
+
+  const statsCards = [
+    { label: '活跃用户', value: stats.activeUsers, icon: Users, color: 'from-blue-500 to-cyan-500' },
+    { label: '发布内容', value: stats.totalPosts, icon: FileText, color: 'from-purple-500 to-blue-500' },
+    { label: '用户评论', value: stats.totalComments, icon: MessageSquare, color: 'from-cyan-500 to-green-500' },
+    { label: '互动点赞', value: stats.totalLikes, icon: ThumbsUp, color: 'from-green-500 to-emerald-500' },
   ]
 
   const features = [
@@ -28,7 +65,7 @@ export default function HomePage() {
       gradient: 'from-cyan-500 to-green-500',
     },
     {
-      title: '数据可视化',
+      title: '关系图谱',
       description: '直观展示舆论走势和系统运行状态',
       icon: MessageSquare,
       gradient: 'from-green-500 to-emerald-500',
@@ -56,18 +93,36 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* 数据库选择 */}
+      <div className="glass-card p-6">
+        <div className="flex items-center gap-4">
+          <label className="text-sm font-medium text-slate-700">选择数据库：</label>
+          <select 
+            value={selectedDb}
+            onChange={(e) => setSelectedDb(e.target.value)}
+            className="px-4 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {databases.length === 0 && <option>暂无数据库</option>}
+            {databases.map((db) => (
+              <option key={db} value={db}>{db}</option>
+            ))}
+          </select>
+          {loading && <span className="text-sm text-slate-500">加载中...</span>}
+        </div>
+      </div>
+
       {/* 统计卡片 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => {
+        {statsCards.map((stat, index) => {
           const Icon = stat.icon
           return (
             <div key={index} className="glass-card p-6 hover:scale-105 transition-transform duration-200">
               <div className="flex items-center justify-between mb-4">
-                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${stat.color} flex items-center justify-center shadow-lg`}>
+                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-r ${stat.color} flex items-center justify-center shadow-lg`}>
                   <Icon size={24} className="text-white" />
                 </div>
               </div>
-              <p className="text-3xl font-bold text-slate-800 mb-1">{stat.value}</p>
+              <p className="text-3xl font-bold text-slate-800 mb-1">{stat.value.toLocaleString()}</p>
               <p className="text-sm text-slate-600">{stat.label}</p>
             </div>
           )
@@ -82,7 +137,7 @@ export default function HomePage() {
             const Icon = feature.icon
             return (
               <div key={index} className="glass-card p-6 hover:scale-105 transition-transform duration-200">
-                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center shadow-lg mb-4`}>
+                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-r ${feature.gradient} flex items-center justify-center shadow-lg mb-4`}>
                   <Icon size={28} className="text-white" />
                 </div>
                 <h3 className="text-xl font-semibold text-slate-800 mb-2">{feature.title}</h3>
@@ -90,25 +145,6 @@ export default function HomePage() {
               </div>
             )
           })}
-        </div>
-      </div>
-
-      {/* 系统状态 */}
-      <div className="glass-card p-6">
-        <h2 className="text-xl font-bold text-slate-800 mb-4">系统状态</h2>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-slate-600">数据库服务</span>
-            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">运行中</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-600">监控服务</span>
-            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">运行中</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-600">AI 引擎</span>
-            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">就绪</span>
-          </div>
         </div>
       </div>
     </div>
