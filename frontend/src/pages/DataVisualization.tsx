@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Database, Network } from 'lucide-react'
+import { Database, Network, Maximize2, Minimize2 } from 'lucide-react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { getDatabases, getNetworkData } from '../services/api'
 
@@ -8,6 +8,8 @@ export default function DataVisualization() {
   const [selectedDb, setSelectedDb] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const graphRef = useRef<any>()
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const graphContainerRef = useRef<HTMLDivElement>(null)
   
   // 过滤选项
   const [showUsers, setShowUsers] = useState(true)
@@ -278,15 +280,35 @@ export default function DataVisualization() {
   // 配置力导向参数
   useEffect(() => {
     if (graphRef.current) {
-      // 使用极强的排斥力，让节点充分分散
-      graphRef.current.d3Force('charge')?.strength(-5000)
-      graphRef.current.d3Force('link')?.distance(350).strength(0.1)
+      // 使用更强的排斥力，让节点更分散
+      graphRef.current.d3Force('charge')?.strength(-8000)
+      graphRef.current.d3Force('link')?.distance(500).strength(0.05)
       // 移除径向力，让节点自由分布
       graphRef.current.d3Force('radial', null)
       // 取消中心引力
       graphRef.current.d3Force('center', null)
     }
   }, [graphData])
+
+  // 全屏切换函数
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      graphContainerRef.current?.requestFullscreen()
+      setIsFullscreen(true)
+    } else {
+      document.exitFullscreen()
+      setIsFullscreen(false)
+    }
+  }
+
+  // 监听全屏状态变化
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -432,10 +454,19 @@ export default function DataVisualization() {
         <>
           {/* 关系网络图 */}
           {graphData.nodes && graphData.nodes.length > 0 ? (
-            <div className="glass-card p-6">
+            <div className="glass-card p-6" ref={graphContainerRef}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-slate-800">关系图谱</h2>
                 <div className="flex items-center gap-6">
+                  {/* 全屏按钮 */}
+                  <button
+                    onClick={toggleFullscreen}
+                    className="p-2 rounded-lg bg-gradient-to-r from-blue-500 to-green-500 text-white hover:from-blue-600 hover:to-green-600 transition-all shadow-md hover:shadow-lg"
+                    title={isFullscreen ? "退出全屏" : "全屏显示"}
+                  >
+                    {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+                  </button>
+                  
                   {/* 用户节点图例 */}
                   <div className="flex flex-col gap-1">
                     <p className="text-xs font-semibold text-slate-700 mb-1">用户影响力</p>
@@ -507,17 +538,17 @@ export default function DataVisualization() {
                 </div>
               </div>
               
-              <div className="flex gap-4">
+              <div className={`flex gap-4 ${isFullscreen ? 'h-[calc(100vh-120px)]' : ''}`}>
                 {/* 图谱主体 */}
                 <div 
                   className="bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50 rounded-xl overflow-hidden shadow-inner flex-1"
-                  style={{ height: '800px' }}
+                  style={{ height: isFullscreen ? '100%' : '800px' }}
                 >
                   <ForceGraph2D
                     ref={graphRef}
                     graphData={graphData}
                     width={undefined}
-                    height={800}
+                    height={isFullscreen ? window.innerHeight - 120 : 800}
                     nodeLabel={(node: any) => `${getNodeTypeName(node.type)}: ${node.name}`}
                     enableNodeDrag={true}
                     enableZoomInteraction={true}
@@ -755,7 +786,7 @@ export default function DataVisualization() {
                 </div>
                 
                 {/* 右侧详情面板 */}
-                <div className="w-80 flex flex-col gap-3 overflow-y-auto" style={{ maxHeight: '800px' }}>
+                <div className={`w-80 flex flex-col gap-3 overflow-y-auto ${isFullscreen ? 'h-full' : ''}`} style={{ maxHeight: isFullscreen ? '100%' : '800px' }}>
                   {selectedNodes.size === 0 ? (
                     <div className="bg-gradient-to-br from-white to-slate-50 rounded-xl shadow-lg p-6 text-center">
                       <Network size={48} className="mx-auto mb-3 opacity-30 text-slate-400" />
