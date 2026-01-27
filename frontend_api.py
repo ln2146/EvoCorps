@@ -966,7 +966,7 @@ def get_network_data(db_name):
                 'type': 'post',
                 'name': post_id,
                 'author_id': author_id,
-                'content': (row[2] or '')[:100] + '...' if row[2] and len(row[2]) > 100 else (row[2] or ''),
+                'content': row[2] or '',
                 'created_at': row[3],
                 'num_likes': row[4] or 0,
                 'num_comments': row[5] or 0,
@@ -1007,7 +1007,7 @@ def get_network_data(db_name):
                 'name': comment_id,
                 'post_id': post_id,
                 'author_id': author_id,
-                'content': (row[3] or '')[:100] + '...' if row[3] and len(row[3]) > 100 else (row[3] or ''),
+                'content': row[3] or '',
                 'created_at': row[4],
                 'num_likes': row[5] or 0
             })
