@@ -922,10 +922,15 @@ def get_network_data(db_name):
             # 解析persona获取角色信息
             persona_str = row[4] or '{}'
             try:
-                import ast
-                persona = ast.literal_eval(persona_str) if isinstance(persona_str, str) else {}
+                # 尝试JSON解析
+                persona = json.loads(persona_str) if isinstance(persona_str, str) else {}
             except:
-                persona = {}
+                try:
+                    # 如果JSON失败，尝试ast.literal_eval
+                    import ast
+                    persona = ast.literal_eval(persona_str) if isinstance(persona_str, str) else {}
+                except:
+                    persona = {}
             
             nodes.append({
                 'id': user_id,

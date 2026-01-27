@@ -801,27 +801,22 @@ export default function DataVisualization() {
                               {/* 角色信息 */}
                               {node.persona && typeof node.persona === 'object' && (
                                 <>
-                                  {node.persona.name && (
-                                    <div>
-                                      <label className="text-xs text-slate-500">名字</label>
-                                      <p className="text-sm font-semibold text-slate-800">{node.persona.name}</p>
-                                    </div>
-                                  )}
+                                  {/* 名字和年龄在同一行 */}
+                                  <div>
+                                    <label className="text-xs text-slate-500">名字</label>
+                                    <p className="text-xs font-medium text-slate-800">
+                                      {node.persona.name || 'Unknown'}
+                                      {node.persona.demographics?.age && (
+                                        <span className="text-slate-600 ml-2">({node.persona.demographics.age}岁)</span>
+                                      )}
+                                    </p>
+                                  </div>
                                   
-                                  {node.persona.demographics && (
-                                    <div className="grid grid-cols-2 gap-2">
-                                      {node.persona.demographics.profession && (
-                                        <div className="bg-indigo-50 p-2 rounded">
-                                          <p className="text-xs text-slate-600">职业</p>
-                                          <p className="text-xs font-medium text-slate-800">{node.persona.demographics.profession}</p>
-                                        </div>
-                                      )}
-                                      {node.persona.demographics.age && (
-                                        <div className="bg-pink-50 p-2 rounded">
-                                          <p className="text-xs text-slate-600">年龄</p>
-                                          <p className="text-xs font-medium text-slate-800">{node.persona.demographics.age}</p>
-                                        </div>
-                                      )}
+                                  {/* 职业 */}
+                                  {node.persona.demographics?.profession && (
+                                    <div>
+                                      <label className="text-xs text-slate-500">职业</label>
+                                      <p className="text-xs font-medium text-slate-800">{node.persona.demographics.profession}</p>
                                     </div>
                                   )}
                                   
@@ -861,21 +856,21 @@ export default function DataVisualization() {
                               <div className="grid grid-cols-2 gap-2 mt-2">
                                 <div className="bg-blue-50 p-2 rounded">
                                   <p className="text-xs text-slate-600">粉丝</p>
-                                  <p className="text-sm font-bold text-slate-800">{node.follower_count}</p>
+                                  <p className="text-xs font-medium text-slate-800">{node.follower_count}</p>
                                 </div>
                                 <div className="bg-purple-50 p-2 rounded">
                                   <p className="text-xs text-slate-600">影响力</p>
-                                  <p className="text-sm font-bold text-slate-800">{node.influence_score}</p>
+                                  <p className="text-xs font-medium text-slate-800">{node.influence_score}</p>
                                 </div>
                               </div>
                               <div className="grid grid-cols-2 gap-2 mt-2">
                                 <div className="bg-green-50 p-2 rounded">
                                   <p className="text-xs text-slate-600">帖子数</p>
-                                  <p className="text-sm font-bold text-slate-800">{node.post_count || 0}</p>
+                                  <p className="text-xs font-medium text-slate-800">{node.post_count || 0}</p>
                                 </div>
                                 <div className="bg-orange-50 p-2 rounded">
                                   <p className="text-xs text-slate-600">评论数</p>
-                                  <p className="text-sm font-bold text-slate-800">{node.comment_count || 0}</p>
+                                  <p className="text-xs font-medium text-slate-800">{node.comment_count || 0}</p>
                                 </div>
                               </div>
                             </>
