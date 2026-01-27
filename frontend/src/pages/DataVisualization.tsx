@@ -797,11 +797,68 @@ export default function DataVisualization() {
                                 <label className="text-xs text-slate-500">ID</label>
                                 <p className="font-mono text-xs text-slate-800 break-all">{node.id}</p>
                               </div>
-                              <div>
-                                <label className="text-xs text-slate-500">角色</label>
-                                <p className="text-xs text-slate-800">{node.role}</p>
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
+                              
+                              {/* 角色信息 */}
+                              {node.persona && typeof node.persona === 'object' && (
+                                <>
+                                  {node.persona.name && (
+                                    <div>
+                                      <label className="text-xs text-slate-500">名字</label>
+                                      <p className="text-sm font-semibold text-slate-800">{node.persona.name}</p>
+                                    </div>
+                                  )}
+                                  
+                                  {node.persona.demographics && (
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {node.persona.demographics.profession && (
+                                        <div className="bg-indigo-50 p-2 rounded">
+                                          <p className="text-xs text-slate-600">职业</p>
+                                          <p className="text-xs font-medium text-slate-800">{node.persona.demographics.profession}</p>
+                                        </div>
+                                      )}
+                                      {node.persona.demographics.age && (
+                                        <div className="bg-pink-50 p-2 rounded">
+                                          <p className="text-xs text-slate-600">年龄</p>
+                                          <p className="text-xs font-medium text-slate-800">{node.persona.demographics.age}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                  
+                                  {node.persona.personality_traits && Array.isArray(node.persona.personality_traits) && node.persona.personality_traits.length > 0 && (
+                                    <div>
+                                      <label className="text-xs text-slate-500">性格特征</label>
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {node.persona.personality_traits.map((trait: string, idx: number) => (
+                                          <span key={idx} className="px-2 py-0.5 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 text-xs rounded-full">
+                                            {trait}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {node.persona.communication_style && (
+                                    <div>
+                                      <label className="text-xs text-slate-500">社交风格</label>
+                                      <div className="bg-slate-50 p-2 rounded mt-1 space-y-1">
+                                        {node.persona.communication_style.tone && (
+                                          <p className="text-xs text-slate-700">
+                                            <span className="font-medium">语气:</span> {node.persona.communication_style.tone}
+                                          </p>
+                                        )}
+                                        {node.persona.communication_style.engagement_level && (
+                                          <p className="text-xs text-slate-700">
+                                            <span className="font-medium">参与度:</span> {node.persona.communication_style.engagement_level}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              
+                              <div className="grid grid-cols-2 gap-2 mt-2">
                                 <div className="bg-blue-50 p-2 rounded">
                                   <p className="text-xs text-slate-600">粉丝</p>
                                   <p className="text-sm font-bold text-slate-800">{node.follower_count}</p>
