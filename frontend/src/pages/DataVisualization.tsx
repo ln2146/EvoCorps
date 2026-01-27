@@ -755,7 +755,7 @@ export default function DataVisualization() {
                 </div>
                 
                 {/* 右侧详情面板 */}
-                <div className="w-80 flex flex-col gap-3" style={{ height: '800px', overflowY: 'auto' }}>
+                <div className="w-80 flex flex-col gap-3 overflow-y-auto" style={{ maxHeight: '800px' }}>
                   {selectedNodes.size === 0 ? (
                     <div className="bg-gradient-to-br from-white to-slate-50 rounded-xl shadow-lg p-6 text-center">
                       <Network size={48} className="mx-auto mb-3 opacity-30 text-slate-400" />
@@ -797,28 +797,80 @@ export default function DataVisualization() {
                                 <label className="text-xs text-slate-500">ID</label>
                                 <p className="font-mono text-xs text-slate-800 break-all">{node.id}</p>
                               </div>
-                              <div>
-                                <label className="text-xs text-slate-500">角色</label>
-                                <p className="text-xs text-slate-800">{node.role}</p>
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
+                              
+                              {/* 角色信息 */}
+                              {node.persona && typeof node.persona === 'object' && (
+                                <>
+                                  {/* 名字和年龄在同一行 */}
+                                  <div>
+                                    <label className="text-xs text-slate-500">名字</label>
+                                    <p className="text-xs font-medium text-slate-800">
+                                      {node.persona.name || 'Unknown'}
+                                      {node.persona.demographics?.age && (
+                                        <span className="text-slate-600 ml-2">({node.persona.demographics.age}岁)</span>
+                                      )}
+                                    </p>
+                                  </div>
+                                  
+                                  {/* 职业 */}
+                                  {node.persona.demographics?.profession && (
+                                    <div>
+                                      <label className="text-xs text-slate-500">职业</label>
+                                      <p className="text-xs font-medium text-slate-800">{node.persona.demographics.profession}</p>
+                                    </div>
+                                  )}
+                                  
+                                  {node.persona.personality_traits && Array.isArray(node.persona.personality_traits) && node.persona.personality_traits.length > 0 && (
+                                    <div>
+                                      <label className="text-xs text-slate-500">性格特征</label>
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {node.persona.personality_traits.map((trait: string, idx: number) => (
+                                          <span key={idx} className="px-2 py-0.5 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 text-xs rounded-full">
+                                            {trait}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {node.persona.communication_style && (
+                                    <div>
+                                      <label className="text-xs text-slate-500">社交风格</label>
+                                      <div className="bg-slate-50 p-2 rounded mt-1 space-y-1">
+                                        {node.persona.communication_style.tone && (
+                                          <p className="text-xs text-slate-700">
+                                            <span className="font-medium">语气:</span> {node.persona.communication_style.tone}
+                                          </p>
+                                        )}
+                                        {node.persona.communication_style.engagement_level && (
+                                          <p className="text-xs text-slate-700">
+                                            <span className="font-medium">参与度:</span> {node.persona.communication_style.engagement_level}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              
+                              <div className="grid grid-cols-2 gap-2 mt-2">
                                 <div className="bg-blue-50 p-2 rounded">
                                   <p className="text-xs text-slate-600">粉丝</p>
-                                  <p className="text-sm font-bold text-slate-800">{node.follower_count}</p>
+                                  <p className="text-xs font-medium text-slate-800">{node.follower_count}</p>
                                 </div>
                                 <div className="bg-purple-50 p-2 rounded">
                                   <p className="text-xs text-slate-600">影响力</p>
-                                  <p className="text-sm font-bold text-slate-800">{node.influence_score}</p>
+                                  <p className="text-xs font-medium text-slate-800">{node.influence_score}</p>
                                 </div>
                               </div>
                               <div className="grid grid-cols-2 gap-2 mt-2">
                                 <div className="bg-green-50 p-2 rounded">
                                   <p className="text-xs text-slate-600">帖子数</p>
-                                  <p className="text-sm font-bold text-slate-800">{node.post_count || 0}</p>
+                                  <p className="text-xs font-medium text-slate-800">{node.post_count || 0}</p>
                                 </div>
                                 <div className="bg-orange-50 p-2 rounded">
                                   <p className="text-xs text-slate-600">评论数</p>
-                                  <p className="text-sm font-bold text-slate-800">{node.comment_count || 0}</p>
+                                  <p className="text-xs font-medium text-slate-800">{node.comment_count || 0}</p>
                                 </div>
                               </div>
                             </>
@@ -835,11 +887,13 @@ export default function DataVisualization() {
                                 <label className="text-xs text-slate-500">主题</label>
                                 <p className="text-xs text-slate-800">{node.topic}</p>
                               </div>
-                              <div>
-                                <label className="text-xs text-slate-500">内容</label>
-                                <p className="text-xs text-slate-700 bg-slate-50 p-1 rounded max-h-20 overflow-y-auto">{node.content}</p>
+                              <div className="w-full">
+                                <label className="text-xs text-slate-500 block mb-1">内容</label>
+                                <div className="text-xs text-slate-700 bg-slate-50 p-3 rounded whitespace-pre-wrap break-words w-full" style={{ maxHeight: 'none', height: 'auto', overflow: 'visible' }}>
+                                  {node.content}
+                                </div>
                               </div>
-                              <div className="grid grid-cols-3 gap-1">
+                              <div className="grid grid-cols-3 gap-1 mt-2">
                                 <div className="bg-red-50 p-1 rounded text-center">
                                   <p className="text-xs text-slate-600">赞</p>
                                   <p className="text-sm font-bold">{node.num_likes}</p>
@@ -863,11 +917,13 @@ export default function DataVisualization() {
                                 <label className="text-xs text-slate-500">ID</label>
                                 <p className="font-mono text-xs text-slate-800 break-all">{node.id}</p>
                               </div>
-                              <div>
-                                <label className="text-xs text-slate-500">内容</label>
-                                <p className="text-xs text-slate-700 bg-slate-50 p-1 rounded max-h-20 overflow-y-auto">{node.content}</p>
+                              <div className="w-full">
+                                <label className="text-xs text-slate-500 block mb-1">内容</label>
+                                <div className="text-xs text-slate-700 bg-slate-50 p-3 rounded whitespace-pre-wrap break-words w-full" style={{ maxHeight: 'none', height: 'auto', overflow: 'visible' }}>
+                                  {node.content}
+                                </div>
                               </div>
-                              <div className="bg-red-50 p-2 rounded">
+                              <div className="bg-red-50 p-2 rounded mt-2">
                                 <p className="text-xs text-slate-600">点赞数</p>
                                 <p className="text-sm font-bold text-slate-800">{node.num_likes}</p>
                               </div>
