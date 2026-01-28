@@ -1,11 +1,11 @@
 {
-    "num_users": 50,
-    "num_time_steps": 30,
+    "num_users": 10,
+    "num_time_steps": 5,
     "engine": "gemini-2.0-flash",
     "agent_config_generation": "file",
     "agent_config_path": "separate",
     "max_total_posts": 10000,
-    "max_total_users": 50,
+    "max_total_users": 10,
     "separate_personas": {
         "positive_ratio": 0.0,
         "neutral_ratio": 1.0,

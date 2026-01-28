@@ -42,13 +42,15 @@ class MultiModelSelector:
         "strategist": DEFAULT_POOL,
         "leader": DEFAULT_POOL,
         "echo": DEFAULT_POOL,
+        "memory": DEFAULT_POOL,
+        "fact_checker": DEFAULT_POOL,
     }
 
     # Backwards-compatible aliases used elsewhere in this repo.
     AVAILABLE_MODELS = ROLE_MODEL_POOLS["regular"]
-    MALICIOUS_ECHO_MODELS = ROLE_MODEL_POOLS["malicious"]
+    MALICIOUS_ECHO_MODELS = ROLE_MODEL_POOLS["echo"]
     FALLBACK_PRIORITY = ROLE_MODEL_POOLS["regular"]
-    MALICIOUS_ECHO_FALLBACK = ROLE_MODEL_POOLS["malicious"]
+    MALICIOUS_ECHO_FALLBACK = ROLE_MODEL_POOLS["echo"]
     
     def __init__(self):
         self.usage_stats = {model: 0 for model in self.ALL_MODELS}

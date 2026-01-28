@@ -104,7 +104,8 @@ class Simulation:
         self.experiment_settings = config.get('experiment', {}).get('settings', {})
         if self.experiment_type in ["third_party_fact_checking", "hybrid_fact_checking"]:
             # Use dedicated fact checker engine if specified, otherwise fallback to main engine
-            fact_checker_engine = self.experiment_settings.get('fact_checker_engine', self.engine)
+            from multi_model_selector import multi_model_selector
+            fact_checker_engine = multi_model_selector.select_random_model(role="fact_checker")
             self.fact_checker_engine = fact_checker_engine
             self.fact_checker = FactChecker(
                 checker_id="main_checker",

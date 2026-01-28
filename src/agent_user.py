@@ -1158,18 +1158,17 @@ Please create an updated memory that:
 Format your response as a single, updated memory that replaces and integrates multiple individual memories. Focus on behavioral patterns, preferences, and insights about the user's identity and interests."""
 
             # Call LLM to integrate (with retries and timeout)
-            from openai import OpenAI
-            from keys import OPENAI_API_KEY, OPENAI_BASE_URL
             import asyncio
+            from multi_model_selector import multi_model_selector
 
             logging.info(f"User {self.user_id}: Starting memory integration LLM call")
-            client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, max_retries=2, timeout=45)
+            client, model = multi_model_selector.create_openai_client(role="memory")
 
             async def _do_call():
                 logging.info(f"User {self.user_id}: Making LLM call with prompt length: {len(integration_prompt)}")
                 return await asyncio.to_thread(
                     client.chat.completions.create,
-                    model="gemini-2.0-flash",
+                    model=model,
                     messages=[
                         {"role": "system", "content": "You are helping an AI agent integrate their memories to form coherent insights about their behavior, preferences, and identity. Focus on creating comprehensive memory summaries that capture patterns and preferences."},
                         {"role": "user", "content": integration_prompt}
@@ -1226,14 +1225,13 @@ Please create an integrated memory summary that:
 Format your response as a single, comprehensive memory entry that can replace multiple individual memories."""
 
             # Call LLM to integrate (with retries and timeout)
-            from openai import OpenAI
-            from keys import OPENAI_API_KEY, OPENAI_BASE_URL
-            client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, max_retries=2, timeout=45)
+            from multi_model_selector import multi_model_selector
+            client, model = multi_model_selector.create_openai_client(role="memory")
 
             async def _do_call2():
                 return await asyncio.to_thread(
                     client.chat.completions.create,
-                    model="gemini-2.0-flash",
+                    model=model,
                     messages=[
                         {"role": "system", "content": "You are helping an AI agent integrate and summarize their memories to form coherent insights about their behavior and preferences."},
                         {"role": "user", "content": integration_prompt}
@@ -1391,11 +1389,11 @@ Task:
 """
 
             # 4) Call LLM to generate new integrated memory (consistent with global keys/agent)
-            from keys import OPENAI_API_KEY, OPENAI_BASE_URL
-            client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, max_retries=2, timeout=45)
+            from multi_model_selector import multi_model_selector
+            client, model = multi_model_selector.create_openai_client(role="memory")
             response = await asyncio.to_thread(
                 client.chat.completions.create,
-                model="gemini-2.0-flash",
+                model=model,
                 messages=[
                     {"role": "system", "content": "You update and maintain a user's integrated memory as one concise paragraph."},
                     {"role": "user", "content": integration_prompt}
