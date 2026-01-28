@@ -1,52 +1,54 @@
 #!/usr/bin/env python3
 """
 Multi-model selection system - centrally manages model selection for all agents.
-Supports random selection across 4 models with fallback mechanisms.
+Supports random selection across multiple models with fallback mechanisms.
 """
+
+from __future__ import annotations
 
 import random
 import logging
 import time
 import asyncio
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, TYPE_CHECKING
 from openai import OpenAI
-from langchain_openai import ChatOpenAI
 import httpx
 from keys import OPENAI_API_KEY, OPENAI_BASE_URL
+
+if TYPE_CHECKING:
+    from langchain_openai import ChatOpenAI
 
 
 class MultiModelSelector:
     """Multi-model selection system."""
     
-    # Four available models (full list)
+    # Full list of supported models.
     ALL_MODELS = [
         "gpt-4.1-nano",      # OpenAI-compatible model
         "gemini-2.0-flash",  # Google Gemini model
+        "deepseek-chat",
     ]
 
-    # Model list for regular users (excluding grok-3-mini)
-    AVAILABLE_MODELS = [
-        "gpt-4.1-nano",      # OpenAI-compatible model
-        "gemini-2.0-flash",   # Google Gemini model
-    ]
+    # Centralized per-role model pools.
+    #
+    # Keep all role defaults here. If you want every role to use DeepSeek, keep the
+    # pools as ["deepseek-chat"]. If you want multi-provider fallback, add models
+    # to the lists below (they must be OpenAI-compatible on your OPENAI_BASE_URL).
+    DEFAULT_POOL = ["deepseek-chat"]
+    ROLE_MODEL_POOLS: dict[str, list[str]] = {
+        "regular": DEFAULT_POOL,
+        "malicious": DEFAULT_POOL,
+        "analyst": DEFAULT_POOL,
+        "strategist": DEFAULT_POOL,
+        "leader": DEFAULT_POOL,
+        "echo": DEFAULT_POOL,
+    }
 
-    # Model list dedicated to malicious bot and echo groups
-    MALICIOUS_ECHO_MODELS = [
-        "gpt-4.1-nano",      # OpenAI-compatible model
-        "gemini-2.0-flash",   # Google Gemini model
-    ]
-
-    # Fallback priority list (high to low, excluding grok-3-mini)
-    FALLBACK_PRIORITY = [
-        "gemini-2.0-flash",
-        "gpt-4.1-nano"
-    ]
-
-    # Fallback priority for malicious bot and echo group (excluding grok-3-mini)
-    MALICIOUS_ECHO_FALLBACK = [
-        "gemini-2.0-flash",
-        "gpt-4.1-nano"
-    ]
+    # Backwards-compatible aliases used elsewhere in this repo.
+    AVAILABLE_MODELS = ROLE_MODEL_POOLS["regular"]
+    MALICIOUS_ECHO_MODELS = ROLE_MODEL_POOLS["malicious"]
+    FALLBACK_PRIORITY = ROLE_MODEL_POOLS["regular"]
+    MALICIOUS_ECHO_FALLBACK = ROLE_MODEL_POOLS["malicious"]
     
     def __init__(self):
         self.usage_stats = {model: 0 for model in self.ALL_MODELS}
@@ -54,7 +56,6 @@ class MultiModelSelector:
         self.api_health_status = {}
         self.failed_api_cooldown = 300  # 5-minute cooldown
         self.last_failure_time = {}
-        self.cooldown_until = {}  # Track cooldown timestamps
 
         # New: request configuration optimized to align with utils.py
         self.request_config = {
@@ -66,16 +67,15 @@ class MultiModelSelector:
         }
 
         # New: request pacing control matching utils.py
-        self.last_request_time = {model: 0 for model in self.AVAILABLE_MODELS}
+        self.last_request_time = {model: 0 for model in self.ALL_MODELS}
         # Extended intervals to address persistent API errors
         self.min_request_interval = {
-            "DeepSeek-V3": 25.0,      # DeepSeek interval 25 seconds (significantly increased)
+            "deepseek-chat": 10.0,    # DeepSeek can be rate-limited on some gateways
             "gemini-2.0-flash": 8.0,  # Gemini interval 8 seconds (increased)
-            "claude-3-5-sonnet": 10.0, # Claude interval 10 seconds (increased)
             "gpt-4.1-nano": 6.0,      # GPT interval 6 seconds
             "default": 8.0            # Others 8 seconds (increased)
         }
-        self.request_lock = {model: False for model in self.AVAILABLE_MODELS}  # Add per-model lock
+        self.request_lock = {model: False for model in self.ALL_MODELS}  # Add per-model lock
 
         # New: connection pool management
         self._http_client = None
@@ -117,26 +117,38 @@ class MultiModelSelector:
             # 释放锁
             self.request_lock[model] = False
 
-    def select_random_model(self) -> str:
-        """randomselect一个模型"""
+    @staticmethod
+    def _normalize_role(role: Optional[str]) -> str:
+        if not role:
+            return "regular"
+        role_norm = str(role).strip().lower()
+        return role_norm or "regular"
+
+    def get_model_pool(self, role: Optional[str] = None) -> list[str]:
+        """Get model pool for a role; falls back to regular."""
+        role_norm = self._normalize_role(role)
+        pool = self.ROLE_MODEL_POOLS.get(role_norm)
+        return pool if pool else self.ROLE_MODEL_POOLS["regular"]
+
+    def select_random_model(self, role: Optional[str] = None) -> str:
+        """randomselect一个模型（按角色）"""
+        pool = self.get_model_pool(role)
         # 优先select健康的模型
-        healthy_models = [model for model in self.AVAILABLE_MODELS if self.is_model_healthy(model)]
+        healthy_models = [model for model in pool if self.is_model_healthy(model)]
 
         if healthy_models:
             selected = random.choice(healthy_models)
         else:
             # 如果没有健康的模型，select冷却时间最短的
-            selected = min(self.AVAILABLE_MODELS,
-                         key=lambda m: self.last_failure_time.get(m, 0))
+            selected = min(pool, key=lambda m: self.last_failure_time.get(m, 0))
             print(f"⚠️ 所有模型都在冷却期，选择冷却时间最短的: {selected}")
 
         self.usage_stats[selected] += 1
         return selected
     
     def select_model_for_agent_type(self, agent_type: str) -> str:
-        """根据Agentclass型select模型（目前所有class型都randomselect）"""
-        # 未来可以根据不同Agentclass型optimize模型select
-        return self.select_random_model()
+        """根据Agentclass型select模型（兼容旧调用）"""
+        return self.select_random_model(role=agent_type)
 
     def is_model_healthy(self, model: str) -> bool:
         """check模型是否健康（未在冷却期）"""
@@ -150,6 +162,9 @@ class MultiModelSelector:
     def mark_model_failed(self, model: str, error_type: str = "unknown"):
         """标记模型failed"""
         import time
+        if model not in self.failure_stats:
+            self.failure_stats[model] = 0
+            self.usage_stats[model] = 0
         self.failure_stats[model] += 1
         self.last_failure_time[model] = time.time()
         print(f"🚫 模型 {model} 标记为失败，进入冷却期")
@@ -212,8 +227,9 @@ class MultiModelSelector:
             return None
 
     def get_healthy_models(self) -> list[str]:
-        """get健康的模型列表"""
-        return [model for model in self.AVAILABLE_MODELS if self.is_model_healthy(model)]
+        """get健康的模型列表（regular 池）"""
+        pool = self.get_model_pool("regular")
+        return [model for model in pool if self.is_model_healthy(model)]
 
     def get_next_fallback_model(self, failed_model: str) -> str:
         """get下一个回退模型"""
@@ -239,7 +255,7 @@ class MultiModelSelector:
             if self.last_failure_time:
                 return min(self.last_failure_time.keys(), key=lambda x: self.last_failure_time[x])
             else:
-                return random.choice(self.AVAILABLE_MODELS)
+                return random.choice(self.get_model_pool("regular"))
 
         # 从健康模型中randomselect
         selected = random.choice(healthy_models)
@@ -247,28 +263,29 @@ class MultiModelSelector:
         return selected
 
     def select_malicious_echo_model(self) -> str:
-        """为恶意水军和echo_groupselect模型 - 排除grok-3-mini"""
+        """为恶意水军和echo_groupselect模型"""
         # get健康的恶意水军专用模型
-        healthy_malicious_models = [model for model in self.MALICIOUS_ECHO_MODELS if self.is_model_healthy(model)]
+        pool = self.get_model_pool("echo")
+        healthy_malicious_models = [model for model in pool if self.is_model_healthy(model)]
 
         if not healthy_malicious_models:
             print("⚠️ 所有恶意水军专用模型都在冷却期，使用最早失败的模型")
             # 从恶意水军专用模型中select最早failed的
-            malicious_failure_times = {k: v for k, v in self.last_failure_time.items() if k in self.MALICIOUS_ECHO_MODELS}
+            malicious_failure_times = {k: v for k, v in self.last_failure_time.items() if k in pool}
             if malicious_failure_times:
                 return min(malicious_failure_times.keys(), key=lambda x: malicious_failure_times[x])
             else:
-                return random.choice(self.MALICIOUS_ECHO_MODELS)
+                return random.choice(pool)
 
         # 从健康的恶意水军专用模型中randomselect
         selected = random.choice(healthy_malicious_models)
         self.usage_stats[selected] += 1
         return selected
 
-    def create_openai_client(self, model_name: str = None) -> Tuple[OpenAI, str]:
+    def create_openai_client(self, model_name: str = None, role: str = "regular") -> Tuple[OpenAI, str]:
         """createoptimize的OpenAIclient"""
         if model_name is None:
-            model_name = self.select_random_model()
+            model_name = self.select_random_model(role=role)
 
         # 请求间隔控制
         self._wait_for_request_interval(model_name)
@@ -291,10 +308,17 @@ class MultiModelSelector:
 
         return client, model_name
     
-    def create_langchain_client(self, model_name: str = None, **kwargs) -> Tuple[ChatOpenAI, str]:
+    def create_langchain_client(self, model_name: str = None, role: str = "regular", **kwargs) -> Tuple[ChatOpenAI, str]:
         """createoptimize的LangChain ChatOpenAIclient"""
+        try:
+            from langchain_openai import ChatOpenAI
+        except ModuleNotFoundError as e:
+            raise ModuleNotFoundError(
+                "Missing dependency 'langchain-openai'. Install it or avoid calling create_langchain_client()."
+            ) from e
+
         if model_name is None:
-            model_name = self.select_random_model()
+            model_name = self.select_random_model(role=role)
 
         # 请求间隔控制
         self._wait_for_request_interval(model_name)
@@ -327,17 +351,23 @@ class MultiModelSelector:
 
         return client, model_name
     
-    def create_client_with_fallback(self, preferred_model: str = None, client_type: str = "openai") -> Tuple[Any, str]:
-        """createclient，支持回退机制"""
-        models_to_try = self.FALLBACK_PRIORITY.copy() if preferred_model is None else [preferred_model] + [m for m in self.FALLBACK_PRIORITY if m != preferred_model]
+    def create_client_with_fallback(
+        self,
+        preferred_model: str = None,
+        client_type: str = "openai",
+        role: str = "regular",
+    ) -> Tuple[Any, str]:
+        """createclient，支持回退机制（按角色）"""
+        fallback_pool = self.get_model_pool(role)
+        models_to_try = fallback_pool.copy() if preferred_model is None else [preferred_model] + [m for m in fallback_pool if m != preferred_model]
         
         last_error = None
         for model in models_to_try:
             try:
                 if client_type == "langchain":
-                    client, selected_model = self.create_langchain_client(model)
+                    client, selected_model = self.create_langchain_client(model, role=role)
                 else:
-                    client, selected_model = self.create_openai_client(model)
+                    client, selected_model = self.create_openai_client(model, role=role)
                 
                 # simpletestingconnect（可选）
                 return client, selected_model
@@ -359,7 +389,7 @@ class MultiModelSelector:
                 "temperature": 0.8,
                 "max_tokens": 150
             },
-            "DeepSeek-V3": {
+            "deepseek-chat": {
                 "temperature": 0.7,
                 "max_tokens": 200
             },
@@ -376,13 +406,8 @@ class MultiModelSelector:
                 "frequency_penalty": 0.3,
                 "presence_penalty": 0.3
             },
-            "DeepSeek-V3": {
-                # DeepSeek通常不支持penaltyparameter
-            },
-            "gemini-2.0-flash": {
-                # Gemini通常不支持penaltyparameter
-            },
-
+            "deepseek-chat": {},
+            "gemini-2.0-flash": {},
         }
 
         # getbasicconfigure，如果模型不存在则抛出exception
@@ -457,22 +482,8 @@ class MultiModelSelector:
                 self.usage_stats[model_name] += 1
                 if not success:
                     self.failure_stats[model_name] += 1
-                    # 激进的冷却机制以减少502error
-                    failure_count = self.failure_stats[model_name]
-                    if failure_count >= 3:  # 提高failed阈值，减少误判
-                        # 对于频繁502error的模型，更快进入冷却
-                        if model_name in ["DeepSeek-V3"]:
-                            cooldown_time = min(120 * failure_count, 1800)  # 最多30分钟
-                        else:
-                            cooldown_time = min(60 * failure_count, 600)   # 最多10分钟
-
-                        self.cooldown_until[model_name] = time.time() + cooldown_time
-                        print(f"🚫 模型 {model_name} 标记为失败，进入冷却期 ({cooldown_time//60}分钟)")
-                        print(f"⚠️ 模型 {model_name} 失败次数: {failure_count}")
-                    elif failure_count >= 1:
-                        print(f"⚠️ 模型 {model_name} 失败次数: {failure_count}")
-                        # 即使1次failed也增加延迟
-                        time.sleep(3)
+                    # Align with is_model_healthy(): failures mark last_failure_time.
+                    self.last_failure_time[model_name] = time.time()
             else:
                 print(f"⚠️ 未知模型: {model_name}")
         except Exception as e:
@@ -483,15 +494,15 @@ class MultiModelSelector:
 multi_model_selector = MultiModelSelector()
 
 
-def get_random_model() -> str:
-    """getrandom模型的便捷函数"""
-    return multi_model_selector.select_random_model()
+def get_random_model(role: str = "regular") -> str:
+    """getrandom模型的便捷函数（按角色）"""
+    return multi_model_selector.select_random_model(role=role)
 
 
 def create_model_client(agent_type: str = "normal", client_type: str = "openai", **kwargs) -> Tuple[Any, str]:
     """为Agentcreate模型client的便捷函数"""
     try:
-        return multi_model_selector.create_client_with_fallback(client_type=client_type, **kwargs)
+        return multi_model_selector.create_client_with_fallback(client_type=client_type, role=agent_type, **kwargs)
     except Exception as e:
         logging.error(f"create{agent_type} Agent的模型clientfailed: {e}")
         raise

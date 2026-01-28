@@ -114,7 +114,7 @@ class SimpleAnalystAgent:
         # Use MultiModelSelector to create optimized client
         try:
             from multi_model_selector import multi_model_selector
-            self.client, self.model = multi_model_selector.create_openai_client()
+            self.client, self.model = multi_model_selector.create_openai_client(role="analyst")
             workflow_logger.info(f"✅ AnalystAgent using MultiModelSelector to create optimized client")
         except Exception as e:
             workflow_logger.info(f"⚠️ AnalystAgent MultiModelSelector init failed: {e}, using legacy client")
@@ -123,7 +123,7 @@ class SimpleAnalystAgent:
                 base_url=OPENAI_BASE_URL,
                 timeout=120
             )
-            self.model = "gemini-2.0-flash"  # Default model
+            self.model = "deepseek-chat"  # Default model
         self.analysis_history = []
 
         # Continuous monitoring related attributes
@@ -707,21 +707,19 @@ class SimpleStrategistAgent:
 
     def __init__(self, agent_id: str = "strategist_main"):
         self.agent_id = agent_id
-        # Use MultiModelSelector with gemini-2.0-flash prioritization for strategist
+        # Use MultiModelSelector for strategist
         try:
             from multi_model_selector import multi_model_selector
-            self.client, self.model = multi_model_selector.create_openai_client()
-            # Force gemini-2.0-flash for strategist
-            self.model = "gemini-2.0-flash"
-            workflow_logger.info(f"✅ StrategistAgent using gemini-2.0-flash model")
+            self.client, self.model = multi_model_selector.create_openai_client(role="strategist")
+            workflow_logger.info(f"✅ StrategistAgent using model: {self.model}")
         except Exception as e:
-            workflow_logger.info(f"⚠️ StrategistAgent MultiModelSelector init failed: {e}, using gemini-2.0-flash default config")
+            workflow_logger.info(f"⚠️ StrategistAgent MultiModelSelector init failed: {e}, using deepseek-chat default config")
             self.client = OpenAI(
                 api_key=OPENAI_API_KEY,
                 base_url=OPENAI_BASE_URL,
                 timeout=120
             )
-            self.model = "gemini-2.0-flash"
+            self.model = "deepseek-chat"
         
         # Initialize learning system related attributes
         self.learning_system = None
@@ -2673,11 +2671,16 @@ class SimpleLeaderAgent:
     
     def __init__(self, agent_id: str = "leader_main"):
         self.agent_id = agent_id
-        self.client = OpenAI(
-            api_key=OPENAI_API_KEY,
-            base_url=OPENAI_BASE_URL,
-            timeout=120
-        )
+        try:
+            from multi_model_selector import multi_model_selector
+            self.client, self.model = multi_model_selector.create_openai_client(role="leader")
+        except Exception:
+            self.client = OpenAI(
+                api_key=OPENAI_API_KEY,
+                base_url=OPENAI_BASE_URL,
+                timeout=120
+            )
+            self.model = "deepseek-chat"
         self.content_history = []
     
     async def generate_content(self, instruction: Dict[str, Any], target_content: str = "") -> Dict[str, Any]:
@@ -2890,13 +2893,12 @@ class SimpleEchoAgent:
             sys.path.append('src')
             from multi_model_selector import multi_model_selector, get_random_model
             self.multi_model_selector = multi_model_selector
-            # Use echo_group-specific model selection (exclude grok-3-mini)
-            self.selected_model = multi_model_selector.select_malicious_echo_model()
+            self.selected_model = get_random_model("echo")
 
         except ImportError as e:
             workflow_logger.info(f"⚠️ Multi-model selection system import failed: {e}, using default model")
             self.multi_model_selector = None
-            self.selected_model = "gemini-2.0-flash"
+            self.selected_model = "deepseek-chat"
 
         # Optimization: use shared client pool to speed up creation
         try:
@@ -2914,7 +2916,7 @@ class SimpleEchoAgent:
                     self.coordination_system._shared_pool_logged = True
             elif self.multi_model_selector:
                 # Use multi-model selector to create independent client
-                self.client, _ = self.multi_model_selector.create_openai_client(self.selected_model)
+                self.client, _ = self.multi_model_selector.create_openai_client(self.selected_model, role="echo")
                 workflow_logger.info(f"⚠️ Echo Agent {agent_id} using independent client (shared pool not found)")
             else:
                 # Create legacy client
@@ -3761,7 +3763,7 @@ class SimpleCoordinationSystem:
                 import sys
                 sys.path.append('src')
                 from multi_model_selector import multi_model_selector
-                shared_client, shared_model = multi_model_selector.create_openai_client()
+                shared_client, shared_model = multi_model_selector.create_openai_client(role="echo")
                 workflow_logger.info("✅ Shared client pool initialized successfully (multi-model selector)")
             except Exception as e:
                 # If multi-model selector fails, use default client
@@ -3770,7 +3772,7 @@ class SimpleCoordinationSystem:
                     base_url=OPENAI_BASE_URL,
                     timeout=120
                 )
-                shared_model = "gemini-2.0-flash"
+                shared_model = "deepseek-chat"
                 workflow_logger.info("✅ Shared client pool initialized successfully (default config)")
 
             # Set shared client pool
@@ -3801,7 +3803,7 @@ class SimpleCoordinationSystem:
                 base_url=OPENAI_BASE_URL,
                 timeout=120
             )
-            return client, "gemini-2.0-flash"
+            return client, "deepseek-chat"
     
     def enable_auto_trigger(self, callback_function=None):
         """Enable auto-trigger mechanism.
@@ -7315,7 +7317,7 @@ Your ratings:"""
                     try:
                         response = await asyncio.to_thread(
                             self.analyst.client.chat.completions.create,
-                            model=getattr(self.analyst, 'model', 'gemini-2.0-flash'),  # Use analyst model
+                            model=getattr(self.analyst, 'model', 'deepseek-chat'),  # Use analyst model
                             messages=[
                                 {"role": "system", "content": "You are an expert at analyzing viewpoint extremism. Respond only with a numeric rating."},
                                 {"role": "user", "content": prompt}
@@ -8865,7 +8867,7 @@ Please return the evaluation result in JSON format:
                     leader_user_id,
                     datetime.now().isoformat(),
                     0,  # Initial like count
-                    "gemini-2.0-flash",  # Model used by Leader Agent
+                    "deepseek-chat",  # Model used by Leader Agent
                     'leader_agent'
                 ))
 

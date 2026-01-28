@@ -176,11 +176,16 @@ class EnhancedLeaderAgent:
     
     def __init__(self, agent_id: str = "enhanced_leader_main"):
         self.agent_id = agent_id
-        self.client = OpenAI(
-            api_key=OPENAI_API_KEY,
-            base_url=OPENAI_BASE_URL,
-            timeout=120
-        )
+        try:
+            from multi_model_selector import multi_model_selector
+            self.client, self.model = multi_model_selector.create_openai_client(role="leader")
+        except Exception:
+            self.client = OpenAI(
+                api_key=OPENAI_API_KEY,
+                base_url=OPENAI_BASE_URL,
+                timeout=120
+            )
+            self.model = "deepseek-chat"
         # Use the new argument system
         self.evidence_system = EnhancedOpinionSystem()
         self.content_history = []
@@ -390,7 +395,7 @@ class EnhancedLeaderAgent:
 
             # Use LLM to generate related arguments
             response = self.client.chat.completions.create(
-                model="gemini-2.0-flash",
+                model=self.model,
                 messages=[
                     {
                         "role": "system",
@@ -500,7 +505,7 @@ Please generate 3-5 supporting arguments for this viewpoint from different persp
                     current_angle = f"{base_angle} (variant {i - len(angles) + 1})"
                 
                 response = self.client.chat.completions.create(
-                    model="gemini-2.0-flash",
+                    model=self.model,
                     messages=[
                         {
                             "role": "system",
@@ -580,7 +585,7 @@ Please create a high-quality response based on the above information, using the 
                     evaluation_focus = "Pay special attention to expertise demonstration and professional credibility."
 
                 response = self.client.chat.completions.create(
-                    model="gemini-2.0-flash",
+                    model=self.model,
                     messages=[
                         {
                             "role": "system",
@@ -899,7 +904,7 @@ Please conduct a professional evaluation with focus on the creation angle's stre
         """
         try:
             response = self.client.chat.completions.create(
-                model="gemini-2.0-flash",
+                model=self.model,
                 messages=[
                     {
                         "role": "system",
