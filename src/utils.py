@@ -16,6 +16,30 @@ import matplotlib
 from tenacity import retry, stop_after_attempt, wait_exponential
 from deprecated import deprecated
 
+def resolve_engine(config: dict | None = None, selector=None) -> str:
+    """Resolve the model name to use when config does not specify an engine."""
+    if config and config.get("engine"):
+        return config["engine"]
+
+    if selector is None:
+        try:
+            from multi_model_selector import multi_model_selector
+            selector = multi_model_selector
+        except Exception:
+            selector = None
+
+    if selector is not None:
+        try:
+            return selector.select_random_model(role="regular")
+        except Exception:
+            pass
+
+    try:
+        from multi_model_selector import MultiModelSelector
+        return MultiModelSelector.DEFAULT_POOL[0]
+    except Exception:
+        return "deepseek-chat"
+
 # Global rate limiting controls
 _last_request_time = {}
 # Model failure counters

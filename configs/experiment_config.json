@@ -1,19 +1,12 @@
 {
     "num_users": 10,
     "num_time_steps": 7,
-    "engine": "gemini-2.0-flash",
     "agent_config_generation": "file",
     "agent_config_path": "separate",
     "max_total_posts": 10000,
     "max_total_users": 10,
     "separate_personas": {
-        "positive_ratio": 0.0,
-        "neutral_ratio": 1.0,
-        "negative_ratio": 0.0,
-        "positive_file": "personas/positive_personas_database.json",
-        "neutral_file": "personas/neutral_personas_database.json",
-        "negative_file": "personas/negative_personas_database.json",
-        "shuffle_order": true
+        "neutral_file": "personas/neutral_personas_database.json"
     },
     "temperature": 0.9,
     "reset_db": true,
@@ -26,8 +19,7 @@
     },
     "news_injection": {
         "start_step": 0,
-        "articles_per_injection": 10,
-        "selection_mode": "sequential"
+        "articles_per_injection": 10
     },
     "moderation": {
         "content_moderation": false,
@@ -40,66 +32,28 @@
     "generate_own_post": true,
     "experiment": {
         "type": "third_party_fact_checking",
-        "possible_types": [
-            "third_party_fact_checking",
-            "community_fact_checking",
-            "hybrid_fact_checking",
-            "no_fact_checking"
-        ],
         "settings": {
             "posts_per_step": 10,
             "fact_checker_temperature": 0.3,
             "include_reasoning": false,
-            "start_delay_minutes": 0,
-            "fact_checking_enabled": true
+            "start_delay_minutes": 0
         }
     },
     "opinion_balance_system": {
         "enabled": false,
         "monitoring_enabled": false,
         "intervention_threshold": 1,
-        "response_delay_minutes": [
-            0,
-            1
-        ],
-        "max_responses_per_post": 5,
-        "agent_roles": {
-            "tech_rational": 2,
-            "moderate_neutral": 2,
-            "public_concern": 2
-        },
-        "effectiveness_tracking": true,
         "feedback_system_enabled": true,
         "trending_posts_scan_interval": 5,
         "feedback_monitoring_interval": 30,
-        "engagement_thresholds": {
-            "total_engagement": 20
-        },
         "standalone_mode": true,
         "monitoring_interval": 30
     },
     "malicious_bot_system": {
         "enabled": true,
         "cluster_size": 15,
-        "attack_probability": 1.0,
-        "target_post_types": [
-            "user_post"
-        ],
-        "attack_delay_range": [
-            1,
-            2
-        ],
         "initial_attack_threshold": 15,
-        "subsequent_attack_interval": 30,
-        "personas_file": "personas/negative_personas_database.json"
-    },
-    "deepen_discussions": {
-        "enabled": false,
-        "initial_post_threshold": 10,
-        "comment_target_percentage": 0.5,
-        "comment_target_count": 20,
-        "threshold_increment": 10,
-        "user_comment_limit": 1000
+        "subsequent_attack_interval": 30
     },
     "prebunking_system": {
         "enabled": false

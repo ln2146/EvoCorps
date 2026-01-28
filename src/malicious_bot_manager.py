@@ -31,11 +31,11 @@ class MaliciousBotManager:
         # Malicious bot configuration - use cluster size from the config
         self.cluster_size = self.config.get("cluster_size")  # Number of personas to use per attack
         # self.attack_probability = self.config.get("attack_probability", 0.8)  # Probability control removed; attacks fire immediately
-        self.target_post_types = self.config.get("target_post_types", ["user_post"])
-        self.attack_delay_range = self.config.get("attack_delay_range", [1, 5])  # Delay range in minutes (1-5)
+        # target_post_types and attack_delay_range are deprecated (no longer used)
         self.initial_attack_threshold = self.config.get("initial_attack_threshold", 15)  # Initial attack threshold
         self.subsequent_attack_interval = self.config.get("subsequent_attack_interval", 30)  # Interval between subsequent attacks
         self.malicious_prefix = ""  # Remove obvious prefix to make malicious comments less obvious
+        self.fake_news_attack_size = self.cluster_size
        
         # Initialize the malicious bot cluster using the dynamic persona extraction version
         if self.enabled:
@@ -997,7 +997,7 @@ Write your hostile post:"""
                             pid,
                             content,
                             author_id,
-                            override_cluster_size=15,
+                            override_cluster_size=self.fake_news_attack_size,
                         )
                         if res.get('success'):
                             attacked_posts.append(
@@ -1108,8 +1108,6 @@ Write your hostile post:"""
         # The top posts are re-evaluated every timestep and attacked if they satisfy the conditions
 
         return True
-
-
 
 
 

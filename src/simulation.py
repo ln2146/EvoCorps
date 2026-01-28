@@ -3,7 +3,7 @@ import logging
 import os
 import random
 import time
-from utils import Utils
+from utils import Utils, resolve_engine
 import json
 import csv
 from homophily_analysis import HomophilyAnalysis
@@ -34,7 +34,7 @@ class Simulation:
         self.config = config  # Store the entire config dictionary
         self.reset_db = config.get('reset_db', True)
         self.num_users = config['num_users']
-        self.engine = config['engine']
+        self.engine = resolve_engine(config)
         self.generate_own_post = config.get('generate_own_post', True)  # New parameter with default True
 
         # Generate timestamp for this run

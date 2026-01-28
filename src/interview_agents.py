@@ -3,6 +3,7 @@ import sqlite3
 import json
 from agent_user import AgentUser
 import argparse
+from utils import resolve_engine
 
 # usage: python interview_agents.py --reset
 
@@ -305,7 +306,7 @@ if __name__ == "__main__":
     with open('configs/experiment_config.json', 'r') as file:
         config = json.load(file)
     
-    engine = config['engine']
+    engine = resolve_engine(config)
     
     # Create interviewer
     interviewer = AgentInterviewer(engine)

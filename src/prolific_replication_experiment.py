@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 
 from agent_user import AgentUser, FeedAction, FeedReaction
-from utils import Utils
+from utils import Utils, resolve_engine
 from prompts import AgentPrompts
 from database_manager import DatabaseManager
 from user_manager import UserManager
@@ -30,6 +30,7 @@ class ProlificReplicationExperiment:
         # Load configuration
         with open(config_path, 'r') as f:
             self.config = json.load(f)
+        self.engine = resolve_engine(self.config)
         
         # Generate timestamp for this run
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -47,7 +48,7 @@ class ProlificReplicationExperiment:
         
         # Initialize OpenAI client
         from multi_model_selector import multi_model_selector
-        if self.config['engine'].startswith("gpt") or self.config['engine'].startswith("gemini"):
+        if self.engine.startswith("gpt") or self.engine.startswith("gemini"):
             # Unified model selection via MultiModelSelector (experiment role)
             self.openai_client, _ = multi_model_selector.create_openai_client(role="experiment")
         else:
@@ -117,7 +118,7 @@ class ProlificReplicationExperiment:
             # Generate the reaction using the LLM
             reaction = Utils.generate_llm_response(
                 openai_client=self.openai_client,
-                engine=self.config['engine'],
+                engine=self.engine,
                 prompt=prompt,
                 system_message=system_prompt,
                 temperature=agent.temperature,
