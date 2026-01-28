@@ -139,7 +139,7 @@ class RetrievalResult:
 class AdvancedRAGSystem:
     """Advanced RAG retrieval system"""
     
-    def __init__(self, data_path: str = "database/action_log", model_name: str = "text-embedding-3-small"):
+    def __init__(self, data_path: str = "database/action_log", model_name: str = None):
         # Ensure path is absolute and create required directories
         if not os.path.isabs(data_path):
             # Get current script directory
@@ -153,6 +153,9 @@ class AdvancedRAGSystem:
         self.data_path.mkdir(parents=True, exist_ok=True)
         
         # Initialize vectorization model
+        if model_name is None:
+            from multi_model_selector import MultiModelSelector
+            model_name = MultiModelSelector.EMBEDDING_MODEL
         self.model_name = model_name
         self.encoder = None
         self._initialize_openai_client()
@@ -197,14 +200,10 @@ class AdvancedRAGSystem:
     def _initialize_openai_client(self):
         """Initialize OpenAI client for embeddings"""
         try:
-            from openai import OpenAI
-            from keys import OPENAI_API_KEY, OPENAI_BASE_URL
-            
-            self.encoder = OpenAI(
-                api_key=OPENAI_API_KEY,
-                base_url=OPENAI_BASE_URL,
-                timeout=30
-            )
+            from multi_model_selector import multi_model_selector
+
+            # Unified model selection via MultiModelSelector (embedding role)
+            self.encoder, _ = multi_model_selector.create_embedding_client()
             logger.info(f"✅ Initialized OpenAI embedding client: {self.model_name}")
         except Exception as e:
             logger.warning(f"⚠️ OpenAI client initialization failed: {e}")
@@ -1649,4 +1648,3 @@ class AdvancedRAGSystem:
             ]
         
         return stats
-

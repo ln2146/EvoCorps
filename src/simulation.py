@@ -3,8 +3,6 @@ import logging
 import os
 import random
 import time
-from openai import OpenAI
-from keys import OPENAI_API_KEY, OPENAI_BASE_URL
 from utils import Utils
 import json
 import csv
@@ -81,19 +79,18 @@ class Simulation:
             self.openai_client, _ = multi_model_selector.create_openai_client()
             print(f"✅ Simulation created an optimized client via MultiModelSelector")
         except Exception as e:
-            print(f"⚠️ MultiModelSelector initialization failed: {e}, falling back to the default client")
-            # Fall back to the default setup
+            print(f"⚠️ MultiModelSelector initialization failed: {e}, falling back to selector-only client")
+            from multi_model_selector import MultiModelSelector
+            # Unified model selection via MultiModelSelector (regular role)
+            self.multi_model_selector = MultiModelSelector()
+            # Fall back to selector-managed setup
             if self.engine.startswith("gpt") or self.engine.startswith("gemini"):
-                self.openai_client = OpenAI(
-                    api_key=OPENAI_API_KEY,
-                    base_url=OPENAI_BASE_URL,
-                    timeout=120.0,  # 120 seconds timeout
-                    max_retries=5   # More retries for proxy services
-                )
+                self.openai_client, _ = self.multi_model_selector.create_openai_client(role="regular")
             else:
-                self.openai_client = OpenAI(
-                    base_url='http://localhost:11434/v1',
-                    api_key='ollama'
+                self.openai_client, _ = self.multi_model_selector.create_openai_client_with_base_url(
+                    base_url="http://localhost:11434/v1",
+                    api_key="ollama",
+                    role="regular",
                 )
 
         # Initialize news spread analyzer with config
@@ -104,8 +101,12 @@ class Simulation:
         self.experiment_settings = config.get('experiment', {}).get('settings', {})
         if self.experiment_type in ["third_party_fact_checking", "hybrid_fact_checking"]:
             # Use dedicated fact checker engine if specified, otherwise fallback to main engine
-            from multi_model_selector import multi_model_selector
-            fact_checker_engine = multi_model_selector.select_random_model(role="fact_checker")
+            fact_checker_engine = self.experiment_settings.get("fact_checker_engine")
+            if not fact_checker_engine:
+                if self.multi_model_selector:
+                    fact_checker_engine = self.multi_model_selector.select_random_model(role="fact_checker")
+                else:
+                    fact_checker_engine = self.engine
             self.fact_checker_engine = fact_checker_engine
             self.fact_checker = FactChecker(
                 checker_id="main_checker",
@@ -442,29 +443,6 @@ class Simulation:
             # After malicious attacks and opinion balance system triggers, let regular users keep interacting
             # await self._continue_user_activities(step)
 
-            # Asynchronously analyze sentiment of the top 3 hottest posts at the end of each time step
-            try:
-                logging.info(f"📊 Starting sentiment analysis for time step {step + 1}...")
-                import sys
-                sentiment_path = os.path.dirname(os.path.dirname(__file__))
-                if sentiment_path not in sys.path:
-                    sys.path.append(sentiment_path)
-                from sentiment_analysis_timestep import analyze_current_timestep_sentiment
-
-                # Analyze the current time step sentiment asynchronously, passing the user list for realistic data
-                sentiment_result = await analyze_current_timestep_sentiment(step + 1, self.users)
-                if sentiment_result:
-                    logging.info(f"📊 Time step {step + 1} sentiment analysis complete - average sentiment: {sentiment_result['overall_average']:.4f}")
-                else:
-                    logging.info(f"⚠️ Time step {step + 1} sentiment analysis returned no result")
-
-            except ModuleNotFoundError:
-                # Sentiment analysis module is missing; skip quietly
-                logging.debug(f"⏭️ Sentiment analysis module unavailable for time step {step + 1}; skipping")
-                pass
-            except Exception as e:
-                logging.warning(f"Time step {step + 1} sentiment analysis failed: {e}")
-
             # Update and display negative news heat (comments only)
             if self.negative_news_tracker:
                 self._update_negative_news_heat(step + 1)
@@ -652,24 +630,6 @@ class Simulation:
         # Run homophily analysis after simulation completes
         homophily_analyzer = HomophilyAnalysis(self.db_path)
         homophily_analyzer.run_analysis(output_dir=f"experiment_outputs/homophily_analysis/{self.timestamp}")
-
-        # Generate sentiment analysis visualization (if the module exists)
-        try:
-            import sys
-            sentiment_path = os.path.dirname(os.path.dirname(__file__))
-            if sentiment_path not in sys.path:
-                sys.path.append(sentiment_path)
-            from sentiment_analysis_timestep import generate_sentiment_visualization
-
-            print("📈 Generating sentiment analysis visualization...")
-            generate_sentiment_visualization()
-            print("✅ Sentiment analysis visualization generation complete!")
-
-        except ModuleNotFoundError:
-            # Sentiment analysis module is missing; skip quietly
-            pass
-        except Exception as e:
-            logging.warning(f"Sentiment visualization generation failed: {e}")
 
     async def _async_user_post_creation(self, user, step, user_index):
         """Async user post creation helper with simplified limit checks"""

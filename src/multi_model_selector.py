@@ -13,7 +13,7 @@ import asyncio
 from typing import Any, Dict, Optional, Tuple, TYPE_CHECKING
 from openai import OpenAI
 import httpx
-from keys import OPENAI_API_KEY, OPENAI_BASE_URL
+from keys import OPENAI_API_KEY, OPENAI_BASE_URL, EMBEDDING_API_KEY, EMBEDDING_BASE_URL
 
 if TYPE_CHECKING:
     from langchain_openai import ChatOpenAI
@@ -34,23 +34,32 @@ class MultiModelSelector:
     # Keep all role defaults here. If you want every role to use DeepSeek, keep the
     # pools as ["deepseek-chat"]. If you want multi-provider fallback, add models
     # to the lists below (they must be OpenAI-compatible on your OPENAI_BASE_URL).
+    EMBEDDING_MODEL = "embedding-3"
     DEFAULT_POOL = ["deepseek-chat"]
     ROLE_MODEL_POOLS: dict[str, list[str]] = {
+        # Core agent roles
         "regular": DEFAULT_POOL,
         "malicious": DEFAULT_POOL,
         "analyst": DEFAULT_POOL,
         "strategist": DEFAULT_POOL,
         "leader": DEFAULT_POOL,
         "echo": DEFAULT_POOL,
+        # System roles
         "memory": DEFAULT_POOL,
         "fact_checker": DEFAULT_POOL,
+        "summary": DEFAULT_POOL,
+        "experiment": DEFAULT_POOL,
+        "interview": DEFAULT_POOL,
+        "comment_diversity": DEFAULT_POOL,
+        # Embedding role (client only; embedding model is supplied by caller)
+        "embedding": DEFAULT_POOL,
     }
 
     # Backwards-compatible aliases used elsewhere in this repo.
     AVAILABLE_MODELS = ROLE_MODEL_POOLS["regular"]
-    MALICIOUS_ECHO_MODELS = ROLE_MODEL_POOLS["echo"]
+    MALICIOUS_ECHO_MODELS = ROLE_MODEL_POOLS["malicious"]
     FALLBACK_PRIORITY = ROLE_MODEL_POOLS["regular"]
-    MALICIOUS_ECHO_FALLBACK = ROLE_MODEL_POOLS["echo"]
+    MALICIOUS_ECHO_FALLBACK = ROLE_MODEL_POOLS["malicious"]
     
     def __init__(self):
         self.usage_stats = {model: 0 for model in self.ALL_MODELS}
@@ -309,6 +318,48 @@ class MultiModelSelector:
         )
 
         return client, model_name
+
+    def create_openai_client_with_base_url(
+        self,
+        base_url: str,
+        api_key: str,
+        model_name: str = None,
+        role: str = "regular",
+    ) -> Tuple[OpenAI, str]:
+        """Create OpenAI client with a custom base_url (e.g., local/ollama)."""
+        if model_name is None:
+            model_name = self.select_random_model(role=role)
+
+        # 请求间隔控制
+        self._wait_for_request_interval(model_name)
+
+        http_client = httpx.Client(
+            timeout=self.request_config["timeout"],
+            limits=httpx.Limits(
+                max_connections=self.request_config["connection_pool_size"],
+                max_keepalive_connections=self.request_config["max_keepalive_connections"]
+            )
+        )
+
+        client = OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=self.request_config["timeout"],
+            http_client=http_client
+        )
+
+        return client, model_name
+
+    def create_embedding_client(self, model_name: str = None) -> Tuple[OpenAI, str]:
+        """Create OpenAI client for embeddings."""
+        if model_name is None:
+            model_name = self.EMBEDDING_MODEL
+        return self.create_openai_client_with_base_url(
+            base_url=EMBEDDING_BASE_URL,
+            api_key=EMBEDDING_API_KEY,
+            model_name=model_name,
+            role="embedding",
+        )
     
     def create_langchain_client(self, model_name: str = None, role: str = "regular", **kwargs) -> Tuple[ChatOpenAI, str]:
         """createoptimize的LangChain ChatOpenAIclient"""

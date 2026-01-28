@@ -10,8 +10,6 @@ import random
 import sqlite3
 from datetime import datetime
 from typing import Dict, Any, List, Optional
-from openai import OpenAI
-from keys import OPENAI_API_KEY, OPENAI_BASE_URL
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'evidence_database'))
 from enhanced_opinion_system import EnhancedOpinionSystem
@@ -178,14 +176,13 @@ class EnhancedLeaderAgent:
         self.agent_id = agent_id
         try:
             from multi_model_selector import multi_model_selector
+            # Unified model selection via MultiModelSelector (leader role)
             self.client, self.model = multi_model_selector.create_openai_client(role="leader")
         except Exception:
-            self.client = OpenAI(
-                api_key=OPENAI_API_KEY,
-                base_url=OPENAI_BASE_URL,
-                timeout=120
-            )
-            self.model = "deepseek-chat"
+            from multi_model_selector import MultiModelSelector
+            # Unified model selection via MultiModelSelector (leader role)
+            selector = MultiModelSelector()
+            self.client, self.model = selector.create_openai_client(role="leader")
         # Use the new argument system
         self.evidence_system = EnhancedOpinionSystem()
         self.content_history = []

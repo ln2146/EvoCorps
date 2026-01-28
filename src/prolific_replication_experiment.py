@@ -6,13 +6,11 @@ import time
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
-from openai import OpenAI
 from pydantic import BaseModel
 
 from agent_user import AgentUser, FeedAction, FeedReaction
 from utils import Utils
 from prompts import AgentPrompts
-from keys import OPENAI_API_KEY, OPENAI_BASE_URL
 from database_manager import DatabaseManager
 from user_manager import UserManager
 
@@ -48,17 +46,16 @@ class ProlificReplicationExperiment:
         self.users = self.user_manager.users  # This will load agents from the persona config file
         
         # Initialize OpenAI client
+        from multi_model_selector import multi_model_selector
         if self.config['engine'].startswith("gpt") or self.config['engine'].startswith("gemini"):
-            self.openai_client = OpenAI(
-                api_key=OPENAI_API_KEY,
-                base_url=OPENAI_BASE_URL,
-                timeout=120.0,  # 120 seconds timeout
-                max_retries=5   # More retries for proxy services
-            )
+            # Unified model selection via MultiModelSelector (experiment role)
+            self.openai_client, _ = multi_model_selector.create_openai_client(role="experiment")
         else:
-            self.openai_client = OpenAI(
-                base_url='http://localhost:11434/v1',
-                api_key='ollama'
+            # Unified model selection via MultiModelSelector with custom base_url (experiment role)
+            self.openai_client, _ = multi_model_selector.create_openai_client_with_base_url(
+                base_url="http://localhost:11434/v1",
+                api_key="ollama",
+                role="experiment",
             )
         
         # Create experiment output directory

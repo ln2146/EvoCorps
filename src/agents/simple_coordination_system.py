@@ -102,8 +102,6 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from enhanced_leader_agent import EnhancedLeaderAgent, ArgumentDatabase
 
-from openai import OpenAI
-from keys import OPENAI_API_KEY, OPENAI_BASE_URL
 
 
 class SimpleAnalystAgent:
@@ -117,13 +115,11 @@ class SimpleAnalystAgent:
             self.client, self.model = multi_model_selector.create_openai_client(role="analyst")
             workflow_logger.info(f"✅ AnalystAgent using MultiModelSelector to create optimized client")
         except Exception as e:
-            workflow_logger.info(f"⚠️ AnalystAgent MultiModelSelector init failed: {e}, using legacy client")
-            self.client = OpenAI(
-                api_key=OPENAI_API_KEY,
-                base_url=OPENAI_BASE_URL,
-                timeout=120
-            )
-            self.model = "deepseek-chat"  # Default model
+            workflow_logger.info(f"⚠️ AnalystAgent MultiModelSelector init failed: {e}, using selector fallback")
+            from multi_model_selector import MultiModelSelector
+            # Unified model selection via MultiModelSelector (analyst role)
+            selector = MultiModelSelector()
+            self.client, self.model = selector.create_openai_client(role="analyst")
         self.analysis_history = []
 
         # Continuous monitoring related attributes
@@ -713,13 +709,11 @@ class SimpleStrategistAgent:
             self.client, self.model = multi_model_selector.create_openai_client(role="strategist")
             workflow_logger.info(f"✅ StrategistAgent using model: {self.model}")
         except Exception as e:
-            workflow_logger.info(f"⚠️ StrategistAgent MultiModelSelector init failed: {e}, using deepseek-chat default config")
-            self.client = OpenAI(
-                api_key=OPENAI_API_KEY,
-                base_url=OPENAI_BASE_URL,
-                timeout=120
-            )
-            self.model = "deepseek-chat"
+            workflow_logger.info(f"⚠️ StrategistAgent MultiModelSelector init failed: {e}, using selector fallback")
+            from multi_model_selector import MultiModelSelector
+            # Unified model selection via MultiModelSelector (strategist role)
+            selector = MultiModelSelector()
+            self.client, self.model = selector.create_openai_client(role="strategist")
         
         # Initialize learning system related attributes
         self.learning_system = None
@@ -2675,12 +2669,10 @@ class SimpleLeaderAgent:
             from multi_model_selector import multi_model_selector
             self.client, self.model = multi_model_selector.create_openai_client(role="leader")
         except Exception:
-            self.client = OpenAI(
-                api_key=OPENAI_API_KEY,
-                base_url=OPENAI_BASE_URL,
-                timeout=120
-            )
-            self.model = "deepseek-chat"
+            from multi_model_selector import MultiModelSelector
+            # Unified model selection via MultiModelSelector (leader role)
+            selector = MultiModelSelector()
+            self.client, self.model = selector.create_openai_client(role="leader")
         self.content_history = []
     
     async def generate_content(self, instruction: Dict[str, Any], target_content: str = "") -> Dict[str, Any]:
@@ -2919,20 +2911,17 @@ class SimpleEchoAgent:
                 self.client, _ = self.multi_model_selector.create_openai_client(self.selected_model, role="echo")
                 workflow_logger.info(f"⚠️ Echo Agent {agent_id} using independent client (shared pool not found)")
             else:
-                # Create legacy client
-                self.client = OpenAI(
-                    api_key=OPENAI_API_KEY,
-                    base_url=OPENAI_BASE_URL,
-                    timeout=120
-                )
-                workflow_logger.info(f"⚠️ Echo Agent {agent_id} using legacy client (shared pool and multi-model selector unavailable)")
+                from multi_model_selector import MultiModelSelector
+                # Unified model selection via MultiModelSelector (echo role)
+                selector = MultiModelSelector()
+                self.client, self.selected_model = selector.create_openai_client(role="echo")
+                workflow_logger.info(f"⚠️ Echo Agent {agent_id} using selector fallback client")
         except Exception as e:
-            workflow_logger.info(f"⚠️ Echo Agent {agent_id} client creation failed: {e}, using legacy client")
-            self.client = OpenAI(
-                api_key=OPENAI_API_KEY,
-                base_url=OPENAI_BASE_URL,
-                timeout=120
-            )
+            workflow_logger.info(f"⚠️ Echo Agent {agent_id} client creation failed: {e}, using selector fallback")
+            from multi_model_selector import MultiModelSelector
+            # Unified model selection via MultiModelSelector (echo role)
+            selector = MultiModelSelector()
+            self.client, self.selected_model = selector.create_openai_client(role="echo")
 
         # Extract key info from persona data
         self.personality_traits = persona_data.get("personality_traits", ["Friendly", "Supportive"])
@@ -3754,10 +3743,6 @@ class SimpleCoordinationSystem:
     def _initialize_shared_client_pool(self):
         """Initialize shared client pool to speed up Echo Agent creation."""
         try:
-            # Create a shared OpenAI client
-            from openai import OpenAI
-            from keys import OPENAI_API_KEY, OPENAI_BASE_URL
-
             # Try to use multi-model selector
             try:
                 import sys
@@ -3766,14 +3751,12 @@ class SimpleCoordinationSystem:
                 shared_client, shared_model = multi_model_selector.create_openai_client(role="echo")
                 workflow_logger.info("✅ Shared client pool initialized successfully (multi-model selector)")
             except Exception as e:
-                # If multi-model selector fails, use default client
-                shared_client = OpenAI(
-                    api_key=OPENAI_API_KEY,
-                    base_url=OPENAI_BASE_URL,
-                    timeout=120
-                )
-                shared_model = "deepseek-chat"
-                workflow_logger.info("✅ Shared client pool initialized successfully (default config)")
+                # If multi-model selector fails, use selector fallback
+                from multi_model_selector import MultiModelSelector
+                # Unified model selection via MultiModelSelector (echo role)
+                selector = MultiModelSelector()
+                shared_client, shared_model = selector.create_openai_client(role="echo")
+                workflow_logger.info("✅ Shared client pool initialized successfully (selector fallback)")
 
             # Set shared client pool
             self._shared_client_pool = {
@@ -3796,14 +3779,10 @@ class SimpleCoordinationSystem:
             return self._shared_client_pool['client'], self._shared_client_pool['model']
         else:
             # If shared pool is unavailable, create a temporary client
-            from openai import OpenAI
-            from keys import OPENAI_API_KEY, OPENAI_BASE_URL
-            client = OpenAI(
-                api_key=OPENAI_API_KEY,
-                base_url=OPENAI_BASE_URL,
-                timeout=120
-            )
-            return client, "deepseek-chat"
+            from multi_model_selector import MultiModelSelector
+            # Unified model selection via MultiModelSelector (echo role)
+            selector = MultiModelSelector()
+            return selector.create_openai_client(role="echo")
     
     def enable_auto_trigger(self, callback_function=None):
         """Enable auto-trigger mechanism.

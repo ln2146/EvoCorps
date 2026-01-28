@@ -1,12 +1,12 @@
 import logging
 import sqlite3
 import json
-from openai import OpenAI
-from keys import OPENAI_API_KEY, OPENAI_BASE_URL
 from agent_user import AgentUser
 import argparse
 
 # usage: python interview_agents.py --reset
+
+ENABLE_LLM_INTERVIEWS = False
 
 INTERVIEW_QUESTIONS = [
     "Who were your favorite users to interact with and why?",
@@ -17,20 +17,18 @@ INTERVIEW_QUESTIONS = [
 class AgentInterviewer:
     def __init__(self, engine: str = "gemini-2.0-flash"):
         self.engine = engine
-        
-        # Initialize the appropriate client based on engine type
-        if engine.startswith("gpt") or engine.startswith("gemini"):
-            self.openai_client = OpenAI(
-                api_key=OPENAI_API_KEY,
-                base_url=OPENAI_BASE_URL,
-                timeout=120.0,  # 120 seconds timeout
-                max_retries=5   # More retries for proxy services
-            )
-        else:
-            self.openai_client = OpenAI(
-                base_url='http://localhost:11434/v1',
-                api_key='ollama'
-            )
+        self.openai_client = None
+        if ENABLE_LLM_INTERVIEWS:
+            from multi_model_selector import multi_model_selector
+            # Unified model selection via MultiModelSelector (interview role)
+            if engine.startswith("gpt") or engine.startswith("gemini"):
+                self.openai_client, _ = multi_model_selector.create_openai_client(role="interview")
+            else:
+                self.openai_client, _ = multi_model_selector.create_openai_client_with_base_url(
+                    base_url="http://localhost:11434/v1",
+                    api_key="ollama",
+                    role="interview",
+                )
         
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
         
@@ -157,7 +155,34 @@ class AgentInterviewer:
                     "sample_posts": sample_posts
                 }
             }
-            
+
+            if not ENABLE_LLM_INTERVIEWS:
+                # Skip LLM interviews; only record latest reflection memory snapshot.
+                cursor.execute("""
+                    SELECT content
+                    FROM agent_memories
+                    WHERE user_id = ? AND memory_type = 'reflection'
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """, (user.user_id,))
+                row = cursor.fetchone()
+                memory_snapshot = row[0] if row else ""
+
+                cursor.execute("""
+                    INSERT INTO user_interviews
+                    (user_id, question, answer, context)
+                    VALUES (?, ?, ?, ?)
+                """, (
+                    user.user_id,
+                    "MEMORY_SNAPSHOT",
+                    memory_snapshot,
+                    json.dumps(context)
+                ))
+                conn.commit()
+                logging.info(f"User {user.user_id}: memory snapshot recorded")
+                conn.close()
+                continue
+
             # Create the interview prompt
             prompt = f"""You are the user with the following characteristics:
 Demographic: {json.dumps(user.demographic, indent=2)}
@@ -182,10 +207,10 @@ Based on these characteristics and activities, please provide a brief but natura
                         temperature=0.7
                     )
                     answer = response.choices[0].message.content
-                    
+
                     # Save to database
                     cursor.execute("""
-                        INSERT INTO user_interviews 
+                        INSERT INTO user_interviews
                         (user_id, question, answer, context)
                         VALUES (?, ?, ?, ?)
                     """, (
@@ -195,7 +220,7 @@ Based on these characteristics and activities, please provide a brief but natura
                         json.dumps(context)
                     ))
                     conn.commit()
-                    
+
                     logging.info(f"Q: {question}")
                     logging.info(f"A: {answer}\n")
                 except Exception as e:

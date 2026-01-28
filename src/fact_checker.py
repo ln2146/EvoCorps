@@ -4,11 +4,9 @@ import json
 import os
 from typing import List, Literal
 from pydantic import BaseModel
-from openai import OpenAI
 from post import Post, CommunityNote
 from utils import Utils
 from prompts import FactCheckerPrompts
-from keys import OPENAI_API_KEY, OPENAI_BASE_URL
 
 
 class FactCheckVerdict(BaseModel):
@@ -408,12 +406,9 @@ def main():
     """
     Main function to run the fact checker.
     """
-    openai_client = OpenAI(
-        api_key=OPENAI_API_KEY,
-        base_url=OPENAI_BASE_URL,
-        timeout=120.0,  # 120 seconds timeout
-        max_retries=5   # More retries for proxy services
-    )
+    # Unified model selection via MultiModelSelector (fact_checker role)
+    from multi_model_selector import multi_model_selector
+    openai_client, model_name = multi_model_selector.create_openai_client(role="fact_checker")
     
     # Create fact checker instance
     checker = FactChecker(
@@ -437,7 +432,7 @@ def main():
         try:
             verdict = checker.check_post(
                 openai_client=openai_client,
-                engine="gpt-4o",
+                engine=model_name,
                 post=post
             )
         

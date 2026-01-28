@@ -5,10 +5,8 @@ import asyncio
 import json
 import os
 import random
-from openai import OpenAI
 from utils import Utils
 from agent_user import AgentUser
-from keys import OPENAI_API_KEY, OPENAI_BASE_URL
 # Remove complex user engagement mechanism
 
 class NewsManager:
@@ -32,7 +30,9 @@ class NewsManager:
         self._first_injection_pending = True
         # First injection should be 10 posts: 9 normal + 1 extreme
         self._first_injection_pattern = ['normal'] * 9 + ['extreme']
-        self._summary_client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, max_retries=2, timeout=45)
+        # Unified model selection via MultiModelSelector (summary role)
+        from multi_model_selector import multi_model_selector
+        self._summary_client, _ = multi_model_selector.create_openai_client(role="summary")
 
         # Optional knob: strictly use precomputed summaries and avoid LLM
         self.use_precomputed_summary_only = self.config.get('news_injection', {}).get('use_precomputed_summary_only', False)

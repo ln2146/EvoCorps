@@ -1,6 +1,5 @@
 import json
 import logging
-from openai import OpenAI
 import time
 from pydantic import BaseModel
 from typing import List, Literal, Optional
@@ -127,7 +126,7 @@ class AgentUser:
         except ImportError as e:
             print(f"⚠️ Multi-model selector import failed: {e}, using default model")
             self.multi_model_selector = None
-            self.selected_model = "gemini-2.0-flash"
+            self.selected_model = "deepseek-chat"
 
         # Optimize: set temperature by persona type to increase differentiation
         if temperature is None:
@@ -557,15 +556,12 @@ Your Comment:"""
             # Regenerate with higher temperature
             enhanced_temperature = min(1.0, self.temperature + 0.1)
             
-            from openai import OpenAI
-            from keys import OPENAI_API_KEY, OPENAI_BASE_URL
             import asyncio
-            
-            client = OpenAI(
-                api_key=OPENAI_API_KEY,
-                base_url=OPENAI_BASE_URL,
-                timeout=120
-            )
+            from multi_model_selector import MultiModelSelector
+
+            # Unified model selection via MultiModelSelector (comment diversity role)
+            selector = self.multi_model_selector or MultiModelSelector()
+            client, _ = selector.create_openai_client(role="comment_diversity")
             
             # Fetch system prompt asynchronously (concurrent)
             system_prompt = await self._create_personalized_system_prompt()
@@ -1159,10 +1155,16 @@ Format your response as a single, updated memory that replaces and integrates mu
 
             # Call LLM to integrate (with retries and timeout)
             import asyncio
-            from multi_model_selector import multi_model_selector
 
             logging.info(f"User {self.user_id}: Starting memory integration LLM call")
-            client, model = multi_model_selector.create_openai_client(role="memory")
+            from multi_model_selector import MultiModelSelector
+            # Unified model selection via MultiModelSelector (memory role)
+            if self.multi_model_selector:
+                client, model = self.multi_model_selector.create_openai_client(role="memory")
+            else:
+                logging.warning("MultiModelSelector unavailable; using selector fallback for memory integration.")
+                selector = MultiModelSelector()
+                client, model = selector.create_openai_client(role="memory")
 
             async def _do_call():
                 logging.info(f"User {self.user_id}: Making LLM call with prompt length: {len(integration_prompt)}")
@@ -1225,8 +1227,14 @@ Please create an integrated memory summary that:
 Format your response as a single, comprehensive memory entry that can replace multiple individual memories."""
 
             # Call LLM to integrate (with retries and timeout)
-            from multi_model_selector import multi_model_selector
-            client, model = multi_model_selector.create_openai_client(role="memory")
+            from multi_model_selector import MultiModelSelector
+            # Unified model selection via MultiModelSelector (memory role)
+            if self.multi_model_selector:
+                client, model = self.multi_model_selector.create_openai_client(role="memory")
+            else:
+                logging.warning("MultiModelSelector unavailable; using selector fallback for memory integration.")
+                selector = MultiModelSelector()
+                client, model = selector.create_openai_client(role="memory")
 
             async def _do_call2():
                 return await asyncio.to_thread(
@@ -1268,7 +1276,6 @@ Format your response as a single, comprehensive memory entry that can replace mu
         try:
             import asyncio
             import time, hashlib
-            from openai import OpenAI
 
             # Debounce + dedup + simple in-progress guard to avoid duplicate updates
             # - Debounce: skip if calls happen within a short interval
@@ -1389,8 +1396,14 @@ Task:
 """
 
             # 4) Call LLM to generate new integrated memory (consistent with global keys/agent)
-            from multi_model_selector import multi_model_selector
-            client, model = multi_model_selector.create_openai_client(role="memory")
+            from multi_model_selector import MultiModelSelector
+            # Unified model selection via MultiModelSelector (memory role)
+            if self.multi_model_selector:
+                client, model = self.multi_model_selector.create_openai_client(role="memory")
+            else:
+                logging.warning("MultiModelSelector unavailable; using selector fallback for memory integration.")
+                selector = MultiModelSelector()
+                client, model = selector.create_openai_client(role="memory")
             response = await asyncio.to_thread(
                 client.chat.completions.create,
                 model=model,

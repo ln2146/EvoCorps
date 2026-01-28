@@ -84,5 +84,7 @@ def test_role_pools_include_memory_and_fact_checker() -> None:
 
     assert "memory" in MultiModelSelector.ROLE_MODEL_POOLS
     assert "fact_checker" in MultiModelSelector.ROLE_MODEL_POOLS
+    assert "embedding" in MultiModelSelector.ROLE_MODEL_POOLS
     assert MultiModelSelector.ROLE_MODEL_POOLS["memory"] == MultiModelSelector.DEFAULT_POOL
     assert MultiModelSelector.ROLE_MODEL_POOLS["fact_checker"] == MultiModelSelector.DEFAULT_POOL
+    assert MultiModelSelector.ROLE_MODEL_POOLS["embedding"] == MultiModelSelector.DEFAULT_POOL
