@@ -103,13 +103,14 @@ class OpinionBalanceLauncher:
         # Only create the default configuration when the file is completely missing
         # Only create defaults when the configuration file is entirely missing
         # OpinionBalanceManager will fall back to its built-in defaults in that case
+        from multi_model_selector import MultiModelSelector
         default_config = {
             "opinion_balance_system": {
                 "enabled": True,
                 "monitoring_enabled": True
                 # Let OpinionBalanceManager use its default values for other settings
             },
-            "engine": "gemini-2.0-flash",
+            "engine": MultiModelSelector.DEFAULT_POOL[0],
             "temperature": 0.7
         }
         

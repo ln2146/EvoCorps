@@ -2890,7 +2890,8 @@ class SimpleEchoAgent:
         except ImportError as e:
             workflow_logger.info(f"⚠️ Multi-model selection system import failed: {e}, using default model")
             self.multi_model_selector = None
-            self.selected_model = "deepseek-chat"
+            from multi_model_selector import MultiModelSelector
+            self.selected_model = MultiModelSelector.DEFAULT_POOL[0]
 
         # Optimization: use shared client pool to speed up creation
         try:
@@ -7289,6 +7290,8 @@ Your ratings:"""
             try:
                 # Use analyst OpenAI client for scoring
                 if hasattr(self.analyst, 'client') and self.analyst.client:
+                    from multi_model_selector import MultiModelSelector
+                    default_model = MultiModelSelector.DEFAULT_POOL[0]
                     if log_details:
                         # Only log details when requested and show full content
                         workflow_logger.info(f"    ℹ️  Using LLM client for viewpoint extremism scoring: {content}")
@@ -7296,7 +7299,7 @@ Your ratings:"""
                     try:
                         response = await asyncio.to_thread(
                             self.analyst.client.chat.completions.create,
-                            model=getattr(self.analyst, 'model', 'deepseek-chat'),  # Use analyst model
+                            model=getattr(self.analyst, 'model', default_model),  # Use analyst model
                             messages=[
                                 {"role": "system", "content": "You are an expert at analyzing viewpoint extremism. Respond only with a numeric rating."},
                                 {"role": "user", "content": prompt}
@@ -8835,6 +8838,7 @@ Please return the evaluation result in JSON format:
                         datetime.now().isoformat()
                     ))
 
+                from multi_model_selector import MultiModelSelector
                 # Insert leader comment
                 execute_query('''
                     INSERT INTO comments (comment_id, content, post_id, author_id, created_at, num_likes, selected_model, agent_type)
@@ -8846,7 +8850,7 @@ Please return the evaluation result in JSON format:
                     leader_user_id,
                     datetime.now().isoformat(),
                     0,  # Initial like count
-                    "deepseek-chat",  # Model used by Leader Agent
+                    MultiModelSelector.DEFAULT_POOL[0],  # Model used by Leader Agent
                     'leader_agent'
                 ))
 

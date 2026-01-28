@@ -270,7 +270,7 @@ class FactCheckerPrompts:
     - Lack of clear decision criteria
     - No concrete examples
     - Led to 66.7% unverified rate
-    - Takedown threshold was 0.9 (too high for gpt-4o-mini's 80% typical confidence)
+    - Takedown threshold was 0.9 (too high for typical model confidence levels)
 
     OPTIMIZATION CHANGELOG (2025-01-XX):
     ====================================

@@ -15,7 +15,10 @@ INTERVIEW_QUESTIONS = [
 ]
 
 class AgentInterviewer:
-    def __init__(self, engine: str = "gemini-2.0-flash"):
+    def __init__(self, engine: str = None):
+        if engine is None:
+            from multi_model_selector import MultiModelSelector
+            engine = MultiModelSelector.DEFAULT_POOL[0]
         self.engine = engine
         self.openai_client = None
         if ENABLE_LLM_INTERVIEWS:

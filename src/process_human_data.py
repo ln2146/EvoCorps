@@ -81,9 +81,10 @@ IMPORTANT INSTRUCTIONS:
 def process_feed_content(feed_content, client):
     try:
         # Get the completion from GPT
+        from multi_model_selector import MultiModelSelector
         response = Utils.generate_llm_response(
             openai_client=client,
-            engine="gpt-4",
+            engine=MultiModelSelector.DEFAULT_POOL[0],
             prompt=get_prompt().format(content=feed_content),
             system_message="You are a helpful assistant that reformats social media feed actions into JSON format with an 'actions' array. Each action should have 'action' and 'target' fields.",
             temperature=0.0
@@ -175,4 +176,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

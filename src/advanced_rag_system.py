@@ -190,7 +190,7 @@ class AdvancedRAGSystem:
 
         # Config parameters
         self.config = {
-            "vector_dimension": 1536,  # Dimension for OpenAI text-embedding-3-small
+            "vector_dimension": 1536,  # Default embedding dimension (kept in sync with current embedding model)
             "index_update_threshold": 10,  # Update index after how many new records
             "similarity_weight": 0.6,
             "relevance_weight": 0.4,

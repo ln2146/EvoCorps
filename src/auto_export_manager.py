@@ -48,6 +48,8 @@ class AutoExportManager:
         """Get agent type and model info"""
         agent_type = "unknown"
         selected_model = "unknown"
+        from multi_model_selector import MultiModelSelector
+        default_model = MultiModelSelector.DEFAULT_POOL[0]
 
         try:
             cursor = self.conn.cursor()
@@ -66,7 +68,7 @@ class AutoExportManager:
                     selected_model = result[0]
                 else:
                     # If not found, use default model
-                    selected_model = "gemini-2.0-flash"
+                    selected_model = default_model
 
             # Check malicious agents - confirm via malicious_comments table
             else:
@@ -91,10 +93,10 @@ class AutoExportManager:
                     if result and result[0]:
                         selected_model = result[0]
                     else:
-                        selected_model = "gemini-2.0-flash"  # Default malicious model
+                        selected_model = default_model  # Default malicious model
                 elif author_id.startswith("malicious_") or "malicious" in author_id:
                     agent_type = "malicious_agent"
-                    selected_model = "gemini-2.0-flash"  # Default malicious model
+                    selected_model = default_model  # Default malicious model
                 else:
                     # Normal user
                     agent_type = "normal_user"
@@ -118,7 +120,7 @@ class AutoExportManager:
                         if result and result[0]:
                             selected_model = result[0]
                         else:
-                            selected_model = "gpt-4.1-nano"  # Default normal model
+                            selected_model = default_model  # Default normal model
 
         except Exception as e:
             logging.warning(f"Unable to get agent info for user {author_id}: {e}")
@@ -622,7 +624,7 @@ class AutoExportManager:
 
                     # Set agent_type and selected_model for malicious bot
                     agent_type = 'malicious_agent'
-                    selected_model = malicious_dict.get("selected_model") or "gemini-2.0-flash"
+                    selected_model = malicious_dict.get("selected_model") or default_model
 
                     formatted_comment = {
                         'comment_id': comment_id_safe,

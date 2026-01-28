@@ -32,7 +32,7 @@ class NewsManager:
         self._first_injection_pattern = ['normal'] * 9 + ['extreme']
         # Unified model selection via MultiModelSelector (summary role)
         from multi_model_selector import multi_model_selector
-        self._summary_client, _ = multi_model_selector.create_openai_client(role="summary")
+        self._summary_client, self._summary_model = multi_model_selector.create_openai_client(role="summary")
 
         # Optional knob: strictly use precomputed summaries and avoid LLM
         self.use_precomputed_summary_only = self.config.get('news_injection', {}).get('use_precomputed_summary_only', False)
@@ -457,7 +457,7 @@ News content:
 
             response = await asyncio.to_thread(
                 self._summary_client.chat.completions.create,
-                model="gemini-2.0-flash",
+                model=self._summary_model,
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant that writes concise English summaries."},
                     {"role": "user", "content": prompt}

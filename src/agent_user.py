@@ -126,7 +126,8 @@ class AgentUser:
         except ImportError as e:
             print(f"⚠️ Multi-model selector import failed: {e}, using default model")
             self.multi_model_selector = None
-            self.selected_model = "deepseek-chat"
+            from multi_model_selector import MultiModelSelector
+            self.selected_model = MultiModelSelector.DEFAULT_POOL[0]
 
         # Optimize: set temperature by persona type to increase differentiation
         if temperature is None:

@@ -125,6 +125,8 @@ class ScenarioExportManager:
         """Get agent type and model information"""
         agent_type = "unknown"
         selected_model = "unknown"
+        from multi_model_selector import MultiModelSelector
+        default_model = MultiModelSelector.DEFAULT_POOL[0]
 
         try:
             cursor = self.conn.cursor()
@@ -139,7 +141,7 @@ class ScenarioExportManager:
 
             if result:
                 db_agent_type = result[0]
-                db_model = result[1] if result[1] else "gemini-2.0-flash"
+                db_model = result[1] if result[1] else default_model
 
                 # Use the agent_type stored in the database without remapping
                 agent_type = db_agent_type
@@ -149,13 +151,13 @@ class ScenarioExportManager:
                 # If the comments table lacks agent_type info, infer from the author_id pattern
                 if author_id.startswith("echo_"):
                     agent_type = "echo_agent"
-                    selected_model = "gemini-2.0-flash"
+                    selected_model = default_model
                 elif author_id.startswith("leader_agent") or "leader_agent" in author_id:
                     agent_type = "leader_agent"
-                    selected_model = "gemini-2.0-flash"
+                    selected_model = default_model
                 elif author_id.startswith("malicious_") or "malicious" in author_id:
                     agent_type = "malicious_agent"
-                    selected_model = "gemini-2.0-flash"
+                    selected_model = default_model
                 else:
                     # Check the malicious_comments table
                     try:
@@ -178,7 +180,7 @@ class ScenarioExportManager:
                             if result and result[0]:
                                 selected_model = result[0]
                             else:
-                                selected_model = "gemini-2.0-flash"
+                                selected_model = default_model
                         else:
                             # Regular user
                             agent_type = "normal_user"
@@ -203,7 +205,7 @@ class ScenarioExportManager:
                         if result and result[0]:
                             selected_model = result[0]
                         else:
-                            selected_model = "gpt-4.1-nano"
+                            selected_model = default_model
 
         except Exception as e:
             logging.warning(f"Unable to get agent information for user {author_id}: {e}")
@@ -357,7 +359,7 @@ class ScenarioExportManager:
                         'is_malicious': True,
                         'persona_used': malicious_dict.get("persona_used"),
                         'agent_type': 'malicious_agent',
-                        'selected_model': malicious_dict.get("selected_model", "gemini-2.0-flash"),
+                        'selected_model': malicious_dict.get("selected_model", default_model),
                         'scenario': self.current_scenario,
                         'exported_at': datetime.now().isoformat()
                     })
