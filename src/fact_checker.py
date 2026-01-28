@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import logging
 import sqlite3
+
 import json
 import os
 from typing import List, Literal

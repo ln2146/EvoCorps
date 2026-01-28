@@ -282,9 +282,18 @@ async def ask_tracked_users_about_first_malicious_news(sim, timestep: int):
                 persona_id=persona_name,
             )
 
+            try:
+                from multi_model_selector import MultiModelSelector
+                if getattr(sim, "multi_model_selector", None):
+                    model_name = sim.multi_model_selector.select_random_model(role="regular")
+                else:
+                    model_name = MultiModelSelector.DEFAULT_POOL[0]
+            except Exception:
+                model_name = getattr(sim, "engine", None) or "unknown"
+
             response = await asyncio.to_thread(
                 sim.openai_client.chat.completions.create,
-                model=sim.engine,
+                model=model_name,
                 messages=[
                     {"role": "system", "content": "You answer as the user described."},
                     {"role": "user", "content": prompt_text}

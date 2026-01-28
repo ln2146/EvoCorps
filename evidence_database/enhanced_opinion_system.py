@@ -6,7 +6,6 @@ Supports FAISS vector search, precise workflow control, and Wikipedia API integr
 
 import json
 import sqlite3
-import requests
 import numpy as np
 import os
 from typing import Dict, List, Tuple, Optional, Any
@@ -14,11 +13,18 @@ from datetime import datetime
 import time
 
 # Import configuration
-from config import (
-    API_BASE_URL, API_MODEL_NAME, API_KEY, TOPICS,
-    KEYWORD_SIMILARITY_THRESHOLD, VIEWPOINT_SIMILARITY_THRESHOLD,
-    MAX_WIKIPEDIA_RESULTS, MAX_EVIDENCE_PER_VIEWPOINT, DEFAULT_DB_PATH
-)
+try:
+    from .config import (
+        TOPICS,
+        KEYWORD_SIMILARITY_THRESHOLD, VIEWPOINT_SIMILARITY_THRESHOLD,
+        MAX_WIKIPEDIA_RESULTS, MAX_EVIDENCE_PER_VIEWPOINT, DEFAULT_DB_PATH
+    )
+except ImportError:
+    from config import (
+        TOPICS,
+        KEYWORD_SIMILARITY_THRESHOLD, VIEWPOINT_SIMILARITY_THRESHOLD,
+        MAX_WIKIPEDIA_RESULTS, MAX_EVIDENCE_PER_VIEWPOINT, DEFAULT_DB_PATH
+    )
 
 # FAISS vector search
 try:
@@ -32,8 +38,15 @@ except ModuleNotFoundError:
 # Wikipedia API
 import wikipediaapi
 
-# OpenAI client for vectorization
-from openai import OpenAI
+# OpenAI clients
+import sys
+
+_src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
+
+from keys import OPENAI_BASE_URL, OPENAI_API_KEY
+from multi_model_selector import multi_model_selector
 import math
 
 # Import network configuration
@@ -70,9 +83,15 @@ class EnhancedOpinionSystem:
             os.makedirs(db_dir, exist_ok=True)
             print(f"✅ Created database directory: {db_dir}")
         
-        self.base_url = API_BASE_URL
-        self.model_name = API_MODEL_NAME
-        self.api_key = API_KEY
+        self.model_selector = multi_model_selector
+        self.llm_base_url = OPENAI_BASE_URL
+        self.llm_api_key = OPENAI_API_KEY
+        self.llm_client, self.llm_model_name = self.model_selector.create_openai_client_with_base_url(
+            base_url=self.llm_base_url,
+            api_key=self.llm_api_key,
+            role="fact_checker",
+        )
+        self.embedding_client, self.embedding_model_name = self.model_selector.create_embedding_client()
         
         # 14 topics (loaded from config)
         self.topics = TOPICS
@@ -81,11 +100,10 @@ class EnhancedOpinionSystem:
         self.keyword_similarity_threshold = KEYWORD_SIMILARITY_THRESHOLD
         self.viewpoint_similarity_threshold = VIEWPOINT_SIMILARITY_THRESHOLD
         
-        # OpenAI client
-        self.openai_client = OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url
-        )
+        if not self.llm_client:
+            raise RuntimeError("Failed to initialize LLM client for evidence system.")
+        if not self.embedding_client:
+            raise RuntimeError("Failed to initialize embedding client for evidence system.")
         
         self.keyword_vectors = None
         self.viewpoint_vectors = None
@@ -135,9 +153,9 @@ class EnhancedOpinionSystem:
     
     def _get_embedding_from_api(self, text: str) -> np.ndarray:
         """Fetch embedding vector from the API."""
-        response = self.openai_client.embeddings.create(
+        response = self.embedding_client.embeddings.create(
             input=text,
-            model="gemini-embedding-001"
+            model=self.embedding_model_name
         )
         return np.array(response.data[0].embedding)
 
@@ -235,7 +253,12 @@ class EnhancedOpinionSystem:
     
     def set_api_key(self, api_key: str):
         """Set the API key."""
-        self.api_key = api_key
+        self.llm_api_key = api_key
+        self.llm_client, self.llm_model_name = self.model_selector.create_openai_client_with_base_url(
+            base_url=self.llm_base_url,
+            api_key=self.llm_api_key,
+            role="fact_checker",
+        )
         print("✅ API key configured successfully")
     
     def get_cache_stats(self) -> Dict[str, Any]:
@@ -395,8 +418,16 @@ class EnhancedOpinionSystem:
             keyword_embedding = self._get_embedding(keyword)
             
             # Normalize vectors
-            normalized_viewpoint = viewpoint_embedding / np.linalg.norm(viewpoint_embedding)
-            normalized_keyword = keyword_embedding / np.linalg.norm(keyword_embedding)
+            viewpoint_norm = np.linalg.norm(viewpoint_embedding)
+            keyword_norm = np.linalg.norm(keyword_embedding)
+
+            if not np.isfinite(viewpoint_norm) or viewpoint_norm <= 0:
+                raise ValueError(f"Invalid viewpoint embedding norm: {viewpoint_norm}")
+            if not np.isfinite(keyword_norm) or keyword_norm <= 0:
+                raise ValueError(f"Invalid keyword embedding norm: {keyword_norm}")
+
+            normalized_viewpoint = viewpoint_embedding / viewpoint_norm
+            normalized_keyword = keyword_embedding / keyword_norm
             
             # Create or update the viewpoint index
             if self.faiss_viewpoint_index is None:
@@ -437,7 +468,11 @@ class EnhancedOpinionSystem:
             print(f"   Keyword index vectors: {self.faiss_keyword_index.ntotal}")
             
         except Exception as e:
-            print(f"⚠️ Failed to add vectors to FAISS: {e}")
+            print(f"⚠️ Failed to add vectors to FAISS: {e!r}")
+            print(f"   Viewpoint embedding shape={getattr(viewpoint_embedding, 'shape', None)}, dtype={getattr(viewpoint_embedding, 'dtype', None)}")
+            print(f"   Keyword embedding shape={getattr(keyword_embedding, 'shape', None)}, dtype={getattr(keyword_embedding, 'dtype', None)}")
+            import traceback
+            traceback.print_exc()
     
     def process_opinion(self, opinion: str) -> Dict[str, Any]:
         """Execute the full opinion processing workflow as required."""
@@ -533,29 +568,14 @@ Example:
 - Return: {{"theme": "Technology & Future", "keywords_full": "artificial intelligence healthcare diagnosis", "keyword": "intelligence"}}
 """
             
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            data = {
-                "model": self.model_name,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.3
-            }
-            
-            response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=data,
-                timeout=30
+            response = self.llm_client.chat.completions.create(
+                model=self.llm_model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3
             )
-            
-            if response.status_code == 200:
-                result = response.json()
-                content = result['choices'][0]['message']['content']
+
+            if response and response.choices:
+                content = response.choices[0].message.content
                 
                 try:
                     # Clean the response and strip markdown if present
@@ -584,9 +604,8 @@ Example:
                     print(f"⚠️ Failed to parse LLM response: {e}")
                     print(f"Original response snippet: {content[:200]}...")
                     return {'theme': 'Society & Ethics', 'keyword': 'general'}
-            else:
-                print(f"⚠️ LLM API request failed: {response.status_code}")
-                return {'theme': 'Society & Ethics', 'keyword': 'general'}
+            print(f"⚠️ LLM API request failed: empty response")
+            return {'theme': 'Society & Ethics', 'keyword': 'general'}
                 
         except Exception as e:
             print(f"⚠️ LLM request exception: {e}")
@@ -1058,33 +1077,17 @@ Please evaluate using the following dimensions:
 Return a single number between 0.0 and 1.0 with no explanation.
 """
             
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            data = {
-                "model": self.model_name,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.1
-            }
-            
-            response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=data,
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                content = result['choices'][0]['message']['content'].strip()
+            try:
+                response = self.llm_client.chat.completions.create(
+                    model=self.llm_model_name,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.1
+                )
+                content = response.choices[0].message.content.strip()
                 score = float(content)
                 score = max(0.0, min(1.0, score))
-            else:
-                print(f"⚠️ LLM scoring API failed: {response.status_code}")
+            except Exception as e:
+                print(f"⚠️ LLM scoring API failed: {e}")
                 score = 0.5  # default score
             
             scored_evidence.append({

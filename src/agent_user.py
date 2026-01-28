@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 import json
 import logging
 import time
 from pydantic import BaseModel
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, TYPE_CHECKING
 import sys
 import os
 # Import from the database subdirectory
 from database.database_manager import get_db_manager, execute_query, fetch_one, fetch_all
+
+if TYPE_CHECKING:
+    from openai import OpenAI
 
 
 

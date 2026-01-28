@@ -39,7 +39,7 @@
     },
     "generate_own_post": true,
     "experiment": {
-        "type": "no_fact_checking",
+        "type": "third_party_fact_checking",
         "possible_types": [
             "third_party_fact_checking",
             "community_fact_checking",

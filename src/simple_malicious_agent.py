@@ -239,7 +239,7 @@ Write your toxic response:"""
         try:
             if not self.malicious_personas:
                 logger.error("❌ Malicious persona database is empty")
-            return []
+                return []
 
             if count <= len(self.malicious_personas):
                 # If the required count is less than or equal to the available personas, randomly select without replacement
