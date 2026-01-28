@@ -32,3 +32,5 @@ exported_content/data/
 temp_reaction_log.jsonl
 evidence_database/*.json
 evidence_database/*.binevidence_database/embedding_cache.faiss
+# Worktrees
+.worktrees/
