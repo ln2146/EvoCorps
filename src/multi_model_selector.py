@@ -22,11 +22,10 @@ if TYPE_CHECKING:
 class MultiModelSelector:
     """Multi-model selection system."""
     
-    # Full list of supported chat/completions models.
-    # These names must match the OpenAI-compatible model ids exposed by OPENAI_BASE_URL.
+    # Full list of supported models.
     ALL_MODELS = [
-        "gpt-4.1-nano",      # OpenAI-compatible model
-        "gemini-2.0-flash",  # Google Gemini model
+        "gpt-4.1-nano",      
+        "gemini-2.0-flash",  
         "deepseek-chat",
     ]
 
@@ -35,10 +34,12 @@ class MultiModelSelector:
     # Keep all role defaults here. If you want every role to use DeepSeek, keep the
     # pools as ["deepseek-chat"]. If you want multi-provider fallback, add models
     # to the lists below (they must be OpenAI-compatible on your OPENAI_BASE_URL).
-    # Supported chat models are defined in ALL_MODELS; embeddings use EMBEDDING_MODEL.
-    EMBEDDING_MODEL = "embedding-3"
-    # Default pool for chat roles (used when role-specific pools are not overridden).
-    DEFAULT_POOL = ["deepseek-chat"]
+    # EMBEDDING_MODEL = "embedding-3"
+    # DEFAULT_POOL = ["deepseek-chat"]
+
+    EMBEDDING_MODEL = "text-embedding-3-large"
+    DEFAULT_POOL = ["gemini-2.0-flash"]
+
     ROLE_MODEL_POOLS: dict[str, list[str]] = {
         # Core agent roles
         "regular": DEFAULT_POOL,
@@ -54,7 +55,7 @@ class MultiModelSelector:
         "experiment": DEFAULT_POOL,
         "interview": DEFAULT_POOL,
         "comment_diversity": DEFAULT_POOL,
-        # Embedding role (client only; uses EMBEDDING_MODEL and embedding API base URL)
+        # Embedding role (client only; embedding model is supplied by caller)
         "embedding": [EMBEDDING_MODEL],
     }
 
