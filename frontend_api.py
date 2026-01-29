@@ -521,22 +521,43 @@ def start_service(service_name):
                 except:
                     pass
         
-        # 启动进程 - 在新的终端窗口中运行，使用/K保持窗口打开
+        # 启动进程 - 在新的终端窗口中运行
         if os.name == 'nt':  # Windows
             title = f"EvoCorps-{service_name}"
-            # 如果提供了conda环境，先激活环境
+            
             if conda_env:
-                # Windows上使用conda run命令，这是最可靠的方式
-                # conda run会自动处理环境激活
-                cmd = f'cmd /c start "{title}" cmd /k "conda run -n {conda_env} python {script_path}"'
+                # Windows上，创建一个临时批处理文件来执行命令
+                # 这样可以确保命令按顺序执行
+                import tempfile
+                
+                # 创建临时批处理文件
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.bat', delete=False) as f:
+                    batch_file = f.name
+                    f.write('@echo off\n')
+                    f.write(f'echo Activating conda environment: {conda_env}\n')
+                    f.write(f'call conda activate {conda_env}\n')
+                    f.write('if errorlevel 1 (\n')
+                    f.write(f'    echo Failed to activate conda environment: {conda_env}\n')
+                    f.write('    echo Please check if the environment exists: conda env list\n')
+                    f.write('    pause\n')
+                    f.write('    exit /b 1\n')
+                    f.write(')\n')
+                    f.write(f'echo Running: python {script_path}\n')
+                    f.write(f'python {script_path}\n')
+                    f.write('pause\n')
+                
+                # 启动新终端运行批处理文件
+                cmd = f'cmd /c start "{title}" cmd /k "{batch_file}"'
             else:
-                cmd = f'cmd /c start "{title}" cmd /k python {script_path}'
+                # 没有conda环境，直接运行
+                cmd = f'cmd /c start "{title}" cmd /k "python {script_path}"'
+            
             subprocess.Popen(cmd, shell=True)
         else:  # Linux/Mac
             if conda_env:
-                # Linux/Mac上使用conda run
-                cmd = f'conda run -n {conda_env} python {script_path}'
-                subprocess.Popen(cmd, shell=True, executable='/bin/bash')
+                # Linux/Mac上先激活环境再运行
+                cmd = f'bash -c "source $(conda info --base)/etc/profile.d/conda.sh && conda activate {conda_env} && python {script_path}"'
+                subprocess.Popen(cmd, shell=True)
             else:
                 subprocess.Popen(['python', script_path])
         
@@ -1228,7 +1249,7 @@ def get_experiment_config():
 
 @app.route('/api/config/experiment', methods=['POST'])
 def save_experiment_config():
-    """保存实验配置"""
+    """保存实验配置 - 只修改数值，完全保持原格式"""
     try:
         config_path = 'configs/experiment_config.json'
         data = request.get_json()
@@ -1236,15 +1257,44 @@ def save_experiment_config():
         if not data:
             return jsonify({'error': 'No data provided'}), 400
         
-        # 备份原配置
-        if os.path.exists(config_path):
-            import shutil
-            backup_path = config_path + '.backup'
-            shutil.copy(config_path, backup_path)
+        # 读取原文件内容（文本形式）
+        with open(config_path, 'r', encoding='utf-8') as f:
+            content = f.read()
         
-        # 保存新配置
+        # 读取原配置（JSON形式）
+        original_config = json.loads(content)
+        
+        # 只替换修改的字段值，使用正则表达式精确替换
+        import re
+        
+        # 处理 num_users
+        if 'num_users' in data and data['num_users'] != original_config.get('num_users'):
+            pattern = r'("num_users":\s*)(\d+)'
+            content = re.sub(pattern, r'\g<1>' + str(data['num_users']), content)
+        
+        # 处理 num_time_steps
+        if 'num_time_steps' in data and data['num_time_steps'] != original_config.get('num_time_steps'):
+            pattern = r'("num_time_steps":\s*)(\d+)'
+            content = re.sub(pattern, r'\g<1>' + str(data['num_time_steps']), content)
+        
+        # 处理 engine
+        if 'engine' in data and data['engine'] != original_config.get('engine'):
+            pattern = r'("engine":\s*)"([^"]*)"'
+            content = re.sub(pattern, r'\g<1>"' + data['engine'] + '"', content)
+        
+        # 处理 temperature
+        if 'temperature' in data and data['temperature'] != original_config.get('temperature'):
+            pattern = r'("temperature":\s*)(\d+\.?\d*)'
+            content = re.sub(pattern, r'\g<1>' + str(data['temperature']), content)
+        
+        # 处理 reset_db
+        if 'reset_db' in data and data['reset_db'] != original_config.get('reset_db'):
+            pattern = r'("reset_db":\s*)(true|false)'
+            content = re.sub(pattern, r'\g<1>' + ('true' if data['reset_db'] else 'false'), content)
+        
+        # 保存修改后的内容
         with open(config_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
+            f.write(content)
         
         return jsonify({'message': 'Config saved successfully'})
         
@@ -2038,4 +2088,6 @@ def get_all_user_ids(db_name):
 if __name__ == '__main__':
     print("Starting EvoCorps Frontend API Server...")
     print("Database directory:", os.path.abspath(DATABASE_DIR))
-    app.run(host='127.0.0.1', port=5001, debug=True)
+    print("Server running at: http://127.0.0.1:5001")
+    print("Press Ctrl+C to stop")
+    app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)

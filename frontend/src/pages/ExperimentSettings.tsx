@@ -177,7 +177,15 @@ export default function ExperimentSettings() {
     
     setConfigLoading(true)
     try {
-      await axios.post('/api/config/experiment', config)
+      // 只发送需要修改的字段
+      const updateData = {
+        num_users: config.num_users,
+        num_time_steps: config.num_time_steps,
+        engine: config.engine,
+        temperature: config.temperature,
+        reset_db: config.reset_db
+      }
+      await axios.post('/api/config/experiment', updateData)
       alert('配置保存成功！')
     } catch (error: any) {
       alert(`保存失败: ${error.response?.data?.error || error.message}`)
