@@ -18,6 +18,8 @@ def _ensure_keys_module() -> None:
     keys_module = types.ModuleType("keys")
     keys_module.OPENAI_API_KEY = "test-key"
     keys_module.OPENAI_BASE_URL = "https://example.test"
+    keys_module.EMBEDDING_API_KEY = "test-embedding-key"
+    keys_module.EMBEDDING_BASE_URL = "https://embedding.example.test"
     sys.modules["keys"] = keys_module
 
 
@@ -87,4 +89,4 @@ def test_role_pools_include_memory_and_fact_checker() -> None:
     assert "embedding" in MultiModelSelector.ROLE_MODEL_POOLS
     assert MultiModelSelector.ROLE_MODEL_POOLS["memory"] == MultiModelSelector.DEFAULT_POOL
     assert MultiModelSelector.ROLE_MODEL_POOLS["fact_checker"] == MultiModelSelector.DEFAULT_POOL
-    assert MultiModelSelector.ROLE_MODEL_POOLS["embedding"] == MultiModelSelector.DEFAULT_POOL
+    assert MultiModelSelector.ROLE_MODEL_POOLS["embedding"] == [MultiModelSelector.EMBEDDING_MODEL]

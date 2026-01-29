@@ -153,9 +153,6 @@ class AdvancedRAGSystem:
         self.data_path.mkdir(parents=True, exist_ok=True)
         
         # Initialize vectorization model
-        if model_name is None:
-            from multi_model_selector import MultiModelSelector
-            model_name = MultiModelSelector.EMBEDDING_MODEL
         self.model_name = model_name
         self.encoder = None
         self._initialize_openai_client()
@@ -203,7 +200,10 @@ class AdvancedRAGSystem:
             from multi_model_selector import multi_model_selector
 
             # Unified model selection via MultiModelSelector (embedding role)
-            self.encoder, _ = multi_model_selector.create_embedding_client()
+            self.encoder, selected_model = multi_model_selector.create_embedding_client(
+                model_name=self.model_name
+            )
+            self.model_name = selected_model
             logger.info(f"✅ Initialized OpenAI embedding client: {self.model_name}")
         except Exception as e:
             logger.warning(f"⚠️ OpenAI client initialization failed: {e}")
