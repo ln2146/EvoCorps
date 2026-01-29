@@ -52,7 +52,7 @@ class MultiModelSelector:
         "interview": DEFAULT_POOL,
         "comment_diversity": DEFAULT_POOL,
         # Embedding role (client only; embedding model is supplied by caller)
-        "embedding": DEFAULT_POOL,
+        "embedding": [EMBEDDING_MODEL],
     }
 
     # Backwards-compatible aliases used elsewhere in this repo.
