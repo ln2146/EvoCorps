@@ -1,6 +1,6 @@
 {
     "num_users": 10,
-    "num_time_steps": 7,
+    "num_time_steps": 5,
     "agent_config_generation": "file",
     "agent_config_path": "separate",
     "max_total_posts": 10000,
@@ -36,7 +36,8 @@
             "posts_per_step": 10,
             "fact_checker_temperature": 0.3,
             "include_reasoning": false,
-            "start_delay_minutes": 0
+            "start_delay_minutes": 0,
+            "fact_checking_enabled": true
         }
     },
     "opinion_balance_system": {
@@ -52,10 +53,13 @@
     "malicious_bot_system": {
         "enabled": true,
         "cluster_size": 15,
-        "initial_attack_threshold": 15,
-        "subsequent_attack_interval": 30
+        "attack_probability": 1.0,
+        "target_post_types": [
+            "user_post"
+        ]
     },
     "prebunking_system": {
         "enabled": false
-    }
+    },
+    "engine": "deepseek-chat"
 }

@@ -32,8 +32,9 @@ class MaliciousBotManager:
         self.cluster_size = self.config.get("cluster_size")  # Number of personas to use per attack
         # self.attack_probability = self.config.get("attack_probability", 0.8)  # Probability control removed; attacks fire immediately
         # target_post_types and attack_delay_range are deprecated (no longer used)
-        self.initial_attack_threshold = self.config.get("initial_attack_threshold", 15)  # Initial attack threshold
-        self.subsequent_attack_interval = self.config.get("subsequent_attack_interval", 30)  # Interval between subsequent attacks
+        # Deprecated thresholds: batch attacks ignore heat-based gating
+        self.initial_attack_threshold = None
+        self.subsequent_attack_interval = None
         self.malicious_prefix = ""  # Remove obvious prefix to make malicious comments less obvious
         self.fake_news_attack_size = self.cluster_size
        
@@ -274,134 +275,6 @@ Write your hostile post:"""
 
         return f"{starter} {ending}"
 
-    async def monitor_post(self, post_id: str, content: str, user_id: str) -> Optional[Dict[str, Any]]:
-        """Cross-like among malicious users within the current attack batch."""
-        if not self.enabled or not self.bot_cluster:
-            return {"success": False, "reason": "malicious_bot_system_disabled"}
-
-        try:
-            # Determine whether this post should be targeted
-            should_attack = self._should_attack_post(post_id, content, user_id)
-
-            if not should_attack:
-                return {"success": False, "reason": "conditions_not_met", "post_id": post_id}
-
-            logging.info(f"Malicious bot preparing to attack post: {post_id}")
-
-            # Execute the attack immediately without delay
-            attack_result = await self._execute_attack(post_id, content, user_id)
-
-            return attack_result
-
-        except Exception as e:
-            logging.error(f"Malicious bot monitor failed: {e}")
-            return {"success": False, "reason": "exception", "error": str(e), "post_id": post_id}
-    
-    def _should_attack_post(self, post_id: str, content: str, user_id: str) -> bool:
-        """Determine whether a post should be targeted."""
-
-        cursor = self.conn.cursor()
-
-        # 1. Check if the post is published by malicious bot itself (by checking if user has published malicious comments)
-        cursor.execute('''
-            SELECT COUNT(*) FROM malicious_comments mc
-            JOIN comments c ON mc.comment_id = c.comment_id
-            WHERE c.author_id = ?
-        ''', (user_id,))
-
-        if cursor.fetchone()[0] > 0:
-            # This user has published malicious comments before, is a malicious bot, don't attack their posts
-            return False
-
-        # 2. Check content length (don't attack posts that are too short)
-        if len(content.strip()) < 20:
-            return False
-
-        # 3. Get current post engagement
-        cursor.execute('''
-            SELECT num_comments, num_likes, num_shares
-            FROM posts
-            WHERE post_id = ?
-        ''', (post_id,))
-
-        post_data = cursor.fetchone()
-        if not post_data:
-            return False  # Post doesn't exist
-
-        num_comments, num_likes, num_shares = post_data
-        current_engagement = (num_comments or 0) + (num_likes or 0) + (num_shares or 0)
-
-        # 4. Get historical attack records for this post
-        cursor.execute('''
-            SELECT attack_round, engagement_at_attack
-            FROM malicious_attacks
-            WHERE target_post_id = ?
-            ORDER BY attack_round DESC
-            LIMIT 1
-        ''', (post_id,))
-
-        last_attack = cursor.fetchone()
-
-        if last_attack is None:
-            # First attack: check if initial attack threshold is reached
-            if current_engagement >= self.initial_attack_threshold:
-                return self._reserve_attack_slot(post_id, user_id, 1, current_engagement)
-            else:
-                if current_engagement > 0:  # Only print when there's some engagement to avoid spam
-                    pass
-                return False
-        else:
-            # Subsequent attack: check if incremental threshold is reached
-            last_round, last_engagement = last_attack
-            next_round = last_round + 1
-            required_engagement = last_engagement + self.subsequent_attack_interval
-
-            # Debug information
-            pass
-
-            if current_engagement >= required_engagement:
-                pass
-                return self._reserve_attack_slot(post_id, user_id, next_round, current_engagement)
-            else:
-                if current_engagement >= last_engagement:  # Engagement has increased or remained the same
-                    pass
-                else:
-                    pass
-                return False
-
-    def _reserve_attack_slot(self, post_id: str, user_id: str, attack_round: int, current_engagement: int) -> bool:
-        """Cross-like among malicious users within the current attack batch."""
-        cursor = self.conn.cursor()
-
-        try:
-            cursor.execute('BEGIN IMMEDIATE TRANSACTION')
-
-            # Check whether an attack for this round already exists
-            cursor.execute('''
-                SELECT COUNT(*) FROM malicious_attacks
-                WHERE target_post_id = ? AND attack_round = ?
-            ''', (post_id, attack_round))
-
-            if cursor.fetchone()[0] > 0:
-                cursor.execute('ROLLBACK')
-                return False  # This round has already been attacked
-
-            # Insert a placeholder record immediately to prevent concurrent attacks
-            cursor.execute('''
-                INSERT INTO malicious_attacks (
-                    target_post_id, target_user_id, cluster_size,
-                    successful_attacks, attack_details, attack_round, engagement_at_attack
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (post_id, user_id, 0, 0, '{"status": "reserved"}', attack_round, current_engagement))
-
-            cursor.execute('COMMIT')
-            return True
-
-        except Exception as e:
-            cursor.execute('ROLLBACK')
-            logging.error(f"Error occurred while reserving attack slot: {e}")
-            return False
-    
     async def _execute_attack(self, post_id: str, content: str, user_id: str, override_cluster_size: int = None) -> Dict[str, Any]:
         """Cross-like among malicious users within the current attack batch."""
         try:
@@ -1108,8 +981,6 @@ Write your hostile post:"""
         # The top posts are re-evaluated every timestep and attacked if they satisfy the conditions
 
         return True
-
-
 
 
 

@@ -1,10 +1,10 @@
 {
-  "simulation_timestamp": "20260128_213716",
-  "created_at": "2026-01-28T21:54:12.633173",
-  "last_update": "2026-01-28T21:54:12.633173",
-  "total_timesteps": 2,
+  "simulation_timestamp": "20260129_005356",
+  "created_at": "2026-01-29T01:37:05.151333",
+  "last_update": "2026-01-29T01:37:05.151333",
+  "total_timesteps": 5,
   "posts": {
-    "post-9c9aba": {
+    "post-2ace82": {
       "info": {
         "extremism_level": 3,
         "news_type": "fake",
@@ -16,17 +16,35 @@
           "timestep": 1,
           "comments": 17,
           "likes": 15,
-          "shares": 0
+          "shares": 2
         },
         {
           "timestep": 2,
           "comments": 33,
-          "likes": 30,
-          "shares": 0
+          "likes": 31,
+          "shares": 2
+        },
+        {
+          "timestep": 3,
+          "comments": 65,
+          "likes": 47,
+          "shares": 2
+        },
+        {
+          "timestep": 4,
+          "comments": 70,
+          "likes": 47,
+          "shares": 2
+        },
+        {
+          "timestep": 5,
+          "comments": 73,
+          "likes": 47,
+          "shares": 2
         }
       ]
     },
-    "post-f16ee7": {
+    "post-a3be16": {
       "info": {
         "extremism_level": 3,
         "news_type": "fake",
@@ -36,7 +54,91 @@
       "history": [
         {
           "timestep": 2,
-          "comments": 17,
+          "comments": 18,
+          "likes": 16,
+          "shares": 1
+        },
+        {
+          "timestep": 3,
+          "comments": 39,
+          "likes": 32,
+          "shares": 1
+        },
+        {
+          "timestep": 4,
+          "comments": 71,
+          "likes": 48,
+          "shares": 1
+        },
+        {
+          "timestep": 5,
+          "comments": 76,
+          "likes": 48,
+          "shares": 1
+        }
+      ]
+    },
+    "post-776dd1": {
+      "info": {
+        "extremism_level": 3,
+        "news_type": "fake",
+        "bucket": "extreme",
+        "injection_timestep": 3
+      },
+      "history": [
+        {
+          "timestep": 3,
+          "comments": 15,
+          "likes": 15,
+          "shares": 0
+        },
+        {
+          "timestep": 4,
+          "comments": 33,
+          "likes": 30,
+          "shares": 0
+        },
+        {
+          "timestep": 5,
+          "comments": 63,
+          "likes": 45,
+          "shares": 0
+        }
+      ]
+    },
+    "post-7ed08f": {
+      "info": {
+        "extremism_level": 3,
+        "news_type": "fake",
+        "bucket": "extreme",
+        "injection_timestep": 4
+      },
+      "history": [
+        {
+          "timestep": 4,
+          "comments": 16,
+          "likes": 15,
+          "shares": 0
+        },
+        {
+          "timestep": 5,
+          "comments": 34,
+          "likes": 30,
+          "shares": 0
+        }
+      ]
+    },
+    "post-b9ce1c": {
+      "info": {
+        "extremism_level": 3,
+        "news_type": "fake",
+        "bucket": "extreme",
+        "injection_timestep": 5
+      },
+      "history": [
+        {
+          "timestep": 5,
+          "comments": 15,
           "likes": 15,
           "shares": 0
         }

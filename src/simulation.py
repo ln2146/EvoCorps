@@ -419,9 +419,7 @@ class Simulation:
             # Execute malicious attacks concurrently
             tasks = []
 
-            # ========== Deprecated: threshold-based real-time attack mechanism replaced with batch attacks at timestep end ==========
-            # if self.malicious_bot_manager and self.malicious_bot_manager.enabled:
-            #     tasks.append(self._comment_based_malicious_attacks(step))
+            # ========== Deprecated: threshold-based real-time attack mechanism removed ==========
 
             # Legacy news-based malicious post generation (retained for compatibility)
             if self.malicious_bot_manager and self.malicious_bot_manager.enabled:
@@ -1222,103 +1220,6 @@ Latest comments (chronological):"""
         # This function is no longer in use; background monitoring replaces it
         pass
 
-    async def _comment_based_malicious_attacks(self, step):
-        """Parallel malicious attacks against all posts that exceed the heat threshold (news and user posts)"""
-        try:
-            cursor = self.conn.cursor()
-
-            # Retrieve attack threshold configuration
-            attack_threshold = 10  # Default threshold
-            if hasattr(self, 'malicious_bot_manager') and self.malicious_bot_manager:
-                attack_threshold = self.malicious_bot_manager.initial_attack_threshold
-
-            # Find all posts with heat greater than the threshold: include user and news posts
-            # Note: multi-round attacks are now supported; the malicious bot manager decides when to attack
-            cursor.execute(f"""
-                SELECT p.post_id, p.content, p.author_id, p.created_at, COUNT(c.comment_id) as comment_count,
-                       (p.num_comments + p.num_likes + p.num_shares) as popularity
-                FROM posts p
-                LEFT JOIN comments c ON p.post_id = c.post_id
-                WHERE (p.num_comments + p.num_likes + p.num_shares) > {attack_threshold}  -- Use the configured attack threshold
-                GROUP BY p.post_id, p.content, p.author_id, p.created_at, p.num_comments, p.num_likes, p.num_shares
-                ORDER BY (p.num_comments + p.num_likes + p.num_shares) DESC
-            """)
-
-            available_posts = cursor.fetchall()
-
-            if available_posts:
-                print(f"\n🎯 Malicious bot parallel attack - found {len(available_posts)} trending posts (heat > {attack_threshold}, includes news and user posts)")
-
-                # Create parallel attack tasks
-                tasks = []
-                for target_post in available_posts:
-                    post_id, content, author_id, created_at, comment_count, popularity = target_post
-
-                    print(f"🔥 Creating attack task for {post_id} (comments: {comment_count}, heat: {popularity})")
-
-                    # Create asynchronous attack tasks
-                    task = self._execute_single_malicious_attack(post_id, content, author_id, comment_count)
-                    tasks.append(task)
-
-                print(f"📊 Created {len(tasks)} parallel attack tasks")
-
-                # Execute all attack tasks in parallel
-                if tasks:
-                    attack_results = await asyncio.gather(*tasks, return_exceptions=True)
-
-                    # Aggregate attack results
-                    successful_attacks = 0
-                    total_comments = 0
-
-                    for i, result in enumerate(attack_results):
-                        if isinstance(result, Exception):
-                            print(f"❌ Attack task {i+1} failed: {result}")
-                        elif result and result.get("success"):
-                            successful_attacks += 1
-                            total_comments += len(result.get('comment_ids', []))
-
-                    print(f"\n🔥 Parallel attack complete - success: {successful_attacks}/{len(available_posts)}, total comments: {total_comments}")
-
-            else:
-                # No message needed when no suitable posts are found
-                pass
-
-        except Exception as e:
-            logging.error(f"Error occurred during malicious attack: {e}")
-            import traceback
-            traceback.print_exc()
-
-    async def _execute_single_malicious_attack(self, post_id: str, content: str, author_id: str, comment_count: int):
-        """Execute a single malicious attack task"""
-        try:
-            print(f"🔥 Targeting attack on {post_id}")
-            print(f"   📊 Current comments: {comment_count}")
-            print(f"   👤 Target user: {author_id}")
-            print(f"   📝 Content: {content[:80]}...")
-
-            # Execute the malicious comment attack
-            attack_result = await self.malicious_bot_manager.monitor_post(post_id, content, author_id)
-
-            if attack_result and attack_result.get("success"):
-                print(f"   ✅ Malicious attack complete")
-                print(f"   💬 Malicious comments posted: {len(attack_result.get('comment_ids', []))}")
-                return attack_result
-            elif attack_result and attack_result.get("reason") == "conditions_not_met":
-                print(f"   ⏸️  Not attacking yet (conditions not met)")
-                return {"success": False, "reason": "conditions_not_met", "post_id": post_id}
-            elif attack_result and attack_result.get("reason") == "malicious_bot_system_disabled":
-                print(f"   ⚠️  Malicious bot system is disabled")
-                return {"success": False, "reason": "disabled", "post_id": post_id}
-            else:
-                reason = attack_result.get("reason", "unknown") if attack_result else "no_result"
-                print(f"   ❌ Malicious attack failed: {reason}")
-                return {"success": False, "reason": reason, "post_id": post_id}
-
-        except Exception as e:
-            print(f"   ❌ Malicious attack execution failed: {e}")
-            logging.error(f"Malicious attack execution failed for {post_id}: {e}")
-            return {"success": False, "post_id": post_id, "error": str(e)}
-
     async def _news_based_malicious_posts(self, step):
         """News-based malicious post generation is disabled (kept for compatibility)."""
         # No malicious posts are auto-generated anymore, so just return.
@@ -1623,36 +1524,5 @@ Latest comments (chronological):"""
             return feed
 
     async def _check_comment_based_interventions(self, user_id: str, step: int):
-        """Check if commenting triggers heat-based interventions (uses the configured attack threshold)"""
-        try:
-            cursor = self.conn.cursor()
-
-            # Retrieve the attack threshold configuration
-            attack_threshold = 10  # Default threshold
-            if hasattr(self, 'malicious_bot_manager') and self.malicious_bot_manager:
-                attack_threshold = self.malicious_bot_manager.initial_attack_threshold
-
-            # Look for posts the user recently commented on that exceed the heat threshold (includes news posts)
-            # Note: multi-round attacks are now supported; do not simply exclude previously attacked posts
-            cursor.execute(f"""
-                SELECT p.post_id, p.content, p.author_id,
-                       (p.num_comments + p.num_likes + p.num_shares) as popularity
-                FROM posts p
-                WHERE p.post_id IN (
-                    SELECT DISTINCT post_id FROM comments
-                    WHERE author_id = ?
-                    AND created_at > datetime('now', '-5 minutes')
-                )
-                AND (p.num_comments + p.num_likes + p.num_shares) > {attack_threshold}
-                LIMIT 1
-            """, (user_id,))
-
-            result = cursor.fetchone()
-            if result and self.malicious_bot_manager and self.malicious_bot_manager.enabled:
-                post_id, content, author_id, popularity = result
-                print(f"\n🎯 High-heat post detected: {post_id} (heat: {popularity}) - switching to end-of-timestep batch attacks")
-                # ========== Deprecated: replaced with end-of-timestep batch attacks ==========
-                # await self.malicious_bot_manager.monitor_post(post_id, content, author_id)
-
-        except Exception as e:
-            logging.error(f"Check for comment-based interventions failed: {e}")
+        """Deprecated: replaced by batch attacks; retained as a no-op for compatibility."""
+        return

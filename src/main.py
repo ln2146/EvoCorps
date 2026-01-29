@@ -4,6 +4,7 @@ import os
 import sqlite3
 from simulation import Simulation
 from utils import Utils
+from engine_selector import apply_selector_engine
 import logging
 import time
 from datetime import datetime
@@ -406,6 +407,8 @@ if __name__ == "__main__":
     config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'configs', 'experiment_config.json')
     with open(config_path, 'r') as file:
         config = json.load(file)
+
+    apply_selector_engine(config)
 
     # Reset simulation database before each run
     from database_manager import DatabaseManager
