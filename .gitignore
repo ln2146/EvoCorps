@@ -23,7 +23,6 @@ organized_comments_from_jsonl
 *.db-shm
 *.db-wal
 myenv/
-src/keys.py
 
 learning_data/rag
 sentiment_analysis_results/
