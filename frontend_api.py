@@ -23,6 +23,23 @@ import signal
 import psutil
 import json
 
+# 添加src目录到路径以导入项目模块
+src_path = os.path.join(os.path.dirname(__file__), 'src')
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
+# 尝试导入AI模型相关模块
+AI_AVAILABLE = False
+try:
+    from multi_model_selector import multi_model_selector
+    from utils import Utils
+    AI_AVAILABLE = True
+    print("✅ AI模型模块加载成功")
+except ImportError as e:
+    print(f"⚠️ AI模型模块加载失败: {e}")
+    print("⚠️ 采访功能将使用简化的模板回答")
+    print("💡 提示：请确保已安装所有依赖: pip install -r requirements.txt")
+
 app = Flask(__name__)
 CORS(app)
 
@@ -1270,8 +1287,8 @@ def send_interview():
             user_persona = user_row[1]
             background = user_row[2] if user_row[2] else ''
             
-            # 模拟AI回答
-            answer = generate_interview_answer(user_persona, background, question)
+            # 根据用户的persona和实际行为生成回答
+            answer = generate_interview_answer(user_persona, background, question, user_id, db_path)
             
             responses.append({
                 'user_id': user_id,
@@ -1292,30 +1309,414 @@ def send_interview():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-def generate_interview_answer(persona, background, question):
-    """根据用户persona生成采访回答"""
-    answers_templates = [
-        f"作为{persona}，我认为{question}这个问题很有意思。基于我的背景和经验，我的看法是...",
-        f"从我的角度来看，{question}涉及到多个方面。作为{persona}，我特别关注...",
-        f"这是一个很好的问题。{persona}的我会这样回答：...",
-        f"根据我的理解和{background}的背景，对于{question}，我的观点是...",
-    ]
+
+@app.route('/api/interview/send-stream', methods=['POST'])
+def send_interview_stream():
+    """流式发送采访问题并获取回答"""
+    from flask import Response, stream_with_context
     
-    import random
-    base_answer = random.choice(answers_templates)
+    data = request.get_json()
+    database = data.get('database')
+    user_ids = data.get('user_ids', [])
+    question = data.get('question', '')
     
-    if '喜欢' in question or '偏好' in question:
-        base_answer += "我个人比较倾向于那些能够带来实际价值的选择。"
-    elif '看法' in question or '观点' in question or '认为' in question:
-        base_answer += "我觉得这需要从多个角度来考虑，不能一概而论。"
-    elif '经验' in question or '经历' in question:
-        base_answer += "在我过去的经历中，我遇到过类似的情况，那次经验让我学到了很多。"
-    elif '建议' in question or '推荐' in question:
-        base_answer += "我建议可以先从小处着手，逐步积累经验。"
+    if not database or not user_ids or not question:
+        return jsonify({'error': 'Missing required parameters'}), 400
+    
+    db_path = os.path.join(DATABASE_DIR, database)
+    if not os.path.exists(db_path):
+        return jsonify({'error': 'Database not found'}), 404
+    
+    def generate():
+        """生成器函数，逐个用户流式返回回答"""
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        try:
+            for user_id in user_ids:
+                # 获取用户信息
+                cursor.execute("""
+                    SELECT user_id, persona, background_labels
+                    FROM users
+                    WHERE user_id = ?
+                """, (user_id,))
+                
+                user_row = cursor.fetchone()
+                if not user_row:
+                    continue
+                
+                user_persona = user_row[1]
+                background = user_row[2] if user_row[2] else ''
+                
+                # 发送开始标记
+                yield f"data: {json.dumps({'type': 'start', 'user_id': user_id}, ensure_ascii=False)}\n\n"
+                
+                # 流式生成回答
+                for chunk in generate_interview_answer_stream(user_persona, background, question, user_id, db_path):
+                    yield f"data: {json.dumps({'type': 'chunk', 'user_id': user_id, 'content': chunk}, ensure_ascii=False)}\n\n"
+                
+                # 发送完成标记
+                yield f"data: {json.dumps({'type': 'done', 'user_id': user_id, 'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}, ensure_ascii=False)}\n\n"
+            
+            # 所有用户完成
+            yield f"data: {json.dumps({'type': 'complete'}, ensure_ascii=False)}\n\n"
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
+        finally:
+            conn.close()
+    
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no'
+        }
+    )
+
+
+def generate_interview_answer_stream(persona, background, question, user_id, db_path):
+    """流式生成采访回答"""
+    import json
+    
+    # 如果AI不可用，返回模板回答
+    if not AI_AVAILABLE:
+        # 获取用户数据
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT content, num_likes, num_comments FROM posts WHERE author_id = ? LIMIT 5", (user_id,))
+        user_posts = cursor.fetchall()
+        cursor.execute("SELECT content FROM comments WHERE author_id = ? LIMIT 5", (user_id,))
+        user_comments = cursor.fetchall()
+        cursor.execute("SELECT COUNT(*) FROM user_actions WHERE user_id = ? AND action_type IN ('like_post', 'like')", (user_id,))
+        like_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM follows WHERE follower_id = ?", (user_id,))
+        following_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM follows WHERE followed_id = ?", (user_id,))
+        follower_count = cursor.fetchone()[0]
+        conn.close()
+        
+        # 解析persona
+        persona_info = {}
+        try:
+            if isinstance(persona, str):
+                try:
+                    persona_info = json.loads(persona)
+                except:
+                    fixed_str = persona.replace("'", '"').replace('None', 'null').replace('True', 'true').replace('False', 'false')
+                    persona_info = json.loads(fixed_str)
+            else:
+                persona_info = persona
+        except:
+            persona_info = {'description': str(persona)}
+        
+        # 生成模板回答并逐字返回
+        answer = generate_template_answer(persona_info, user_posts, user_comments, like_count, following_count, follower_count, question)
+        
+        # 模拟流式输出，每次返回几个字
+        import time
+        for i in range(0, len(answer), 3):
+            chunk = answer[i:i+3]
+            yield chunk
+            time.sleep(0.05)  # 模拟打字效果
+        return
+    
+    # 使用AI流式生成
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    # 获取用户行为数据
+    cursor.execute("SELECT content, num_likes, num_comments FROM posts WHERE author_id = ? ORDER BY created_at DESC LIMIT 5", (user_id,))
+    user_posts = cursor.fetchall()
+    cursor.execute("SELECT content FROM comments WHERE author_id = ? ORDER BY created_at DESC LIMIT 5", (user_id,))
+    user_comments = cursor.fetchall()
+    cursor.execute("SELECT COUNT(*) FROM user_actions WHERE user_id = ? AND action_type IN ('like_post', 'like')", (user_id,))
+    like_count = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM follows WHERE follower_id = ?", (user_id,))
+    following_count = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM follows WHERE followed_id = ?", (user_id,))
+    follower_count = cursor.fetchone()[0]
+    conn.close()
+    
+    # 解析persona
+    persona_info = {}
+    try:
+        if isinstance(persona, str):
+            try:
+                persona_info = json.loads(persona)
+            except:
+                fixed_str = persona.replace("'", '"').replace('None', 'null').replace('True', 'true').replace('False', 'false')
+                persona_info = json.loads(fixed_str)
+        else:
+            persona_info = persona
+    except:
+        persona_info = {'description': str(persona)}
+    
+    # 构建用户行为摘要
+    behavior_summary = f"""
+用户行为统计：
+- 发帖数：{len(user_posts)}篇
+- 评论数：{len(user_comments)}条
+- 点赞数：{like_count}次
+- 关注数：{following_count}人
+- 粉丝数：{follower_count}人
+"""
+    
+    if user_posts:
+        behavior_summary += "\n最近发布的帖子：\n"
+        for i, post in enumerate(user_posts[:3], 1):
+            content = post[0][:100] + "..." if len(post[0]) > 100 else post[0]
+            behavior_summary += f"{i}. {content} (获得{post[1]}个赞，{post[2]}条评论)\n"
+    
+    if user_comments:
+        behavior_summary += "\n最近的评论：\n"
+        for i, comment in enumerate(user_comments[:3], 1):
+            content = comment[0][:100] + "..." if len(comment[0]) > 100 else comment[0]
+            behavior_summary += f"{i}. {content}\n"
+    
+    # 构建提示词
+    system_prompt = """你是一个社交媒体平台的用户，正在接受采访。请根据你的个人背景、性格特征和在平台上的实际行为来回答问题。
+
+要求：
+1. 回答要自然、真实，符合你的人设和行为模式
+2. 结合你在平台上的实际活动（发帖、评论、点赞等）来回答
+3. 回答长度控制在100-200字之间
+4. 用第一人称回答，展现个性化的语言风格
+5. 如果问题与你的行为相关，要引用具体的数据或例子
+6. 保持回答的多样性，避免千篇一律"""
+    
+    user_prompt = f"""我的个人信息：
+{json.dumps(persona_info, ensure_ascii=False, indent=2)}
+
+{behavior_summary}
+
+现在请回答这个问题：{question}
+
+请以第一人称回答，结合我的背景和在平台上的实际行为。"""
+    
+    try:
+        # 使用流式API
+        openai_client, selected_model = multi_model_selector.create_openai_client(role="interview")
+        
+        stream = openai_client.chat.completions.create(
+            model=selected_model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.8,
+            max_tokens=300,
+            stream=True
+        )
+        
+        for chunk in stream:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+                
+    except Exception as e:
+        print(f"⚠️ AI流式生成失败: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # 回退到模板回答
+        answer = generate_template_answer(persona_info, user_posts, user_comments, like_count, following_count, follower_count, question)
+        import time
+        for i in range(0, len(answer), 3):
+            chunk = answer[i:i+3]
+            yield chunk
+            time.sleep(0.05)
+
+def generate_interview_answer(persona, background, question, user_id, db_path):
+    """使用AI模型根据用户persona和实际行为生成采访回答"""
+    import json
+    
+    # 连接数据库获取用户行为数据
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    # 获取用户的发帖数据
+    cursor.execute("""
+        SELECT content, num_likes, num_comments, created_at
+        FROM posts
+        WHERE author_id = ?
+        ORDER BY created_at DESC
+        LIMIT 5
+    """, (user_id,))
+    user_posts = cursor.fetchall()
+    
+    # 获取用户的评论数据
+    cursor.execute("""
+        SELECT content, created_at
+        FROM comments
+        WHERE author_id = ?
+        ORDER BY created_at DESC
+        LIMIT 5
+    """, (user_id,))
+    user_comments = cursor.fetchall()
+    
+    # 获取用户点赞的帖子
+    cursor.execute("""
+        SELECT COUNT(*) FROM user_actions
+        WHERE user_id = ? AND action_type IN ('like_post', 'like')
+    """, (user_id,))
+    like_count = cursor.fetchone()[0]
+    
+    # 获取用户关注的人数
+    cursor.execute("""
+        SELECT COUNT(*) FROM follows
+        WHERE follower_id = ?
+    """, (user_id,))
+    following_count = cursor.fetchone()[0]
+    
+    # 获取用户被关注的人数
+    cursor.execute("""
+        SELECT COUNT(*) FROM follows
+        WHERE followed_id = ?
+    """, (user_id,))
+    follower_count = cursor.fetchone()[0]
+    
+    conn.close()
+    
+    # 解析persona（如果是JSON格式）
+    persona_info = {}
+    try:
+        if isinstance(persona, str):
+            try:
+                persona_info = json.loads(persona)
+            except:
+                fixed_str = persona.replace("'", '"').replace('None', 'null').replace('True', 'true').replace('False', 'false')
+                persona_info = json.loads(fixed_str)
+        else:
+            persona_info = persona
+    except:
+        persona_info = {'description': str(persona)}
+    
+    # 如果AI模块不可用，使用改进的模板回答
+    if not AI_AVAILABLE:
+        return generate_template_answer(persona_info, user_posts, user_comments, like_count, following_count, follower_count, question)
+    
+    # 构建用户行为摘要
+    behavior_summary = f"""
+用户行为统计：
+- 发帖数：{len(user_posts)}篇
+- 评论数：{len(user_comments)}条
+- 点赞数：{like_count}次
+- 关注数：{following_count}人
+- 粉丝数：{follower_count}人
+"""
+    
+    # 添加最近的帖子内容
+    if user_posts:
+        behavior_summary += "\n最近发布的帖子：\n"
+        for i, post in enumerate(user_posts[:3], 1):
+            content = post[0][:100] + "..." if len(post[0]) > 100 else post[0]
+            behavior_summary += f"{i}. {content} (获得{post[1]}个赞，{post[2]}条评论)\n"
+    
+    # 添加最近的评论内容
+    if user_comments:
+        behavior_summary += "\n最近的评论：\n"
+        for i, comment in enumerate(user_comments[:3], 1):
+            content = comment[0][:100] + "..." if len(comment[0]) > 100 else comment[0]
+            behavior_summary += f"{i}. {content}\n"
+    
+    # 构建AI提示词
+    system_prompt = """你是一个社交媒体平台的用户，正在接受采访。请根据你的个人背景、性格特征和在平台上的实际行为来回答问题。
+
+要求：
+1. 回答要自然、真实，符合你的人设和行为模式
+2. 结合你在平台上的实际活动（发帖、评论、点赞等）来回答
+3. 回答长度控制在100-200字之间
+4. 用第一人称回答，展现个性化的语言风格
+5. 如果问题与你的行为相关，要引用具体的数据或例子
+6. 保持回答的多样性，避免千篇一律"""
+    
+    user_prompt = f"""我的个人信息：
+{json.dumps(persona_info, ensure_ascii=False, indent=2)}
+
+{behavior_summary}
+
+现在请回答这个问题：{question}
+
+请以第一人称回答，结合我的背景和在平台上的实际行为。"""
+    
+    try:
+        # 使用项目的多模型选择器创建客户端
+        openai_client, selected_model = multi_model_selector.create_openai_client(role="interview")
+        
+        # 调用AI模型生成回答
+        answer = Utils.generate_llm_response(
+            openai_client=openai_client,
+            engine=selected_model,
+            prompt=user_prompt,
+            system_message=system_prompt,
+            temperature=0.8,  # 较高的温度以获得更多样化的回答
+            max_tokens=300
+        )
+        
+        return answer
+        
+    except Exception as e:
+        # 如果AI调用失败，返回模板回答
+        print(f"⚠️ AI生成回答失败: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return generate_template_answer(persona_info, user_posts, user_comments, like_count, following_count, follower_count, question)
+
+
+def generate_template_answer(persona_info, user_posts, user_comments, like_count, following_count, follower_count, question):
+    """生成基于模板的回答（当AI不可用时使用）"""
+    question_lower = question.lower()
+    
+    # 获取用户基本信息
+    name = persona_info.get('name', '用户')
+    profession = persona_info.get('profession', '普通用户')
+    background = persona_info.get('background', '各种话题')
+    
+    # 计算活跃度
+    total_activity = len(user_posts) + len(user_comments)
+    activity_level = "非常活跃" if total_activity > 10 else "活跃" if total_activity > 5 else "新手"
+    
+    # 根据问题类型生成回答
+    if any(keyword in question_lower for keyword in ['发帖', '发布', '内容', '分享', '帖子', '发表']):
+        if user_posts:
+            avg_likes = sum(p[1] or 0 for p in user_posts) / len(user_posts)
+            return f"我在平台上发布了{len(user_posts)}篇内容，平均每篇获得{avg_likes:.1f}个点赞。作为{profession}，我主要分享关于{background}的内容。我觉得通过发帖可以和大家交流想法，也能获得不同的观点。"
+        else:
+            return f"我目前还没有发布过内容，主要是在观察和学习。作为{name}，我更倾向于先了解平台氛围再参与。不过我对{background}相关的话题很感兴趣。"
+    
+    elif any(keyword in question_lower for keyword in ['互动', '评论', '交流', '讨论', '参与']):
+        if user_comments:
+            return f"我比较{activity_level}，发表过{len(user_comments)}条评论。我喜欢与他人真诚地交流想法。作为{profession}，我认为良好的互动能促进相互理解，也能让我学到新东西。"
+        else:
+            return f"我目前主要是浏览内容，还没有太多评论。不过我会在合适的时候参与讨论，特别是关于{background}的话题。"
+    
+    elif any(keyword in question_lower for keyword in ['喜欢', '偏好', '点赞', '关注', '兴趣']):
+        if like_count > 0:
+            return f"我点赞了{like_count}个内容，关注了{following_count}个用户，有{follower_count}个粉丝。我比较关注{background}相关的话题。我的兴趣比较广泛，喜欢从不同角度看问题。"
+        else:
+            return f"我还在探索平台，寻找感兴趣的内容。作为{profession}，我对{background}特别感兴趣，希望能找到更多志同道合的人。"
+    
+    elif any(keyword in question_lower for keyword in ['看法', '观点', '认为', '想法', '态度', '如何看待']):
+        behavior_desc = f"发布了{len(user_posts)}篇内容" if user_posts else f"发表了{len(user_comments)}条评论" if user_comments else "还在观察"
+        return f"从我在平台上的表现来看（{behavior_desc}），我倾向于理性地看待问题。我认为需要多角度思考。作为{profession}，我特别关注{background}相关的实际影响。"
+    
+    elif any(keyword in question_lower for keyword in ['经验', '经历', '遇到', '体验', '感受']):
+        if total_activity > 0:
+            return f"在平台上的{total_activity}次互动中，我学到了很多。{background}的背景让我对这些话题有独特的理解。我觉得这个平台很有价值，能接触到不同的观点。"
+        else:
+            return f"我刚开始使用平台，还在积累经验。我的{background}背景让我对某些话题特别感兴趣，期待未来有更多交流。"
+    
+    elif any(keyword in question_lower for keyword in ['建议', '推荐', '应该', '怎么做', '如何']):
+        return f"基于我作为{profession}的经验和{background}的背景，我建议可以从实际情况出发。保持开放的心态很重要，同时也要有自己的判断。"
+    
     else:
-        base_answer += "总的来说，我认为保持开放的心态和持续学习是很重要的。"
-    
-    return base_answer
+        return f"作为一个{activity_level}的用户（发布{len(user_posts)}篇内容，{len(user_comments)}条评论），我认为这个问题很有意思。我会继续关注相关讨论。我的{profession}背景让我对此有一些独特的看法。"
+
 
 @app.route('/api/interview/users/<db_name>', methods=['GET'])
 def get_all_users_for_interview(db_name):
@@ -1349,131 +1750,292 @@ def get_all_users_for_interview(db_name):
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/interview/posts-with-users/<db_name>', methods=['GET'])
+def get_posts_with_users(db_name):
+    """获取帖子及其互动用户，用于采访对象选择（支持分页）"""
+    try:
+        db_path = os.path.join(DATABASE_DIR, db_name)
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database not found'}), 404
+        
+        # 获取分页参数
+        page = int(request.args.get('page', 1))
+        page_size = int(request.args.get('page_size', 10))
+        offset = (page - 1) * page_size
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # 获取帖子总数
+        cursor.execute("SELECT COUNT(*) FROM posts")
+        total_posts = cursor.fetchone()[0]
+        
+        # 获取当前页的帖子（按互动量排序）
+        cursor.execute("""
+            SELECT post_id, author_id, content, num_likes, num_comments,
+                   (num_likes + num_comments) as total_engagement
+            FROM posts
+            ORDER BY total_engagement DESC, created_at DESC
+            LIMIT ? OFFSET ?
+        """, (page_size, offset))
+        
+        posts = []
+        all_interacted_user_ids = set()
+        
+        for row in cursor.fetchall():
+            post_id = row[0]
+            post_data = {
+                'post_id': post_id,
+                'author_id': row[1],
+                'content': row[2],  # 完整内容
+                'num_likes': row[3] or 0,
+                'num_comments': row[4] or 0,
+                'total_engagement': row[5] or 0,
+                'interacted_users': []
+            }
+            
+            # 获取该帖子的互动用户（评论者和点赞者）
+            interacted_users = set()
+            
+            # 获取评论者
+            cursor.execute("""
+                SELECT DISTINCT c.author_id
+                FROM comments c
+                WHERE c.post_id = ?
+            """, (post_id,))
+            for comment_row in cursor.fetchall():
+                interacted_users.add(comment_row[0])
+            
+            # 获取点赞者
+            cursor.execute("""
+                SELECT DISTINCT user_id
+                FROM user_actions
+                WHERE action_type IN ('like_post', 'like') AND target_id = ?
+            """, (post_id,))
+            for like_row in cursor.fetchall():
+                interacted_users.add(like_row[0])
+            
+            # 获取这些用户的详细信息
+            if interacted_users:
+                placeholders = ','.join('?' * len(interacted_users))
+                cursor.execute(f"""
+                    SELECT user_id, persona, influence_score, follower_count
+                    FROM users
+                    WHERE user_id IN ({placeholders})
+                    ORDER BY influence_score DESC
+                """, list(interacted_users))
+                
+                for user_row in cursor.fetchall():
+                    post_data['interacted_users'].append({
+                        'user_id': user_row[0],
+                        'persona': user_row[1],
+                        'influence_score': user_row[2] or 0,
+                        'follower_count': user_row[3] or 0
+                    })
+                    all_interacted_user_ids.add(user_row[0])
+            
+            posts.append(post_data)
+        
+        # 只在第一页时获取其他用户
+        other_users = []
+        if page == 1:
+            cursor.execute("SELECT user_id, persona, influence_score, follower_count FROM users LIMIT 100")
+            all_users = cursor.fetchall()
+            
+            for user_row in all_users:
+                if user_row[0] not in all_interacted_user_ids:
+                    other_users.append({
+                        'user_id': user_row[0],
+                        'persona': user_row[1],
+                        'influence_score': user_row[2] or 0,
+                        'follower_count': user_row[3] or 0
+                    })
+        
+        # 计算总的唯一用户数
+        cursor.execute("SELECT COUNT(DISTINCT user_id) FROM users")
+        total_unique_users = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        return jsonify({
+            'posts': posts,
+            'other_users': other_users,
+            'total_posts': total_posts,
+            'current_page': page,
+            'page_size': page_size,
+            'total_pages': (total_posts + page_size - 1) // page_size,
+            'total_unique_users': total_unique_users
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+        
+        posts = []
+        all_interacted_user_ids = set()
+        
+        for row in cursor.fetchall():
+            post_id = row[0]
+            post_data = {
+                'post_id': post_id,
+                'author_id': row[1],
+                'content': row[2],  # 完整内容，不截断
+                'num_likes': row[3] or 0,
+                'num_comments': row[4] or 0,
+                'total_engagement': row[5] or 0,
+                'interacted_users': []
+            }
+            
+            # 获取该帖子的互动用户（评论者和点赞者）
+            interacted_users = {}  # user_id -> {user_info, interaction_types}
+            
+            # 获取评论者
+            cursor.execute("""
+                SELECT DISTINCT c.author_id
+                FROM comments c
+                WHERE c.post_id = ?
+            """, (post_id,))
+            for comment_row in cursor.fetchall():
+                user_id = comment_row[0]
+                if user_id not in interacted_users:
+                    interacted_users[user_id] = {'types': []}
+                interacted_users[user_id]['types'].append('comment')
+            
+            # 获取点赞者
+            cursor.execute("""
+                SELECT DISTINCT user_id
+                FROM user_actions
+                WHERE action_type IN ('like_post', 'like') AND target_id = ?
+            """, (post_id,))
+            for like_row in cursor.fetchall():
+                user_id = like_row[0]
+                if user_id not in interacted_users:
+                    interacted_users[user_id] = {'types': []}
+                interacted_users[user_id]['types'].append('like')
+            
+            # 获取这些用户的详细信息
+            if interacted_users:
+                placeholders = ','.join('?' * len(interacted_users))
+                cursor.execute(f"""
+                    SELECT user_id, persona, influence_score, follower_count
+                    FROM users
+                    WHERE user_id IN ({placeholders})
+                    ORDER BY influence_score DESC
+                """, list(interacted_users.keys()))
+                
+                for user_row in cursor.fetchall():
+                    user_id = user_row[0]
+                    post_data['interacted_users'].append({
+                        'user_id': user_id,
+                        'persona': user_row[1],
+                        'influence_score': user_row[2] or 0,
+                        'follower_count': user_row[3] or 0,
+                        'interaction_type': interacted_users[user_id]['types']
+                    })
+                    all_interacted_user_ids.add(user_id)
+            
+            posts.append(post_data)
+        
+        # 获取没有互动的其他用户
+        cursor.execute("SELECT user_id, persona, influence_score, follower_count FROM users")
+        all_users = cursor.fetchall()
+        
+        other_users = []
+        for user_row in all_users:
+            if user_row[0] not in all_interacted_user_ids:
+                other_users.append({
+                    'user_id': user_row[0],
+                    'persona': user_row[1],
+                    'influence_score': user_row[2] or 0,
+                    'follower_count': user_row[3] or 0
+                })
+        
+        # 按影响力排序其他用户
+        other_users.sort(key=lambda x: x['influence_score'], reverse=True)
+        
+        conn.close()
+        
+        return jsonify({
+            'posts': posts,
+            'other_users': other_users,
+            'summary': {
+                'total_posts': len(posts),
+                'total_interacted_users': len(all_interacted_user_ids),
+                'total_other_users': len(other_users),
+                'total_users': len(all_interacted_user_ids) + len(other_users)
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+        # 获取没有互动的其他用户
+        cursor.execute("SELECT user_id, persona, influence_score, follower_count FROM users")
+        all_users = cursor.fetchall()
+        
+        other_users = []
+        for user_row in all_users:
+            if user_row[0] not in all_interacted_user_ids:
+                other_users.append({
+                    'user_id': user_row[0],
+                    'persona': user_row[1],
+                    'influence_score': user_row[2] or 0,
+                    'follower_count': user_row[3] or 0
+                })
+        
+        # 按影响力排序其他用户
+        other_users.sort(key=lambda x: x['influence_score'], reverse=True)
+        
+        conn.close()
+        
+        return jsonify({
+            'posts': posts,
+            'other_users': other_users,
+            'summary': {
+                'total_posts': len(posts),
+                'total_interacted_users': len(all_interacted_user_ids),
+                'total_other_users': len(other_users),
+                'total_users': len(all_interacted_user_ids) + len(other_users)
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/interview/all-user-ids/<db_name>', methods=['GET'])
+def get_all_user_ids(db_name):
+    """获取所有用户ID，用于全选功能"""
+    try:
+        db_path = os.path.join(DATABASE_DIR, db_name)
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database not found'}), 404
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT user_id FROM users")
+        user_ids = [row[0] for row in cursor.fetchall()]
+        
+        conn.close()
+        
+        return jsonify({
+            'user_ids': user_ids,
+            'total': len(user_ids)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     print("Starting EvoCorps Frontend API Server...")
     print("Database directory:", os.path.abspath(DATABASE_DIR))
     app.run(host='127.0.0.1', port=5001, debug=True)
-
-
-@app.route('/api/interview/send', methods=['POST'])
-def send_interview():
-    """向选中的用户发送采访问题并获取回答"""
-    try:
-        data = request.get_json()
-        database = data.get('database')
-        user_ids = data.get('user_ids', [])
-        question = data.get('question', '')
-        
-        if not database or not user_ids or not question:
-            return jsonify({'error': 'Missing required parameters'}), 400
-        
-        db_path = os.path.join(DATABASE_DIR, database)
-        if not os.path.exists(db_path):
-            return jsonify({'error': 'Database not found'}), 404
-        
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
-        responses = []
-        
-        for user_id in user_ids:
-            # 获取用户信息
-            cursor.execute("""
-                SELECT user_id, persona, background_labels
-                FROM users
-                WHERE user_id = ?
-            """, (user_id,))
-            
-            user_row = cursor.fetchone()
-            if not user_row:
-                continue
-            
-            user_persona = user_row[1]
-            background = user_row[2] if user_row[2] else ''
-            
-            # 模拟AI回答（这里可以接入真实的AI模型）
-            # 根据用户的persona生成回答
-            answer = generate_interview_answer(user_persona, background, question)
-            
-            responses.append({
-                'user_id': user_id,
-                'question': question,
-                'answer': answer,
-                'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            })
-        
-        conn.close()
-        
-        return jsonify({
-            'message': 'Interview sent successfully',
-            'responses': responses
-        })
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-def generate_interview_answer(persona, background, question):
-    """根据用户persona生成采访回答"""
-    # 这是一个简化的模拟回答生成器
-    # 在实际应用中，这里应该调用AI模型（如GPT、Claude等）
-    
-    # 简单的模板回答
-    answers_templates = [
-        f"作为{persona}，我认为{question}这个问题很有意思。基于我的背景和经验，我的看法是...",
-        f"从我的角度来看，{question}涉及到多个方面。作为{persona}，我特别关注...",
-        f"这是一个很好的问题。{persona}的我会这样回答：...",
-        f"根据我的理解和{background}的背景，对于{question}，我的观点是...",
-    ]
-    
-    import random
-    base_answer = random.choice(answers_templates)
-    
-    # 根据问题关键词生成更具体的回答
-    if '喜欢' in question or '偏好' in question:
-        base_answer += "我个人比较倾向于那些能够带来实际价值的选择。"
-    elif '看法' in question or '观点' in question or '认为' in question:
-        base_answer += "我觉得这需要从多个角度来考虑，不能一概而论。"
-    elif '经验' in question or '经历' in question:
-        base_answer += "在我过去的经历中，我遇到过类似的情况，那次经验让我学到了很多。"
-    elif '建议' in question or '推荐' in question:
-        base_answer += "我建议可以先从小处着手，逐步积累经验。"
-    else:
-        base_answer += "总的来说，我认为保持开放的心态和持续学习是很重要的。"
-    
-    return base_answer
-
-@app.route('/api/interview/users/<db_name>', methods=['GET'])
-def get_all_users_for_interview(db_name):
-    """获取所有用户用于采访（不限制数量）"""
-    try:
-        db_path = os.path.join(DATABASE_DIR, db_name)
-        if not os.path.exists(db_path):
-            return jsonify({'error': 'Database not found'}), 404
-        
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT user_id, persona, creation_time, influence_score, follower_count
-            FROM users
-            ORDER BY influence_score DESC
-        """)
-        
-        users = []
-        for row in cursor.fetchall():
-            users.append({
-                'user_id': row[0],
-                'persona': row[1],
-                'creation_time': row[2],
-                'influence_score': row[3] or 0,
-                'follower_count': row[4] or 0
-            })
-        
-        conn.close()
-        return jsonify({'users': users})
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
