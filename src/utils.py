@@ -37,8 +37,8 @@ def resolve_engine(config: dict | None = None, selector=None) -> str:
     try:
         from multi_model_selector import MultiModelSelector
         return MultiModelSelector.DEFAULT_POOL[0]
-    except Exception:
-        return "deepseek-chat"
+    except Exception as exc:
+        raise RuntimeError("Unable to resolve default model via multi_model_selector") from exc
 
 # Global rate limiting controls
 _last_request_time = {}

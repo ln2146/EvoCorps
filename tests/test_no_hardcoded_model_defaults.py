@@ -25,3 +25,8 @@ def test_no_hardcoded_model_defaults_in_app_files() -> None:
         content = pathlib.Path(path).read_text(encoding="utf-8")
         for model in HARD_CODED_MODELS:
             assert model not in content, f"{path} still hardcodes {model}"
+
+
+def test_utils_has_no_hardcoded_deepseek_chat_default() -> None:
+    content = pathlib.Path("src/utils.py").read_text(encoding="utf-8")
+    assert "deepseek-chat" not in content
