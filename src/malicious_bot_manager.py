@@ -35,7 +35,7 @@ class MaliciousBotManager:
         self.initial_attack_threshold = self.config.get("initial_attack_threshold", 15)  # Initial attack threshold
         self.subsequent_attack_interval = self.config.get("subsequent_attack_interval", 30)  # Interval between subsequent attacks
         self.malicious_prefix = ""  # Remove obvious prefix to make malicious comments less obvious
-        self.fake_news_attack_size = self.cluster_size
+        self.fake_news_attack_size = self.config.get("fake_news_attack_size", self.cluster_size)
        
         # Initialize the malicious bot cluster using the dynamic persona extraction version
         if self.enabled:
@@ -1108,7 +1108,6 @@ Write your hostile post:"""
         # The top posts are re-evaluated every timestep and attacked if they satisfy the conditions
 
         return True
-
 
 
 
