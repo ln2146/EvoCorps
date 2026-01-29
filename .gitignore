@@ -22,7 +22,6 @@ organized_comments_from_jsonl
 *.db
 *.db-shm
 *.db-wal
-src/keys.py
 myenv/
 src/main.py
 

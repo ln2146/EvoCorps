@@ -138,12 +138,9 @@ conda activate your_conda_name
 pip install -r requirements.txt
 ```
 
-### 3. 配置 API
-在 `src/` 文件夹下创建 `keys.py`文件，并将下列代码复制到其中，并根据实际使用的服务填写 API Key 与 Base URL：
-```python
-OPENAI_API_KEY = "YOUR_API_KEY"
-OPENAI_BASE_URL = "BASE_URL"
-```
+### 3. 配置 API 与选择模型
+在 `src/keys.py`文件中根据提示填写对应的 API-KEY 与 BASE-URL。并在`src/multi_model_selector.py`中配置相应的模型。
+（示例：在`src/keys.py`配置deepseek的API-KEY 与 BASE-URL，那么在`src/multi_model_selector.py`中模型可选择DEFAULT_POOL = ["deepseek-chat"]；在`src/keys.py`配置gemini的API-KEY 与 BASE-URL，那么在`src/multi_model_selector.py`中模型可选择DEFAULT_POOL = ["gemini-2.0-flash"]；embedding模型可选择OpenAI的text-embedding-3-large、智谱的embedding-3等）
 
 ### 4. 系统运行步骤
 - 开启数据库服务

@@ -139,13 +139,11 @@ Base dependency installation:
 pip install -r requirements.txt
 ```
 
-### 3. Configure API
+### 3. Configure API & Select Models
 
-Create a new `keys.py` file in the `src/` directory, copy the content below, and configure the API key and Base URL according to the service you are using.
-```python
-OPENAI_API_KEY = "YOUR_API_KEY"
-OPENAI_BASE_URL = "BASE_URL"
-```
+Fill in the corresponding API-KEY and BASE-URL in `src/keys.py`, and configure the models in `src/multi_model_selector.py`.
+(Example: if you configure DeepSeek API-KEY and BASE-URL in `src/keys.py`, you can set `DEFAULT_POOL = ["deepseek-chat"]` in `src/multi_model_selector.py`; if you configure Gemini API-KEY and BASE-URL, you can set `DEFAULT_POOL = ["gemini-2.0-flash"]`; for embeddings you can use OpenAI `text-embedding-3-large`, Zhipu `embedding-3`, etc.)
+
 
 ### 4. System Run Steps
 - Start the database service
