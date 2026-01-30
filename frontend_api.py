@@ -22,6 +22,7 @@ import subprocess
 import signal
 import psutil
 import json
+import time
 
 # 添加src目录到路径以导入项目模块
 src_path = os.path.join(os.path.dirname(__file__), 'src')
@@ -44,6 +45,8 @@ app = Flask(__name__)
 CORS(app)
 
 DATABASE_DIR = 'database'
+OPINION_BALANCE_LOG_DIR = os.path.join(os.path.dirname(__file__), 'logs', 'opinion_balance')
+WORKFLOW_LOG_DIR = os.path.join(os.path.dirname(__file__), 'logs', 'workflow')
 
 @app.route('/api/databases', methods=['GET'])
 def get_databases():
@@ -2083,6 +2086,113 @@ def get_all_user_ids(db_name):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/opinion-balance/logs/stream', methods=['GET'])
+def stream_opinion_balance_logs():
+    """
+    Stream the latest opinion balance log file using SSE (Server-Sent Events).
+
+    Query params:
+      - tail: number of last lines to emit first (default 300, max 2000)
+      - follow_latest: whether to switch to a newer log file if it appears (default true)
+    """
+    from flask import Response, stream_with_context
+    from log_tail import find_latest_file, tail_lines
+
+    # source=workflow streams from logs/workflow (preferred for real-time UI);
+    # source=opinion_balance streams from logs/opinion_balance (legacy).
+    source = request.args.get('source', default='workflow')
+    source = str(source).lower().strip()
+
+    if source == 'opinion_balance':
+        base_dir = OPINION_BALANCE_LOG_DIR
+    else:
+        base_dir = WORKFLOW_LOG_DIR
+
+    tail = request.args.get('tail', default=0, type=int)
+    tail = max(0, min(2000, tail))
+
+    follow_latest = request.args.get('follow_latest', default='true')
+    follow_latest = str(follow_latest).lower() not in ('0', 'false', 'no', 'off')
+
+    poll_interval_sec = 0.25
+    heartbeat_sec = 15.0
+
+    def sse_data(line: str) -> str:
+        safe = (line or '').replace('\r', '').rstrip('\n')
+        return f"data: {safe}\n\n"
+
+    def generate():
+        os.makedirs(base_dir, exist_ok=True)
+
+        current_path = find_latest_file(base_dir, pattern="*.log")
+        if not current_path:
+            # Don't silently fail: provide a visible error line to the UI.
+            yield sse_data(f"ERROR: no log file found under {os.path.relpath(base_dir, os.path.dirname(__file__))} (start the workflow first)")
+            return
+
+        yield sse_data(f"INFO: connected to {os.path.basename(current_path)}")
+
+        if tail > 0:
+            try:
+                for line in tail_lines(current_path, n=tail):
+                    yield sse_data(line)
+            except Exception as e:
+                yield sse_data(f"ERROR: failed to read log tail: {e}")
+
+        last_switch_check = time.time()
+        last_heartbeat = time.time()
+
+        # Tail-follow the active log file.
+        try:
+            f = open(current_path, 'r', encoding='utf-8', errors='replace')
+            f.seek(0, os.SEEK_END)
+
+            while True:
+                line = f.readline()
+                if line:
+                    yield sse_data(line)
+                    continue
+
+                now = time.time()
+                if now - last_heartbeat >= heartbeat_sec:
+                    last_heartbeat = now
+                    yield ": keep-alive\n\n"
+
+                if follow_latest and (now - last_switch_check >= 2.0):
+                    last_switch_check = now
+                    latest = find_latest_file(base_dir, pattern="*.log")
+                    if latest and latest != current_path:
+                        current_path = latest
+                        try:
+                            f.close()
+                        except Exception:
+                            pass
+                        f = open(current_path, 'r', encoding='utf-8', errors='replace')
+                        # New run files are typically small; stream from the beginning.
+                        yield sse_data(f"INFO: switched to new log file: {os.path.basename(current_path)}")
+                        continue
+
+                time.sleep(poll_interval_sec)
+        except GeneratorExit:
+            return
+        except Exception as e:
+            yield sse_data(f"ERROR: log stream stopped unexpectedly: {e}")
+        finally:
+            try:
+                f.close()
+            except Exception:
+                pass
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no'
+        }
+    )
 
 
 if __name__ == '__main__':

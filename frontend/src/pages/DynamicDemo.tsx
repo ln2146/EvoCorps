@@ -3,7 +3,7 @@ import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContai
 import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { createInitialFlowState, routeLogLine, type FlowState, type Role } from '../lib/interventionFlow/logRouter'
-import { createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
+import { createEventSourceLogStream, createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
 
 const DEMO_BACKEND_LOG_LINES: string[] = [
   '2026-01-28 21:13:09,286 - INFO - 📊 Phase 1: perception and decision',
@@ -32,6 +32,9 @@ const DEMO_BACKEND_LOG_LINES: string[] = [
   '2026-01-28 21:24:38,434 - INFO - ⚖️ Strategist is creating strategy...',
   '2026-01-28 21:24:49,879 - INFO - 🎯 Leader Agent starts USC process and generates candidate comments...',
 ]
+
+const USE_SIMULATED_LOG_STREAM = false
+const OPINION_BALANCE_LOG_STREAM_URL = '/api/opinion-balance/logs/stream?source=workflow&tail=0&follow_latest=true'
 
 interface HeatPost {
   id: string
@@ -180,7 +183,9 @@ export default function DynamicDemo() {
     if (!isRunning || !enableEvoCorps) return
     if (streamRef.current) return
 
-    const stream = createSimulatedLogStream({ lines: DEMO_BACKEND_LOG_LINES, intervalMs: 320 })
+    const stream = USE_SIMULATED_LOG_STREAM
+      ? createSimulatedLogStream({ lines: DEMO_BACKEND_LOG_LINES, intervalMs: 320 })
+      : createEventSourceLogStream(OPINION_BALANCE_LOG_STREAM_URL)
     const unsubscribe = stream.subscribe((line) => {
       setFlowState((prev) => routeLogLine(prev, line))
     })
@@ -206,7 +211,9 @@ export default function DynamicDemo() {
           streamRef.current = null
           unsubscribeRef.current = null
 
-          const stream = createSimulatedLogStream({ lines: DEMO_BACKEND_LOG_LINES, intervalMs: 320 })
+          const stream = USE_SIMULATED_LOG_STREAM
+            ? createSimulatedLogStream({ lines: DEMO_BACKEND_LOG_LINES, intervalMs: 320 })
+            : createEventSourceLogStream(OPINION_BALANCE_LOG_STREAM_URL)
           const unsubscribe = stream.subscribe((line) => {
             setFlowState((prev) => routeLogLine(prev, line))
           })

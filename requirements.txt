@@ -38,3 +38,4 @@ wikipedia-api
 # Optional high-performance dependencies
 faiss-cpu
 flask
+flask-cors
