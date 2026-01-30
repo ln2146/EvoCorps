@@ -158,13 +158,15 @@ export default function DynamicDemo() {
   const [isRunning, setIsRunning] = useState(false)
   const [enableAttack, setEnableAttack] = useState(false)
   const [enableAftercare, setEnableAftercare] = useState(false)
-  const [enableEvoCorps, setEnableEvoCorps] = useState(true)
+  const [enableEvoCorps, setEnableEvoCorps] = useState(false)
 
   const [selectedPost, setSelectedPost] = useState<HeatPost | null>(null)
   const [commentSort, setCommentSort] = useState<'likes' | 'time'>('likes')
 
   const [analysisOpen, setAnalysisOpen] = useState(false)
   const [analysisStatus, setAnalysisStatus] = useState<'Idle' | 'Running' | 'Done' | 'Error'>('Idle')
+
+  const [isStarting, setIsStarting] = useState(false)
 
   const [flowState, setFlowState] = useState<FlowState>(() => createInitialFlowState())
   const streamRef = useRef<LogStream | null>(null)
@@ -201,33 +203,94 @@ export default function DynamicDemo() {
     <DynamicDemoPage>
       <DynamicDemoHeader
         isRunning={isRunning}
-        onStart={() => {
-          setIsRunning(true)
-          sse.connect()
-          setFlowState(createInitialFlowState())
+        isStarting={isStarting}
+        onStart={async () => {
+          // 设置加载状态
+          setIsStarting(true)
 
-          streamRef.current?.stop()
-          unsubscribeRef.current?.()
-          streamRef.current = null
-          unsubscribeRef.current = null
+          try {
+            // 调用后端 API 启动进程
+            const response = await fetch('/api/dynamic/start', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({}),
+            })
 
-          const stream = USE_SIMULATED_LOG_STREAM
-            ? createSimulatedLogStream({ lines: DEMO_BACKEND_LOG_LINES, intervalMs: 320 })
-            : createEventSourceLogStream(OPINION_BALANCE_LOG_STREAM_URL)
-          const unsubscribe = stream.subscribe((line) => {
-            setFlowState((prev) => routeLogLine(prev, line))
-          })
-          stream.start()
-          streamRef.current = stream
-          unsubscribeRef.current = unsubscribe
+            const data = await response.json()
+
+            if (data.success) {
+              // 成功：设置 isRunning 状态，连接 SSE
+              setIsRunning(true)
+              sse.connect()
+              setFlowState(createInitialFlowState())
+
+              streamRef.current?.stop()
+              unsubscribeRef.current?.()
+              streamRef.current = null
+              unsubscribeRef.current = null
+
+              const stream = USE_SIMULATED_LOG_STREAM
+                ? createSimulatedLogStream({ lines: DEMO_BACKEND_LOG_LINES, intervalMs: 320 })
+                : createEventSourceLogStream(OPINION_BALANCE_LOG_STREAM_URL)
+              const unsubscribe = stream.subscribe((line) => {
+                setFlowState((prev) => routeLogLine(prev, line))
+              })
+              stream.start()
+              streamRef.current = stream
+              unsubscribeRef.current = unsubscribe
+            } else {
+              // 失败：显示错误消息
+              alert(`启动失败：${data.message || '未知错误'}`)
+              console.error('Failed to start dynamic demo:', data)
+            }
+          } catch (error) {
+            // 网络错误或其他异常
+            alert(`启动失败：${error instanceof Error ? error.message : '网络错误'}`)
+            console.error('Error starting dynamic demo:', error)
+          } finally {
+            // 清除加载状态
+            setIsStarting(false)
+          }
         }}
-        onStop={() => {
-          setIsRunning(false)
-          sse.disconnect()
-          streamRef.current?.stop()
-          unsubscribeRef.current?.()
-          unsubscribeRef.current = null
-          streamRef.current = null
+        onStop={async () => {
+          // 显示确认对话框
+          if (!confirm('是否确认关闭模拟？')) {
+            return
+          }
+
+          try {
+            // 调用后端 API 停止进程
+            const response = await fetch('/api/dynamic/stop', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            })
+
+            const data = await response.json()
+
+            if (data.success) {
+              // 成功：设置 isRunning 为 false，断开 SSE
+              setIsRunning(false)
+              sse.disconnect()
+
+              // 清理前端状态（流、订阅等）
+              streamRef.current?.stop()
+              unsubscribeRef.current?.()
+              unsubscribeRef.current = null
+              streamRef.current = null
+            } else {
+              // 失败：显示错误消息
+              alert(`停止失败：${data.message || '未知错误'}`)
+              console.error('Failed to stop dynamic demo:', data)
+            }
+          } catch (error) {
+            // 网络错误或其他异常
+            alert(`停止失败：${error instanceof Error ? error.message : '网络错误'}`)
+            console.error('Error stopping dynamic demo:', error)
+          }
         }}
         onBack={() => navigate('/')}
         enableAttack={enableAttack}
@@ -235,7 +298,66 @@ export default function DynamicDemo() {
         enableEvoCorps={enableEvoCorps}
         onToggleAttack={() => setEnableAttack((prev) => !prev)}
         onToggleAftercare={() => setEnableAftercare((prev) => !prev)}
-        onToggleEvoCorps={() => setEnableEvoCorps((prev) => !prev)}
+        onToggleEvoCorps={async () => {
+          // 如果当前是禁用状态，则启用并调用 API
+          if (!enableEvoCorps) {
+            try {
+              // 调用后端 API 启动舆论平衡系统
+              const response = await fetch('/api/dynamic/opinion-balance/start', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({}),
+              })
+
+              const data = await response.json()
+
+              if (data.success) {
+                // 成功：设置 enableEvoCorps 为 true
+                setEnableEvoCorps(true)
+              } else {
+                // 失败：显示错误消息，保持状态不变
+                alert(`启动舆论平衡失败：${data.message || '未知错误'}`)
+                console.error('Failed to start opinion balance:', data)
+              }
+            } catch (error) {
+              // 网络错误或其他异常
+              alert(`启动舆论平衡失败：${error instanceof Error ? error.message : '网络错误'}`)
+              console.error('Error starting opinion balance:', error)
+            }
+          } else {
+            // 如果当前是启用状态，则显示确认对话框
+            if (!confirm('是否确认关闭舆论平衡系统？')) {
+              return
+            }
+
+            try {
+              // 调用后端 API 停止舆论平衡系统
+              const response = await fetch('/api/dynamic/opinion-balance/stop', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+              })
+
+              const data = await response.json()
+
+              if (data.success) {
+                // 成功：设置 enableEvoCorps 为 false
+                setEnableEvoCorps(false)
+              } else {
+                // 失败：显示错误消息，保持状态不变
+                alert(`关闭舆论平衡失败：${data.message || '未知错误'}`)
+                console.error('Failed to stop opinion balance:', data)
+              }
+            } catch (error) {
+              // 网络错误或其他异常
+              alert(`关闭舆论平衡失败：${error instanceof Error ? error.message : '网络错误'}`)
+              console.error('Error stopping opinion balance:', error)
+            }
+          }
+        }}
         sseStatus={sse.status}
       />
 
@@ -301,6 +423,7 @@ function DynamicDemoPage({ children }: { children: ReactNode }) {
 
 function DynamicDemoHeader({
   isRunning,
+  isStarting,
   onStart,
   onStop,
   onBack,
@@ -313,6 +436,7 @@ function DynamicDemoHeader({
   sseStatus,
 }: {
   isRunning: boolean
+  isStarting?: boolean
   onStart: () => void
   onStop: () => void
   onBack: () => void
@@ -321,7 +445,7 @@ function DynamicDemoHeader({
   enableEvoCorps: boolean
   onToggleAttack: () => void
   onToggleAftercare: () => void
-  onToggleEvoCorps: () => void
+  onToggleEvoCorps: () => void | Promise<void>
   sseStatus: 'connecting' | 'connected' | 'disconnected'
 }) {
   return (
@@ -346,9 +470,13 @@ function DynamicDemoHeader({
       <div className="flex items-stretch gap-4 w-full xl:w-auto">
         <div className="flex flex-col gap-3 items-center">
           <div className="flex flex-wrap gap-3 justify-center">
-            <button className="btn-primary inline-flex items-center gap-2" onClick={onStart} disabled={isRunning}>
+            <button
+              className="btn-primary inline-flex items-center gap-2"
+              onClick={onStart}
+              disabled={isRunning || isStarting}
+            >
               <Play size={18} />
-              开启演示
+              {isStarting ? '启动中...' : '开启演示'}
             </button>
             <button className="btn-secondary inline-flex items-center gap-2" onClick={onStop} disabled={!isRunning}>
               <Square size={18} />

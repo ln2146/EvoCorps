@@ -8,6 +8,7 @@ Frontend API Server for EvoCorps
 import sys
 import io
 import datetime
+from typing import Optional, List, Dict
 
 # 设置标准输出为 UTF-8 编码
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -47,6 +48,581 @@ CORS(app)
 DATABASE_DIR = 'database'
 OPINION_BALANCE_LOG_DIR = os.path.join(os.path.dirname(__file__), 'logs', 'opinion_balance')
 WORKFLOW_LOG_DIR = os.path.join(os.path.dirname(__file__), 'logs', 'workflow')
+
+
+class ProcessManager:
+    """管理演示系统的所有进程"""
+    
+    def __init__(self):
+        """初始化 ProcessManager
+        
+        初始化进程字典、临时文件列表和 Python 解释器路径
+        """
+        self.processes = {
+            'database': None,      # 存储进程 PID
+            'main': None,
+            'opinion_balance': None
+        }
+        self.temp_files = []       # 临时文件列表，用于清理
+        self.python_exe = sys.executable  # 当前 Python 解释器路径
+        
+        # 启动时清理所有旧的临时文件
+        self._cleanup_all_temp_files()
+    
+    def _is_process_running(self, process_name: str) -> bool:
+        """检查进程是否运行（内部方法）
+        
+        Args:
+            process_name: 进程名称 ('database', 'main', 'opinion_balance')
+            
+        Returns:
+            bool: 进程是否正在运行
+        """
+        # 如果有记录的进程 PID
+        if self.processes.get(process_name):
+            pid = self.processes[process_name]
+            try:
+                proc = psutil.Process(pid)
+                # 检查进程是否存活且命令行匹配
+                if proc.is_running():
+                    cmdline = ' '.join(proc.cmdline())
+                    # 根据不同进程检查不同的关键字
+                    keywords = {
+                        'database': 'start_database_service.py',
+                        'main': 'main.py',
+                        'opinion_balance': 'opinion_balance_launcher.py'
+                    }
+                    if keywords[process_name] in cmdline:
+                        return True
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+        
+        # 如果没有记录，扫描所有进程
+        keywords = {
+            'database': 'start_database_service.py',
+            'main': 'main.py',
+            'opinion_balance': 'opinion_balance_launcher.py'
+        }
+        
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                cmdline = proc.info.get('cmdline')
+                if cmdline and any(keywords[process_name] in str(cmd) for cmd in cmdline):
+                    self.processes[process_name] = proc.info['pid']
+                    return True
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        
+        return False
+    
+    def _create_auto_input_script(
+        self, 
+        script_path: str, 
+        inputs: List[str],
+        conda_env: Optional[str] = None
+    ) -> str:
+        """创建自动输入的批处理脚本（内部方法）
+        
+        Args:
+            script_path: 要运行的 Python 脚本路径
+            inputs: 输入序列列表
+            conda_env: conda 环境名称（已废弃，保留兼容性）
+            
+        Returns:
+            str: 批处理文件路径
+        """
+        # 生成唯一的临时批处理文件名
+        timestamp = int(time.time())
+        bat_file = f"temp_input_{timestamp}.bat"
+        
+        with open(bat_file, 'w', encoding='utf-8') as f:
+            # 不需要激活 conda 环境，直接使用当前 Python 解释器
+            # 使用 sys.executable 确保使用当前 Python 解释器
+            
+            # 写入自动输入命令
+            f.write('@echo off\n')
+            f.write('(\n')
+            for inp in inputs:
+                if inp == '':  # 空字符串表示回车
+                    f.write('echo.\n')
+                else:
+                    f.write(f'echo {inp}\n')
+            f.write(f') | "{self.python_exe}" {script_path}\n')
+            # 添加 exit 命令，确保批处理执行完毕后立即退出，不显示任何提示
+            f.write('exit\n')
+        
+        # 记录临时文件路径用于后续清理
+        self.temp_files.append(bat_file)
+        return bat_file
+    
+    def _start_process_in_terminal(
+        self, 
+        script_path: str, 
+        title: str,
+        auto_inputs: Optional[List[str]] = None,
+        conda_env: Optional[str] = None
+    ) -> subprocess.Popen:
+        """在新终端启动进程（内部方法）
+        
+        Args:
+            script_path: 要运行的 Python 脚本路径
+            title: 终端窗口标题
+            auto_inputs: 自动输入序列（可选）
+            conda_env: conda 环境名称（已废弃，保留兼容性）
+            
+        Returns:
+            subprocess.Popen: 进程对象
+        """
+        if auto_inputs:
+            # 创建临时批处理文件（包含 exit 命令）
+            bat_file = self._create_auto_input_script(script_path, auto_inputs, conda_env)
+            # 直接启动批处理文件
+            cmd = f'cmd /c start "{title}" cmd /c "{bat_file}"'
+        else:
+            # 直接启动，使用当前 Python 解释器
+            cmd = f'cmd /c start "{title}" cmd /c ""{self.python_exe}" {script_path} & exit"'
+        
+        process = subprocess.Popen(cmd, shell=True)
+        return process
+    
+    def _cleanup_temp_files(self):
+        """清理记录的临时文件（内部方法）"""
+        for temp_file in self.temp_files:
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except (FileNotFoundError, PermissionError) as e:
+                # 记录错误但不中断清理过程
+                print(f"警告: 无法删除临时文件 {temp_file}: {e}")
+        
+        # 清空临时文件列表
+        self.temp_files = []
+    
+    def _cleanup_all_temp_files(self):
+        """清理所有临时批处理文件（内部方法）
+        
+        扫描当前目录，删除所有 temp_input_*.bat 文件
+        """
+        try:
+            import glob
+            # 查找所有匹配的临时文件
+            temp_files = glob.glob('temp_input_*.bat')
+            
+            for temp_file in temp_files:
+                try:
+                    os.remove(temp_file)
+                    print(f"已清理临时文件: {temp_file}")
+                except (FileNotFoundError, PermissionError) as e:
+                    # 文件可能正在使用或已被删除
+                    pass
+        except Exception as e:
+            # 清理失败不应影响程序运行
+            print(f"清理临时文件时出错: {e}")
+    
+    def start_demo(self, conda_env: Optional[str] = None) -> dict:
+        """启动演示（数据库 + 主程序）
+        
+        注意: conda_env 参数已废弃，系统自动使用当前 Python 环境
+        
+        Args:
+            conda_env: conda 环境名称（已废弃，保留兼容性）
+            
+        Returns:
+            dict: 启动结果
+        """
+        try:
+            # 清理旧的临时文件
+            self._cleanup_all_temp_files()
+            
+            # 检查数据库和主程序是否已运行
+            if self._is_process_running('database'):
+                return {
+                    'success': False,
+                    'message': 'Database service is already running',
+                    'error': 'ProcessAlreadyRunning'
+                }
+            
+            if self._is_process_running('main'):
+                return {
+                    'success': False,
+                    'message': 'Main program is already running',
+                    'error': 'ProcessAlreadyRunning'
+                }
+            
+            # 启动数据库服务
+            db_script = 'src/start_database_service.py'
+            if not os.path.exists(db_script):
+                return {
+                    'success': False,
+                    'message': f'Database script not found: {db_script}',
+                    'error': 'FileNotFound'
+                }
+            
+            db_process = self._start_process_in_terminal(
+                script_path=db_script,
+                title='EvoCorps-Database',
+                auto_inputs=None,
+                conda_env=conda_env
+            )
+            
+            # 记录数据库进程（注意：由于是在新终端启动，我们无法直接获取子进程的 PID）
+            # 我们需要等待进程启动后通过 _is_process_running 来获取 PID
+            time.sleep(2)  # 等待进程启动
+            
+            # 尝试获取数据库进程 PID
+            db_pid = None
+            if self._is_process_running('database'):
+                db_pid = self.processes.get('database')
+            
+            # 等待 5 秒让数据库初始化
+            print("等待数据库服务初始化...")
+            time.sleep(5)
+            
+            # 创建自动输入脚本并启动主程序
+            main_script = 'src/main.py'
+            if not os.path.exists(main_script):
+                return {
+                    'success': False,
+                    'message': f'Main script not found: {main_script}',
+                    'error': 'FileNotFound'
+                }
+            
+            # 输入序列：n, y, n, n, Enter
+            auto_inputs = ['n', 'y', 'n', 'n', '']
+            
+            main_process = self._start_process_in_terminal(
+                script_path=main_script,
+                title='EvoCorps-Main',
+                auto_inputs=auto_inputs,
+                conda_env=conda_env
+            )
+            
+            # 等待主程序启动
+            time.sleep(2)
+            
+            # 尝试获取主程序进程 PID
+            main_pid = None
+            if self._is_process_running('main'):
+                main_pid = self.processes.get('main')
+            
+            return {
+                'success': True,
+                'message': 'Dynamic demo started successfully',
+                'processes': {
+                    'database': {
+                        'pid': db_pid,
+                        'status': 'running' if db_pid else 'starting'
+                    },
+                    'main': {
+                        'pid': main_pid,
+                        'status': 'running' if main_pid else 'starting'
+                    }
+                }
+            }
+            
+        except FileNotFoundError as e:
+            return {
+                'success': False,
+                'message': f'Script not found: {str(e)}',
+                'error': 'FileNotFound'
+            }
+        except PermissionError as e:
+            return {
+                'success': False,
+                'message': f'Permission denied: {str(e)}',
+                'error': 'PermissionDenied'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Failed to start demo: {str(e)}',
+                'error': 'ProcessStartFailed'
+            }
+    
+    def stop_all_processes(self) -> dict:
+        """停止所有进程
+        
+        遍历所有已记录的进程，使用 psutil.Process.terminate() 优雅关闭，
+        等待 3 秒后检查进程是否终止，对未终止的进程使用 kill() 强制关闭。
+        清理所有临时文件，重置进程记录字典。
+        
+        Returns:
+            dict: 停止结果（包含已停止进程列表和错误信息）
+        """
+        stopped = []
+        errors = []
+        
+        for name, pid in self.processes.items():
+            if pid is None:
+                continue
+                
+            try:
+                proc = psutil.Process(pid)
+                
+                # 获取父进程（通常是 cmd.exe）
+                try:
+                    parent = proc.parent()
+                    parent_pid = parent.pid if parent else None
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    parent_pid = None
+                
+                # 1. 尝试优雅关闭 Python 进程
+                proc.terminate()
+                
+                # 2. 等待最多 3 秒
+                try:
+                    proc.wait(timeout=3)
+                    stopped.append(name)
+                except psutil.TimeoutExpired:
+                    # 3. 强制关闭 Python 进程
+                    proc.kill()
+                    proc.wait(timeout=1)
+                    stopped.append(name)
+                
+                # 4. 如果有父进程（cmd.exe），也关闭它以关闭终端窗口
+                if parent_pid:
+                    try:
+                        parent_proc = psutil.Process(parent_pid)
+                        # 检查父进程是否是 cmd.exe
+                        if 'cmd.exe' in parent_proc.name().lower():
+                            parent_proc.terminate()
+                            try:
+                                parent_proc.wait(timeout=2)
+                            except psutil.TimeoutExpired:
+                                parent_proc.kill()
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass  # 父进程可能已经关闭
+                    
+            except psutil.NoSuchProcess:
+                # 进程已经不存在
+                stopped.append(name)
+            except Exception as e:
+                errors.append(f"{name}: {str(e)}")
+        
+        # 清理临时文件
+        self._cleanup_temp_files()
+        self._cleanup_all_temp_files()  # 额外清理所有临时文件
+        
+        # 重置进程记录
+        self.processes = {k: None for k in self.processes}
+        
+        return {
+            'success': len(errors) == 0,
+            'message': 'All processes stopped' if not errors else 'Some processes failed to stop',
+            'stopped_processes': stopped,
+            'errors': errors
+        }
+    
+    def start_opinion_balance(self, conda_env: Optional[str] = None) -> dict:
+        """启动舆论平衡系统
+        
+        注意: conda_env 参数已废弃，系统自动使用当前 Python 环境
+        
+        Args:
+            conda_env: conda 环境名称（已废弃，保留兼容性）
+            
+        Returns:
+            dict: 启动结果
+        """
+        try:
+            # 清理旧的临时文件
+            self._cleanup_all_temp_files()
+            
+            # 检查舆论平衡进程是否已运行
+            if self._is_process_running('opinion_balance'):
+                return {
+                    'success': False,
+                    'message': 'Opinion balance system is already running',
+                    'error': 'ProcessAlreadyRunning'
+                }
+            
+            # 启动舆论平衡启动器
+            ob_script = 'src/opinion_balance_launcher.py'
+            if not os.path.exists(ob_script):
+                return {
+                    'success': False,
+                    'message': f'Opinion balance script not found: {ob_script}',
+                    'error': 'FileNotFound'
+                }
+            
+            # 创建自动输入脚本（输入序列：start, auto-status）
+            auto_inputs = ['start', 'auto-status']
+            
+            ob_process = self._start_process_in_terminal(
+                script_path=ob_script,
+                title='EvoCorps-OpinionBalance',
+                auto_inputs=auto_inputs,
+                conda_env=conda_env
+            )
+            
+            # 等待进程启动
+            time.sleep(2)
+            
+            # 尝试获取进程 PID
+            ob_pid = None
+            if self._is_process_running('opinion_balance'):
+                ob_pid = self.processes.get('opinion_balance')
+            
+            return {
+                'success': True,
+                'message': 'Opinion balance system started',
+                'process': {
+                    'pid': ob_pid,
+                    'status': 'running' if ob_pid else 'starting'
+                }
+            }
+            
+        except FileNotFoundError as e:
+            return {
+                'success': False,
+                'message': f'Script not found: {str(e)}',
+                'error': 'FileNotFound'
+            }
+        except PermissionError as e:
+            return {
+                'success': False,
+                'message': f'Permission denied: {str(e)}',
+                'error': 'PermissionDenied'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Failed to start opinion balance: {str(e)}',
+                'error': 'ProcessStartFailed'
+            }
+    
+    def stop_process(self, process_name: str) -> dict:
+        """停止单个进程
+        
+        Args:
+            process_name: 进程名称 ('database', 'main', 'opinion_balance')
+            
+        Returns:
+            dict: 停止结果
+        """
+        if process_name not in self.processes:
+            return {
+                'success': False,
+                'message': f'Unknown process name: {process_name}',
+                'error': 'InvalidProcessName'
+            }
+        
+        pid = self.processes.get(process_name)
+        
+        if pid is None:
+            return {
+                'success': False,
+                'message': f'{process_name} is not running',
+                'error': 'ProcessNotRunning'
+            }
+        
+        try:
+            proc = psutil.Process(pid)
+            
+            # 获取父进程（通常是 cmd.exe）
+            try:
+                parent = proc.parent()
+                parent_pid = parent.pid if parent else None
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                parent_pid = None
+            
+            # 1. 尝试优雅关闭 Python 进程
+            proc.terminate()
+            
+            # 2. 等待最多 3 秒
+            try:
+                proc.wait(timeout=3)
+            except psutil.TimeoutExpired:
+                # 3. 强制关闭 Python 进程
+                proc.kill()
+                proc.wait(timeout=1)
+            
+            # 4. 如果有父进程（cmd.exe），也关闭它以关闭终端窗口
+            if parent_pid:
+                try:
+                    parent_proc = psutil.Process(parent_pid)
+                    # 检查父进程是否是 cmd.exe
+                    if 'cmd.exe' in parent_proc.name().lower():
+                        parent_proc.terminate()
+                        try:
+                            parent_proc.wait(timeout=2)
+                        except psutil.TimeoutExpired:
+                            parent_proc.kill()
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass  # 父进程可能已经关闭
+            
+            # 重置该进程记录
+            self.processes[process_name] = None
+            
+            return {
+                'success': True,
+                'message': f'{process_name} stopped successfully',
+                'process': process_name
+            }
+            
+        except psutil.NoSuchProcess:
+            # 进程已经不存在
+            self.processes[process_name] = None
+            return {
+                'success': True,
+                'message': f'{process_name} was already stopped',
+                'process': process_name
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Failed to stop {process_name}: {str(e)}',
+                'error': 'ProcessStopFailed'
+            }
+    
+    def get_process_status(self) -> dict:
+        """获取所有进程状态
+        
+        遍历所有进程记录，使用 _is_process_running 检查每个进程状态，
+        计算进程运行时间（如果可能）。
+        
+        Returns:
+            dict: 所有进程的状态信息（running/stopped, PID, uptime）
+        """
+        status = {}
+        
+        for name in self.processes.keys():
+            # 使用 _is_process_running 检查进程状态
+            is_running = self._is_process_running(name)
+            pid = self.processes.get(name)
+            
+            if is_running and pid:
+                try:
+                    proc = psutil.Process(pid)
+                    # 计算进程运行时间（秒）
+                    create_time = proc.create_time()
+                    uptime = int(time.time() - create_time)
+                    
+                    status[name] = {
+                        'status': 'running',
+                        'pid': pid,
+                        'uptime': uptime
+                    }
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    # 进程不存在或无法访问
+                    status[name] = {
+                        'status': 'stopped',
+                        'pid': None,
+                        'uptime': 0
+                    }
+            else:
+                status[name] = {
+                    'status': 'stopped',
+                    'pid': None,
+                    'uptime': 0
+                }
+        
+        return status
+
+
+# 创建全局 ProcessManager 实例
+process_manager = ProcessManager()
+
 
 @app.route('/api/databases', methods=['GET'])
 def get_databases():
@@ -2193,6 +2769,195 @@ def stream_opinion_balance_logs():
             'X-Accel-Buffering': 'no'
         }
     )
+
+
+@app.route('/api/dynamic/start', methods=['POST'])
+def start_dynamic_demo():
+    """启动动态演示系统（数据库 + 主程序）
+    
+    自动使用当前 Python 环境（frontend_api.py 运行的环境）
+    
+    请求体:
+        {
+            "conda_env": "环境名称"  // 可选，已废弃，保留兼容性
+        }
+    
+    响应:
+        {
+            "success": true/false,
+            "message": "消息",
+            "processes": {
+                "database": {"pid": 12345, "status": "running"},
+                "main": {"pid": 12346, "status": "running"}
+            }
+        }
+    """
+    try:
+        # 解析请求体（保留 conda_env 参数兼容性，但不使用）
+        data = request.get_json() or {}
+        conda_env = data.get('conda_env')  # 保留兼容性，但不使用
+        
+        # 调用 process_manager.start_demo()
+        result = process_manager.start_demo(conda_env=conda_env)
+        
+        # 返回 JSON 响应
+        return jsonify(result)
+        
+    except Exception as e:
+        # 处理异常并返回错误响应
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to start dynamic demo: {str(e)}',
+            'error': 'UnexpectedError'
+        }), 500
+
+
+@app.route('/api/dynamic/stop', methods=['POST'])
+def stop_dynamic_demo():
+    """停止所有动态演示进程
+    
+    响应:
+        {
+            "success": true/false,
+            "message": "消息",
+            "stopped_processes": ["database", "main", "opinion_balance"],
+            "errors": []
+        }
+    """
+    try:
+        # 调用 process_manager.stop_all_processes()
+        result = process_manager.stop_all_processes()
+        
+        # 返回 JSON 响应
+        return jsonify(result)
+        
+    except Exception as e:
+        # 处理异常并返回错误响应
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to stop processes: {str(e)}',
+            'error': 'UnexpectedError',
+            'stopped_processes': [],
+            'errors': [str(e)]
+        }), 500
+
+
+@app.route('/api/dynamic/opinion-balance/start', methods=['POST'])
+def start_opinion_balance_system():
+    """启动舆论平衡系统
+    
+    自动使用当前 Python 环境
+    
+    请求体:
+        {
+            "conda_env": "环境名称"  // 可选，已废弃，保留兼容性
+        }
+    
+    响应:
+        {
+            "success": true/false,
+            "message": "消息",
+            "process": {
+                "pid": 12347,
+                "status": "running"
+            }
+        }
+    """
+    try:
+        # 解析请求体（保留 conda_env 参数兼容性）
+        data = request.get_json() or {}
+        conda_env = data.get('conda_env')  # 保留兼容性，但不使用
+        
+        # 调用 process_manager.start_opinion_balance()
+        result = process_manager.start_opinion_balance(conda_env=conda_env)
+        
+        # 返回 JSON 响应
+        return jsonify(result)
+        
+    except Exception as e:
+        # 处理异常并返回错误响应
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to start opinion balance: {str(e)}',
+            'error': 'UnexpectedError'
+        }), 500
+
+
+@app.route('/api/dynamic/opinion-balance/stop', methods=['POST'])
+def stop_opinion_balance_system():
+    """停止舆论平衡系统
+    
+    响应:
+        {
+            "success": true/false,
+            "message": "消息",
+            "process": "opinion_balance"
+        }
+    """
+    try:
+        # 调用 process_manager.stop_process('opinion_balance')
+        result = process_manager.stop_process('opinion_balance')
+        
+        # 返回 JSON 响应
+        return jsonify(result)
+        
+    except Exception as e:
+        # 处理异常并返回错误响应
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'Failed to stop opinion balance: {str(e)}',
+            'error': 'UnexpectedError'
+        }), 500
+
+
+@app.route('/api/dynamic/status', methods=['GET'])
+def get_dynamic_demo_status():
+    """获取动态演示系统状态
+    
+    响应:
+        {
+            "database": {
+                "status": "running/stopped",
+                "pid": 12345,
+                "uptime": 120
+            },
+            "main": {
+                "status": "running/stopped",
+                "pid": 12346,
+                "uptime": 115
+            },
+            "opinion_balance": {
+                "status": "stopped",
+                "pid": null,
+                "uptime": 0
+            }
+        }
+    """
+    try:
+        # 调用 process_manager.get_process_status()
+        result = process_manager.get_process_status()
+        
+        # 返回 JSON 响应
+        return jsonify(result)
+        
+    except Exception as e:
+        # 处理异常并返回错误响应
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': str(e),
+            'database': {'status': 'unknown', 'pid': None, 'uptime': 0},
+            'main': {'status': 'unknown', 'pid': None, 'uptime': 0},
+            'opinion_balance': {'status': 'unknown', 'pid': None, 'uptime': 0}
+        }), 500
 
 
 if __name__ == '__main__':
