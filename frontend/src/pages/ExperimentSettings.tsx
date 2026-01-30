@@ -181,7 +181,6 @@ export default function ExperimentSettings() {
       const updateData = {
         num_users: config.num_users,
         num_time_steps: config.num_time_steps,
-        engine: config.engine,
         temperature: config.temperature,
         reset_db: config.reset_db
       }
@@ -264,7 +263,7 @@ export default function ExperimentSettings() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-3 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
                       用户数量
@@ -295,19 +294,6 @@ export default function ExperimentSettings() {
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                      AI模型引擎
-                    </label>
-                    <input
-                      type="text"
-                      value={config.engine}
-                      onChange={(e) => updateConfig('engine', e.target.value)}
-                      className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                    <p className="text-xs text-slate-500 mt-1">例如: gemini-2.0-flash, gpt-4</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Temperature
                     </label>
                     <input
@@ -322,7 +308,7 @@ export default function ExperimentSettings() {
                     <p className="text-xs text-slate-500 mt-1">AI生成的随机性(0-2)</p>
                   </div>
 
-                  <div className="col-span-2">
+                  <div className="col-span-3">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
