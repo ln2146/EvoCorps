@@ -4,6 +4,7 @@ export type RoleStatus = 'idle' | 'running' | 'done' | 'error'
 export interface RoleCardState {
   before: string
   status: RoleStatus
+  summary: string[] // fixed 4-line summary; content can update, layout stays stable
   during: string[]
   after?: string[]
 }
@@ -11,6 +12,7 @@ export interface RoleCardState {
 export interface FlowState {
   activeRole: Role | null
   amplifierSticky: boolean
+  noiseCounters: Partial<Record<'http' | 'wiki' | 'cache' | 'request', number>>
   roles: Record<Role, RoleCardState>
 }
 
@@ -24,6 +26,14 @@ const ROLE_BEFORE_COPY: Record<Role, string> = {
   Strategist: '生成可执行的平衡策略与投放指令',
   Leader: '生成并发布主导评论，定调讨论方向',
   Amplifier: '组织回声集群扩散，提升优质观点权重',
+}
+
+// Option B: 4 fixed rows per role (stable layout; values update as logs arrive).
+const ROLE_SUMMARY_DEFAULT: Record<Role, [string, string, string, string]> = {
+  Analyst: ['干预: 待评估', '极端度: —', '情绪: —', 'Trigger: —'],
+  Strategist: ['策略: —', '置信度: —', '风格: —', '论点: —'],
+  Leader: ['候选: —', '最优: —', '得分: —', '发布: —'],
+  Amplifier: ['Echo: —', '回应: —', '点赞: —', '效果: —'],
 }
 
 const analystAnchors = [
@@ -71,11 +81,12 @@ export function createInitialFlowState(): FlowState {
   return {
     activeRole: null,
     amplifierSticky: false,
+    noiseCounters: {},
     roles: {
-      Analyst: { before: ROLE_BEFORE_COPY.Analyst, status: 'idle', during: [] },
-      Strategist: { before: ROLE_BEFORE_COPY.Strategist, status: 'idle', during: [] },
-      Leader: { before: ROLE_BEFORE_COPY.Leader, status: 'idle', during: [] },
-      Amplifier: { before: ROLE_BEFORE_COPY.Amplifier, status: 'idle', during: [] },
+      Analyst: { before: ROLE_BEFORE_COPY.Analyst, status: 'idle', summary: [...ROLE_SUMMARY_DEFAULT.Analyst], during: [] },
+      Strategist: { before: ROLE_BEFORE_COPY.Strategist, status: 'idle', summary: [...ROLE_SUMMARY_DEFAULT.Strategist], during: [] },
+      Leader: { before: ROLE_BEFORE_COPY.Leader, status: 'idle', summary: [...ROLE_SUMMARY_DEFAULT.Leader], during: [] },
+      Amplifier: { before: ROLE_BEFORE_COPY.Amplifier, status: 'idle', summary: [...ROLE_SUMMARY_DEFAULT.Amplifier], during: [] },
     },
   }
 }
@@ -88,9 +99,9 @@ function detectRoleByAnchor(cleanLine: string): Role | null {
   return null
 }
 
-function appendDuring(card: RoleCardState, cleanLine: string): RoleCardState {
-  const nextDuring = [...card.during, cleanLine]
-  const bounded = nextDuring.slice(Math.max(0, nextDuring.length - MAX_DURING_LINES))
+function appendDuringWithCap(card: RoleCardState, line: string, maxLines: number): RoleCardState {
+  const appended = [...card.during, line]
+  const bounded = appended.slice(Math.max(0, appended.length - maxLines))
   return { ...card, during: bounded }
 }
 
@@ -99,27 +110,197 @@ function freezeAfter(card: RoleCardState): RoleCardState {
   return { ...card, status: 'done', after: snapshot, during: [] }
 }
 
+function truncateEnd(s: string, max: number) {
+  const t = s.trim()
+  if (t.length <= max) return t
+  return `${t.slice(0, Math.max(0, max - 1))}…`
+}
+
+function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): FlowState['roles'] {
+  let roles = prevRoles
+
+  const update = (role: Role, idx: 0 | 1 | 2 | 3, next: string) => {
+    const cur = roles[role]
+    if (cur.summary[idx] === next) return
+    roles = {
+      ...roles,
+      [role]: {
+        ...cur,
+        summary: cur.summary.map((v, i) => (i === idx ? next : v)),
+      },
+    }
+  }
+
+  // Analyst: decision + core metrics.
+  {
+    const mExt = cleanLine.match(/Viewpoint extremism:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
+    if (mExt) update('Analyst', 1, `极端度: ${mExt[1].replace(/\s+/g, '')}`)
+
+    const mSent = cleanLine.match(/Overall sentiment:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
+    if (mSent) update('Analyst', 2, `情绪: ${mSent[1].replace(/\s+/g, '')}`)
+
+    const mReasons = cleanLine.match(/Trigger reasons:\s*(.+)$/i)
+    if (mReasons) update('Analyst', 3, `Trigger: ${truncateEnd(mReasons[1], 80)}`)
+
+    const needs = cleanLine.match(/Needs intervention:\s*(yes|no)\b/i)
+    const urg = cleanLine.match(/Urgency level:\s*(\d+)\b/i)
+    if (needs || urg) {
+      const cur = roles.Analyst.summary[0]
+      const curUrg = cur.match(/\bU(\d+)\b/i)
+      const urgency = Number(urg?.[1] ?? curUrg?.[1] ?? NaN)
+      const needTxt = needs ? (needs[1].toLowerCase() === 'yes' ? '需要' : '不需要') : undefined
+      const curNeed = cur.match(/^干预:\s*([^\s(]+)/)?.[1]
+      const finalNeed = needTxt ?? curNeed ?? '待评估'
+      const withUrg = Number.isFinite(urgency) ? `干预: ${finalNeed} (U${urgency})` : `干预: ${finalNeed}`
+      update('Analyst', 0, withUrg)
+    }
+  }
+
+  // Strategist: strategy selection + leader style.
+  {
+    const mSel = cleanLine.match(/Selected optimal strategy:\s*([a-z0-9_ -]+)/i)
+    if (mSel) update('Strategist', 0, `策略: ${mSel[1].trim()}`)
+
+    const mRec = cleanLine.match(/Recommended strategy:\s*([a-z0-9_ -]+),\s*confidence:\s*([0-9.]+)/i)
+    if (mRec) {
+      update('Strategist', 0, `策略: ${mRec[1].trim()}`)
+      update('Strategist', 1, `置信度: ${mRec[2]}`)
+    }
+
+    const style = cleanLine.match(/Leader style:\s*([a-z0-9_ -]+)/i)?.[1]?.trim()
+    const tone = cleanLine.match(/Tone:\s*([a-z0-9_ -]+)/i)?.[1]?.trim()
+    if (style || tone) {
+      const cur = roles.Strategist.summary[2].replace(/^风格:\s*/i, '').trim()
+      const parts = new Set<string>(cur && cur !== '—' ? cur.split('/').map((s) => s.trim()).filter(Boolean) : [])
+      if (style) parts.add(style)
+      if (tone) parts.add(tone)
+      update('Strategist', 2, `风格: ${parts.size ? Array.from(parts).join(' / ') : '—'}`)
+    }
+
+    const arg = cleanLine.match(/Core argument:\s*(.+)$/i)?.[1]?.trim()
+    if (arg) update('Strategist', 3, `论点: ${truncateEnd(arg, 80)}`)
+  }
+
+  // Leader: generation/vote outcomes.
+  {
+    const mGen = cleanLine.match(/generate\s+(\d+)\s+candidate comments/i)
+    if (mGen) update('Leader', 0, `候选: ${mGen[1]}`)
+
+    const mBest = cleanLine.match(/Best selection:\s*(candidate_\d+)/i)
+    if (mBest) update('Leader', 1, `最优: ${mBest[1]}`)
+
+    const mScore = cleanLine.match(/Best candidate score:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
+    if (mScore) update('Leader', 2, `得分: ${mScore[1].replace(/\s+/g, '')}`)
+  }
+
+  // Amplifier: echo size + likes + effectiveness.
+  {
+    const mTotal = cleanLine.match(/Echo plan:\s*total=(\d+)/i)
+    if (mTotal) update('Amplifier', 0, `Echo: ${mTotal[1]}`)
+
+    const mResp = cleanLine.match(/(\d+)\s+echo responses generated/i)
+    if (mResp) update('Amplifier', 1, `回应: ${mResp[1]}`)
+
+    const mLikes = cleanLine.match(/\(total:\s*(\d+)\s+likes\)/i)
+    if (mLikes) update('Amplifier', 2, `点赞: +${mLikes[1]}`)
+
+    const mEff = cleanLine.match(/effectiveness score:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
+    if (mEff) update('Amplifier', 3, `效果: ${mEff[1].replace(/\s+/g, '')}`)
+  }
+
+  return roles
+}
+
+function compressDisplayLine(cleanLine: string) {
+  // Keep the original language but drop huge bodies. (We still avoid timestamps in UI upstream.)
+  const leaderComment = cleanLine.match(/^💬\s*👑\s*Leader comment\s+(\d+)\s+on\s+post\b/i)
+  if (leaderComment) return `💬 👑 Leader comment posted (${leaderComment[1]})`
+
+  if (/^💬\s*🤖\s*Echo-\d+\b/i.test(cleanLine) && /\bcommented:/i.test(cleanLine)) {
+    return '💬 🤖 Echo commented'
+  }
+
+  if (cleanLine.length > 140) {
+    const idx = cleanLine.indexOf(':')
+    if (idx > 0 && idx < 80) return `${cleanLine.slice(0, idx + 1)} …`
+    return `${cleanLine.slice(0, 140)}…`
+  }
+
+  return cleanLine
+}
+
+function pushAggregated(prev: string[], nextLine: string, maxLines: number) {
+  if (!nextLine) return prev
+  if (prev.length) {
+    const last = prev[prev.length - 1]
+    if (last.startsWith(nextLine)) {
+      const m = last.match(/^(.*?)(?:\s*×\s*(\d+))$/)
+      const base = (m ? m[1] : last).trimEnd()
+      const count = m ? Number(m[2] || 1) : 1
+      const updated = `${base} × ${count + 1}`
+      return [...prev.slice(0, -1), updated]
+    }
+  }
+  const appended = [...prev, nextLine]
+  return appended.slice(Math.max(0, appended.length - maxLines))
+}
+
 export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
   const cleanLine = stripLogPrefix(rawLine)
   if (!cleanLine) return prev
 
+  const rolesAfterSummary = applySummaryUpdates(prev.roles, cleanLine)
+  const stateAfterSummary = rolesAfterSummary === prev.roles ? prev : { ...prev, roles: rolesAfterSummary }
+
+  // Noise collection: keep UI clean while still signaling background activity.
+  if (cleanLine.startsWith('HTTP Request:')) {
+    return {
+      ...stateAfterSummary,
+      noiseCounters: { ...stateAfterSummary.noiseCounters, http: (stateAfterSummary.noiseCounters.http ?? 0) + 1 },
+    }
+  }
+  if (cleanLine.startsWith('Request URL:')) {
+    return {
+      ...stateAfterSummary,
+      noiseCounters: { ...stateAfterSummary.noiseCounters, request: (stateAfterSummary.noiseCounters.request ?? 0) + 1 },
+    }
+  }
+  if (cleanLine.startsWith('Wikipedia:')) {
+    return {
+      ...stateAfterSummary,
+      noiseCounters: { ...stateAfterSummary.noiseCounters, wiki: (stateAfterSummary.noiseCounters.wiki ?? 0) + 1 },
+    }
+  }
+  if (cleanLine.includes('Cache status:')) {
+    return {
+      ...stateAfterSummary,
+      noiseCounters: { ...stateAfterSummary.noiseCounters, cache: (stateAfterSummary.noiseCounters.cache ?? 0) + 1 },
+    }
+  }
+
+  const displayLine = compressDisplayLine(cleanLine)
+
   // Sticky ends only when we observe monitoring/baseline anchors, then role switching resumes.
-  const shouldReleaseSticky = prev.amplifierSticky && matchesAny(cleanLine, monitoringAnchors)
-  const amplifierSticky = shouldReleaseSticky ? false : prev.amplifierSticky
+  const shouldReleaseSticky = stateAfterSummary.amplifierSticky && matchesAny(cleanLine, monitoringAnchors)
+  const amplifierSticky = shouldReleaseSticky ? false : stateAfterSummary.amplifierSticky
 
   // Role switching is anchor-driven; when amplifier is sticky, we force attribution to Amplifier.
   const anchoredRole = detectRoleByAnchor(cleanLine)
   const nextRole: Role | null = amplifierSticky ? 'Amplifier' : anchoredRole
 
-  const activeRole = prev.activeRole
+  const activeRole = stateAfterSummary.activeRole
 
   // No active role yet: only start when we have an anchor to bind to.
   if (!activeRole) {
-    if (!nextRole) return { ...prev, amplifierSticky }
-    const nextRoles = { ...prev.roles }
-    nextRoles[nextRole] = appendDuring({ ...nextRoles[nextRole], status: 'running' }, cleanLine)
+    if (!nextRole) return { ...stateAfterSummary, amplifierSticky }
+    const nextRoles = { ...stateAfterSummary.roles }
+    nextRoles[nextRole] = {
+      ...nextRoles[nextRole],
+      status: 'running',
+      during: pushAggregated(nextRoles[nextRole].during, displayLine, MAX_DURING_LINES),
+    }
     return {
-      ...prev,
+      ...stateAfterSummary,
       amplifierSticky: amplifierSticky || matchesAny(cleanLine, [/Activating Echo Agent cluster/i]),
       activeRole: nextRole,
       roles: nextRoles,
@@ -128,27 +309,31 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
 
   // No anchor (and not sticky): attribute line to current active role.
   if (!nextRole) {
-    const nextRoles = { ...prev.roles }
-    nextRoles[activeRole] = appendDuring(nextRoles[activeRole], cleanLine)
-    return { ...prev, amplifierSticky, roles: nextRoles }
+    const nextRoles = { ...stateAfterSummary.roles }
+    const cur = nextRoles[activeRole]
+    nextRoles[activeRole] = {
+      ...cur,
+      during: pushAggregated(cur.during, displayLine, MAX_DURING_LINES),
+    }
+    return { ...stateAfterSummary, amplifierSticky, roles: nextRoles }
   }
 
   // Anchor resolves to the same active role: keep streaming.
   if (nextRole === activeRole) {
-    const nextRoles = { ...prev.roles }
-    nextRoles[activeRole] = appendDuring(nextRoles[activeRole], cleanLine)
+    const nextRoles = { ...stateAfterSummary.roles }
+    nextRoles[activeRole] = appendDuringWithCap(nextRoles[activeRole], displayLine, MAX_DURING_LINES)
     const nextSticky = amplifierSticky || matchesAny(cleanLine, [/Activating Echo Agent cluster/i])
-    return { ...prev, amplifierSticky: nextSticky, roles: nextRoles }
+    return { ...stateAfterSummary, amplifierSticky: nextSticky, roles: nextRoles }
   }
 
   // Role switch: freeze previous role and start streaming to the new role.
-  const nextRoles = { ...prev.roles }
+  const nextRoles = { ...stateAfterSummary.roles }
   nextRoles[activeRole] = freezeAfter(nextRoles[activeRole])
-  nextRoles[nextRole] = appendDuring({ ...nextRoles[nextRole], status: 'running' }, cleanLine)
+  nextRoles[nextRole] = appendDuringWithCap({ ...nextRoles[nextRole], status: 'running' }, displayLine, MAX_DURING_LINES)
 
-  const nextSticky = (amplifierSticky || matchesAny(cleanLine, [/Activating Echo Agent cluster/i]))
+  const nextSticky = amplifierSticky || matchesAny(cleanLine, [/Activating Echo Agent cluster/i])
   return {
-    ...prev,
+    ...stateAfterSummary,
     activeRole: nextRole,
     amplifierSticky: nextSticky,
     roles: nextRoles,

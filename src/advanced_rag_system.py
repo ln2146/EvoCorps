@@ -651,6 +651,18 @@ class AdvancedRAGSystem:
                 if not self._load_query_text_index():
                     # Rebuild if loading fails
                     self._build_query_text_faiss_index(conn)
+
+            # If embedding dimension changed since the index was built, faiss will hard-fail.
+            # Rebuild the index from DB to match the current query embedding dimension.
+            if hasattr(self, 'query_text_index') and self.query_text_index is not None:
+                qdim = int(query_vector.shape[0])
+                if int(self.query_text_index.d) != qdim:
+                    logger.warning(
+                        f"⚠️ query_text FAISS dim mismatch: index.d={int(self.query_text_index.d)} vs query_dim={qdim}. Rebuilding index..."
+                    )
+                    self.query_text_index = None
+                    self.query_text_ids = []
+                    self._build_query_text_faiss_index(conn)
             
             # Use FAISS to search similar query_text
             if hasattr(self, 'query_text_index') and self.query_text_index is not None:
@@ -730,7 +742,7 @@ class AdvancedRAGSystem:
             logger.info(f"🔍 Retrieved {len(results)} results from action_logs")
             
         except Exception as e:
-            logger.error(f"❌ action_logs retrieval failed: {e}")
+            logger.error(f"❌ action_logs retrieval failed: {type(e).__name__}: {e}")
         
         return results
     
@@ -817,6 +829,15 @@ class AdvancedRAGSystem:
                 if not hasattr(self, 'query_text_index') or self.query_text_index is None:
                     self.query_text_index = faiss.IndexFlatIP(new_vectors.shape[1])
                     self.query_text_ids = []
+                elif int(self.query_text_index.d) != int(new_vectors.shape[1]):
+                    logger.warning(
+                        f"⚠️ query_text FAISS dim mismatch during incremental update: index.d={int(self.query_text_index.d)} vs new_dim={int(new_vectors.shape[1])}. Rebuilding full index..."
+                    )
+                    self.query_text_index = None
+                    self.query_text_ids = []
+                    self._build_query_text_faiss_index(conn)
+                    conn.close()
+                    return
                 
                 # Add new vectors to existing index
                 self.query_text_index.add(new_vectors)
@@ -830,7 +851,7 @@ class AdvancedRAGSystem:
             conn.close()
             
         except Exception as e:
-            logger.error(f"❌ Incremental update of query_text FAISS index failed: {e}")
+            logger.error(f"❌ Incremental update of query_text FAISS index failed: {type(e).__name__}: {e}")
 
     def _parse_strategic_decision(self, strategic_decision: str) -> str:
         """Parse key content in strategic_decision: core_counter_argument, leader_instruction, echo_plan"""
@@ -949,6 +970,9 @@ class AdvancedRAGSystem:
                 self.query_text_index = faiss.IndexFlatIP(vectors.shape[1])
                 self.query_text_index.add(vectors)
                 self.query_text_ids = query_text_ids
+
+                # Keep config/metadata consistent with the actual embedding dimension.
+                self.config["vector_dimension"] = int(vectors.shape[1])
                 
                 logger.info(f"✅ Built query_text FAISS index with {len(vectors)} vectors")
                 
@@ -1044,9 +1068,10 @@ class AdvancedRAGSystem:
     def _save_query_text_index(self):
         """Save query text index"""
         if hasattr(self, 'query_text_index') and self.query_text_index is not None and hasattr(self, 'query_text_ids'):
+            index_dim = int(getattr(self.query_text_index, "d", self.config["vector_dimension"]))
             metadata = {
                 'query_text_ids': self.query_text_ids,
-                'vector_dimension': self.config["vector_dimension"],
+                'vector_dimension': index_dim,
                 'index_type': 'query_text',
                 'created_at': datetime.now().isoformat(),
                 'vector_count': len(self.query_text_ids)
@@ -1060,6 +1085,15 @@ class AdvancedRAGSystem:
         if index is not None and metadata is not None:
             self.query_text_index = index
             self.query_text_ids = metadata.get('query_text_ids', [])
+            try:
+                self.config["vector_dimension"] = int(self.query_text_index.d)
+            except Exception:
+                pass
+            meta_dim = metadata.get('vector_dimension')
+            if meta_dim is not None and int(meta_dim) != int(getattr(self.query_text_index, "d", meta_dim)):
+                logger.warning(
+                    f"⚠️ Query text index metadata dim mismatch: meta={meta_dim} vs index.d={int(self.query_text_index.d)}. Using index.d."
+                )
             logger.info(f"✅ Query text index loaded, contains {len(self.query_text_ids)} vectors")
             return True
         return False

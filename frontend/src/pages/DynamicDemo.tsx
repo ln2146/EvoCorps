@@ -4,6 +4,7 @@ import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, Ar
 import { useNavigate } from 'react-router-dom'
 import { createInitialFlowState, routeLogLine, type FlowState, type Role } from '../lib/interventionFlow/logRouter'
 import { createEventSourceLogStream, createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
+import { computeRoleFlexGrow } from '../lib/interventionFlow/layout'
 
 const DEMO_BACKEND_LOG_LINES: string[] = [
   '2026-01-28 21:13:09,286 - INFO - 📊 Phase 1: perception and decision',
@@ -173,16 +174,21 @@ export default function DynamicDemo() {
   const unsubscribeRef = useRef<null | (() => void)>(null)
 
   useEffect(() => {
+    // Spec:
+    // - enableEvoCorps on => connect log stream and render (independent from isRunning)
+    // - enableEvoCorps off => disconnect stream and clear/freeze UI
     if (!enableEvoCorps) {
       streamRef.current?.stop()
       unsubscribeRef.current?.()
       unsubscribeRef.current = null
       streamRef.current = null
+      setFlowState(createInitialFlowState())
+      return
     }
-  }, [enableEvoCorps])
 
-  useEffect(() => {
-    if (!isRunning || !enableEvoCorps) return
+    // reset display for a new "session" of opinion balance viewing
+    setFlowState(createInitialFlowState())
+
     if (streamRef.current) return
 
     const stream = USE_SIMULATED_LOG_STREAM
@@ -195,7 +201,14 @@ export default function DynamicDemo() {
 
     streamRef.current = stream
     unsubscribeRef.current = unsubscribe
-  }, [enableEvoCorps, isRunning])
+
+    return () => {
+      streamRef.current?.stop()
+      unsubscribeRef.current?.()
+      unsubscribeRef.current = null
+      streamRef.current = null
+    }
+  }, [enableEvoCorps])
 
   const currentMetrics = data.metricsSeries[data.metricsSeries.length - 1]
 
@@ -225,21 +238,6 @@ export default function DynamicDemo() {
               setIsRunning(true)
               sse.connect()
               setFlowState(createInitialFlowState())
-
-              streamRef.current?.stop()
-              unsubscribeRef.current?.()
-              streamRef.current = null
-              unsubscribeRef.current = null
-
-              const stream = USE_SIMULATED_LOG_STREAM
-                ? createSimulatedLogStream({ lines: DEMO_BACKEND_LOG_LINES, intervalMs: 320 })
-                : createEventSourceLogStream(OPINION_BALANCE_LOG_STREAM_URL)
-              const unsubscribe = stream.subscribe((line) => {
-                setFlowState((prev) => routeLogLine(prev, line))
-              })
-              stream.start()
-              streamRef.current = stream
-              unsubscribeRef.current = unsubscribe
             } else {
               // 失败：显示错误消息
               alert(`启动失败：${data.message || '未知错误'}`)
@@ -275,12 +273,6 @@ export default function DynamicDemo() {
               // 成功：设置 isRunning 为 false，断开 SSE
               setIsRunning(false)
               sse.disconnect()
-
-              // 清理前端状态（流、订阅等）
-              streamRef.current?.stop()
-              unsubscribeRef.current?.()
-              unsubscribeRef.current = null
-              streamRef.current = null
             } else {
               // 失败：显示错误消息
               alert(`停止失败：${data.message || '未知错误'}`)
@@ -735,19 +727,23 @@ function InterventionFlowPanel({ state }: { state: FlowState }) {
         </div>
       </div>
 
-      {roles.map(({ role, tone, label }) => (
-        <RoleStepCard
-          key={role}
-          role={role}
-          label={label}
-          tone={tone}
-          isActive={state.activeRole === role}
-          status={state.roles[role].status}
-          before={state.roles[role].before}
-          during={state.roles[role].during}
-          after={state.roles[role].after}
-        />
-      ))}
+      <div className="h-[720px] flex flex-col gap-4 min-h-0">
+        {roles.map(({ role, tone, label }) => (
+          <RoleStepCard
+            key={role}
+            role={role}
+            label={label}
+            tone={tone}
+            isActive={state.activeRole === role}
+            flexGrow={computeRoleFlexGrow(state.activeRole, role)}
+            status={state.roles[role].status}
+            before={state.roles[role].before}
+            summary={state.roles[role].summary}
+            during={state.roles[role].during}
+            after={state.roles[role].after}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -757,8 +753,10 @@ function RoleStepCard({
   label,
   tone,
   isActive,
+  flexGrow,
   status,
   before,
+  summary,
   during,
   after,
 }: {
@@ -766,8 +764,10 @@ function RoleStepCard({
   label: string
   tone: string
   isActive: boolean
+  flexGrow: number
   status: 'idle' | 'running' | 'done' | 'error'
   before: string
+  summary: string[]
   during: string[]
   after?: string[]
 }) {
@@ -781,9 +781,10 @@ function RoleStepCard({
   return (
     <div
       className={[
-        'glass-card transition-all duration-300',
-        isActive ? 'p-6 scale-[1.02] ring-2 ring-emerald-200 shadow-2xl' : 'p-4 opacity-90',
+        'glass-card transition-[flex,transform,opacity] duration-300 min-h-0 overflow-hidden flex flex-col',
+        isActive ? 'p-6 scale-[1.01] ring-2 ring-emerald-200 shadow-2xl' : 'p-4 opacity-90',
       ].join(' ')}
+      style={{ flex: flexGrow }}
       aria-current={isActive ? 'step' : undefined}
       data-role={role}
     >
@@ -802,6 +803,13 @@ function RoleStepCard({
               <StatusBadge label={status.toUpperCase()} tone={statusTone[status]} />
             </div>
             <p className="text-xs text-slate-600">{before}</p>
+            <div className="mt-1 grid grid-cols-1 gap-0.5">
+              {summary.slice(0, 4).map((line, idx) => (
+                <div key={`${role}_summary_${idx}`} className="text-xs text-slate-700/90 leading-snug break-words line-clamp-1">
+                  {line}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -811,8 +819,8 @@ function RoleStepCard({
       </div>
 
       {isActive ? (
-        <div className="mt-4 bg-white/60 border border-white/40 rounded-2xl p-4">
-          <div className="space-y-2 max-h-64 overflow-auto pr-1">
+        <div className="mt-4 bg-white/60 border border-white/40 rounded-2xl p-4 min-h-0 flex-1">
+          <div className="space-y-2 h-full overflow-auto pr-1">
             {during.length ? (
               during.map((line, idx) => (
                 <div key={`${role}_${idx}`} className="text-sm text-slate-700 leading-relaxed break-words">

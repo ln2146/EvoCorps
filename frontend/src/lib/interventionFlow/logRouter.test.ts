@@ -10,6 +10,14 @@ describe('stripLogPrefix', () => {
 })
 
 describe('routeLogLine', () => {
+  it('initializes 4-line summaries per role', () => {
+    const state = createInitialFlowState()
+
+    for (const role of ['Analyst', 'Strategist', 'Leader', 'Amplifier'] as const) {
+      expect(state.roles[role].summary).toHaveLength(4)
+    }
+  })
+
   it('routes by strong anchors and freezes previous role on switch', () => {
     let state = createInitialFlowState()
 
@@ -42,7 +50,7 @@ describe('routeLogLine', () => {
 
     state = routeLogLine(state, '2026-01-28 21:18:33,637 - INFO - 💬 👑 Leader comment 1 on post post-18e9eb: ...')
     expect(state.activeRole).toBe('Amplifier')
-    expect(state.roles.Amplifier.during[state.roles.Amplifier.during.length - 1]).toBe('💬 👑 Leader comment 1 on post post-18e9eb: ...')
+    expect(state.roles.Amplifier.during[state.roles.Amplifier.during.length - 1]).toBe('💬 👑 Leader comment posted (1)')
   })
 
   it('releases amplifier sticky on monitoring and allows switching back to Analyst', () => {
@@ -59,4 +67,64 @@ describe('routeLogLine', () => {
     expect(state.activeRole).toBe('Analyst')
     expect(state.roles.Analyst.status).toBe('running')
   })
+
+  it('updates Analyst summary fields from key result lines', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-28 21:13:09,286 - INFO - 🔍 Analyst is analyzing content...')
+    state = routeLogLine(state, '2026-01-28 21:13:50,217 - INFO -       Viewpoint extremism: 8.6/10.0')
+    state = routeLogLine(state, '2026-01-28 21:13:50,217 - INFO -       Overall sentiment: 0.10/1.0')
+    state = routeLogLine(state, '2026-01-28 21:13:50,251 - INFO -       Needs intervention: yes')
+    state = routeLogLine(state, '2026-01-28 21:13:50,251 - INFO -       Urgency level: 3')
+    state = routeLogLine(state, '2026-01-28 21:13:50,251 - INFO -       Trigger reasons: Viewpoint extremism too high & Sentiment too low')
+
+    expect(state.roles.Analyst.summary[0]).toContain('干预')
+    expect(state.roles.Analyst.summary[0]).toContain('3')
+    expect(state.roles.Analyst.summary[1]).toContain('8.6/10.0')
+    expect(state.roles.Analyst.summary[2]).toContain('0.10/1.0')
+    expect(state.roles.Analyst.summary[3]).toContain('Trigger')
+  })
+
+  it('updates Strategist summary fields from strategy selection lines', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-28 21:13:50,253 - INFO - ⚖️ Strategist is creating strategy...')
+    state = routeLogLine(state, '2026-01-30 20:46:25,342 - INFO - 🎯 Recommended strategy: action_log, confidence: 0.443')
+    state = routeLogLine(state, '2026-01-28 21:14:25,697 - INFO -         🎯 Selected optimal strategy: balanced_response')
+    state = routeLogLine(state, '2026-01-28 21:14:49,879 - INFO -      👑 Leader style: diplomatic')
+    state = routeLogLine(state, '2026-01-28 21:14:49,879 - INFO -         💬 Tone: empathetic')
+
+    expect(state.roles.Strategist.summary.join(' ')).toContain('balanced_response')
+    expect(state.roles.Strategist.summary.join(' ')).toContain('0.443')
+    expect(state.roles.Strategist.summary.join(' ')).toContain('diplomatic')
+    expect(state.roles.Strategist.summary.join(' ')).toContain('empathetic')
+  })
+
+  it('updates Leader summary fields from USC generate/vote lines', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-28 21:14:49,879 - INFO - 🎯 Leader Agent starts USC process and generates candidate comments...')
+    state = routeLogLine(state, '2026-01-28 21:15:36,733 - INFO - ✍️  Step 3: USC-Generate - generate 6 candidate comments')
+    state = routeLogLine(state, '2026-01-28 21:18:33,636 - INFO -    🏆 Best selection: candidate_4 (total: 4.80)')
+    state = routeLogLine(state, '2026-01-28 21:18:33,636 - INFO -    Best candidate score: 4.80/5.0')
+
+    expect(state.roles.Leader.summary.join(' ')).toContain('6')
+    expect(state.roles.Leader.summary.join(' ')).toContain('candidate_4')
+    expect(state.roles.Leader.summary.join(' ')).toContain('4.80')
+  })
+
+  it('updates Amplifier summary fields from echo/likes/effectiveness lines', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-28 21:18:33,877 - INFO - ⚖️ Activating Echo Agent cluster...')
+    state = routeLogLine(state, '2026-01-28 21:18:33,877 - INFO -   📋 Echo plan: total=12, role distribution={...}')
+    state = routeLogLine(state, '2026-01-28 21:18:53,942 - INFO -   ✅ 12 echo responses generated')
+    state = routeLogLine(state, '2026-01-28 21:18:54,726 - INFO -   💖 Successfully added 240 likes to each of 2 leader comments (total: 480 likes)')
+    state = routeLogLine(state, '2026-01-28 21:18:54,727 - INFO - 🎉 Workflow completed - effectiveness score: 10.0/10')
+
+    expect(state.roles.Amplifier.summary.join(' ')).toContain('12')
+    expect(state.roles.Amplifier.summary.join(' ')).toContain('480')
+    expect(state.roles.Amplifier.summary.join(' ')).toContain('10.0/10')
+  })
 })
+

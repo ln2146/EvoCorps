@@ -31,7 +31,7 @@
     },
     "generate_own_post": true,
     "experiment": {
-        "type": "third_party_fact_checking",
+        "type": "no_fact_checking",
         "settings": {
             "posts_per_step": 10,
             "fact_checker_temperature": 0.3,
@@ -51,7 +51,7 @@
         "monitoring_interval": 30
     },
     "malicious_bot_system": {
-        "enabled": true,
+        "enabled": false,
         "cluster_size": 15,
         "attack_probability": 1.0,
         "target_post_types": [
@@ -61,5 +61,5 @@
     "prebunking_system": {
         "enabled": false
     },
-    "engine": "deepseek-chat"
+    "engine": "gemini-2.0-flash"
 }

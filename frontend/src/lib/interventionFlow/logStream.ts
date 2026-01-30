@@ -44,13 +44,25 @@ export function createSimulatedLogStream(opts: {
 }
 
 // Real backend integration seam. Expects each SSE `message` event to carry a single log line in `event.data`.
-export function createEventSourceLogStream(url: string): LogStream {
+export function createEventSourceLogStream(
+  url: string,
+  opts?: {
+    eventSourceFactory?: (url: string) => EventSource
+  },
+): LogStream {
   const handlers = new Set<LogLineHandler>()
   let es: EventSource | null = null
 
   const start = () => {
     if (es) return
-    es = new EventSource(url)
+    const factory = opts?.eventSourceFactory ?? ((u: string) => {
+      if (typeof EventSource === 'undefined') {
+        throw new Error('EventSource is not available in this environment')
+      }
+      return new EventSource(u)
+    })
+
+    es = factory(url)
     es.onmessage = (event) => {
       for (const h of handlers) h(event.data)
     }
@@ -69,4 +81,3 @@ export function createEventSourceLogStream(url: string): LogStream {
 
   return { subscribe, start, stop }
 }
-

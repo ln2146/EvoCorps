@@ -92,6 +92,7 @@ class EnhancedOpinionSystem:
             role="fact_checker",
         )
         self.embedding_client, self.embedding_model_name = self.model_selector.create_embedding_client()
+        self.embedding_dim = None
         
         # 14 topics (loaded from config)
         self.topics = TOPICS
@@ -157,7 +158,8 @@ class EnhancedOpinionSystem:
             input=text,
             model=self.embedding_model_name
         )
-        return np.array(response.data[0].embedding)
+        # Keep dtype stable; faiss expects float32 vectors.
+        return np.asarray(response.data[0].embedding, dtype='float32')
 
     def _init_embedding_cache(self, dimension: int = None):
         """Initialize the embedding cache index."""
@@ -167,6 +169,7 @@ class EnhancedOpinionSystem:
                 test_embedding = self._get_embedding_from_api("test")
                 dimension = test_embedding.shape[0]
                 print(f"🔍 Auto-detected embedding dimension: {dimension}")
+            self.embedding_dim = int(dimension)
             
             # Create FAISS index (inner product)
             self.embedding_cache_index = faiss.IndexFlatIP(dimension)
@@ -176,10 +179,17 @@ class EnhancedOpinionSystem:
             metadata_path = os.path.join(os.path.dirname(self.db_path), "embedding_cache_metadata.json")
             
             if os.path.exists(cache_path) and os.path.exists(metadata_path):
-                self.embedding_cache_index = faiss.read_index(cache_path)
-                with open(metadata_path, 'r', encoding='utf-8') as f:
-                    self.embedding_cache_metadata = json.load(f)
-                print(f"✅ Loaded embedding cache: {self.embedding_cache_index.ntotal} vectors")
+                loaded_index = faiss.read_index(cache_path)
+                # If the embedding model changed (dimension changed), the old cache is invalid.
+                if int(loaded_index.d) != int(dimension):
+                    print(f"⚠️ Embedding cache dimension mismatch: cache.d={int(loaded_index.d)} vs current={int(dimension)}; ignoring old cache")
+                    self.embedding_cache_index = faiss.IndexFlatIP(dimension)
+                    self.embedding_cache_metadata = {}
+                else:
+                    self.embedding_cache_index = loaded_index
+                    with open(metadata_path, 'r', encoding='utf-8') as f:
+                        self.embedding_cache_metadata = json.load(f)
+                    print(f"✅ Loaded embedding cache: {self.embedding_cache_index.ntotal} vectors")
             else:
                 print("📝 Creating a new embedding cache index")
                 
@@ -189,6 +199,85 @@ class EnhancedOpinionSystem:
             default_dimension = 768  # common embedding dimension
             self.embedding_cache_index = faiss.IndexFlatIP(default_dimension)
             self.embedding_cache_metadata = {}
+            self.embedding_dim = int(default_dimension)
+
+    def _ensure_embedding_dim(self) -> int:
+        """Ensure we know the active embedding dimension (may trigger a single API call)."""
+        if self.embedding_dim is not None:
+            return int(self.embedding_dim)
+        if self.embedding_cache_index is not None:
+            self.embedding_dim = int(self.embedding_cache_index.d)
+            return int(self.embedding_dim)
+        self._init_embedding_cache()
+        return int(self.embedding_dim) if self.embedding_dim is not None else int(self.embedding_cache_index.d)
+
+    def _rebuild_faiss_indexes_from_db(self):
+        """Rebuild viewpoint/keyword FAISS indexes from the DB using the current embedding model."""
+        try:
+            dim = self._ensure_embedding_dim()
+
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, viewpoint, key_words FROM viewpoints ORDER BY id")
+            rows = cursor.fetchall()
+            conn.close()
+
+            if not rows:
+                self.faiss_viewpoint_index = None
+                self.faiss_keyword_index = None
+                self.viewpoint_ids = []
+                print("📝 No viewpoints in DB; cleared FAISS indexes")
+                return
+
+            viewpoint_vectors = []
+            keyword_vectors = []
+            viewpoint_ids = []
+
+            for viewpoint_id, viewpoint, keywords in rows:
+                v = self._get_embedding(viewpoint)
+                k = self._get_embedding(keywords)
+
+                if int(v.shape[0]) != dim or int(k.shape[0]) != dim:
+                    raise ValueError(f"Embedding dim mismatch while rebuilding: expected {dim}, got v={int(v.shape[0])}, k={int(k.shape[0])}")
+
+                v = np.asarray(v, dtype='float32')
+                k = np.asarray(k, dtype='float32')
+
+                v_norm = np.linalg.norm(v)
+                k_norm = np.linalg.norm(k)
+                if not np.isfinite(v_norm) or v_norm <= 0:
+                    raise ValueError(f"Invalid viewpoint embedding norm during rebuild: {v_norm}")
+                if not np.isfinite(k_norm) or k_norm <= 0:
+                    raise ValueError(f"Invalid keyword embedding norm during rebuild: {k_norm}")
+
+                viewpoint_vectors.append(v / v_norm)
+                keyword_vectors.append(k / k_norm)
+                viewpoint_ids.append(int(viewpoint_id))
+
+            viewpoint_arr = np.stack(viewpoint_vectors, axis=0).astype('float32')
+            keyword_arr = np.stack(keyword_vectors, axis=0).astype('float32')
+
+            self.faiss_viewpoint_index = faiss.IndexFlatIP(dim)
+            self.faiss_viewpoint_index.add(viewpoint_arr)
+
+            self.faiss_keyword_index = faiss.IndexFlatIP(dim)
+            self.faiss_keyword_index.add(keyword_arr)
+
+            self.viewpoint_ids = viewpoint_ids
+
+            # Persist indexes + mapping.
+            faiss.write_index(self.faiss_viewpoint_index, self.faiss_viewpoint_index_path)
+            faiss.write_index(self.faiss_keyword_index, self.faiss_keyword_index_path)
+            import json
+            with open(self.viewpoint_ids_path, 'w', encoding='utf-8') as f:
+                json.dump(self.viewpoint_ids, f, ensure_ascii=False)
+
+            print(f"✅ Rebuilt FAISS indexes from DB: dim={dim}, viewpoints={self.faiss_viewpoint_index.ntotal}, keywords={self.faiss_keyword_index.ntotal}")
+
+        except Exception as e:
+            print(f"❌ Failed to rebuild FAISS indexes from DB: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _add_to_embedding_cache(self, text: str, embedding: np.ndarray):
         """Add embeddings to the cache."""
@@ -307,6 +396,9 @@ class EnhancedOpinionSystem:
     def _load_vectors(self):
         """Load vector indexes from FAISS files."""
         try:
+            # Determine the current embedding dimension early so we can validate persisted FAISS indexes.
+            self._ensure_embedding_dim()
+
             # Set FAISS index file paths
             db_dir = os.path.dirname(self.db_path)
             self.faiss_viewpoint_index_path = os.path.join(db_dir, "faiss_viewpoint_index.bin")
@@ -317,6 +409,10 @@ class EnhancedOpinionSystem:
             if os.path.exists(self.faiss_viewpoint_index_path):
                 self.faiss_viewpoint_index = faiss.read_index(self.faiss_viewpoint_index_path)
                 faiss_index_size = self.faiss_viewpoint_index.ntotal
+                if self.embedding_dim is not None and int(self.faiss_viewpoint_index.d) != int(self.embedding_dim):
+                    print(f"⚠️ Viewpoint FAISS index dim mismatch: index.d={int(self.faiss_viewpoint_index.d)} vs embedding_dim={int(self.embedding_dim)}; rebuilding")
+                    self._rebuild_faiss_indexes_from_db()
+                    return
                 
                 # Load viewpoint ID mapping
                 if os.path.exists(self.viewpoint_ids_path):
@@ -341,6 +437,10 @@ class EnhancedOpinionSystem:
             # Attempt to load the keyword index
             if os.path.exists(self.faiss_keyword_index_path):
                 self.faiss_keyword_index = faiss.read_index(self.faiss_keyword_index_path)
+                if self.embedding_dim is not None and self.faiss_keyword_index and int(self.faiss_keyword_index.d) != int(self.embedding_dim):
+                    print(f"⚠️ Keyword FAISS index dim mismatch: index.d={int(self.faiss_keyword_index.d)} vs embedding_dim={int(self.embedding_dim)}; rebuilding")
+                    self._rebuild_faiss_indexes_from_db()
+                    return
             else:
                 # Initialize empty keyword index
                 self.faiss_keyword_index = None
@@ -416,6 +516,17 @@ class EnhancedOpinionSystem:
             # Vectorize new content
             viewpoint_embedding = self._get_embedding(viewpoint)
             keyword_embedding = self._get_embedding(keyword)
+
+            # If existing indexes were built with a different embedding model (dimension),
+            # rebuild from DB to keep indexes consistent (and include this newly inserted row).
+            if self.faiss_viewpoint_index is not None and int(self.faiss_viewpoint_index.d) != int(viewpoint_embedding.shape[0]):
+                print(f"⚠️ Viewpoint index dim mismatch on add: index.d={int(self.faiss_viewpoint_index.d)} vs embedding_dim={int(viewpoint_embedding.shape[0])}; rebuilding from DB")
+                self._rebuild_faiss_indexes_from_db()
+                return
+            if self.faiss_keyword_index is not None and int(self.faiss_keyword_index.d) != int(keyword_embedding.shape[0]):
+                print(f"⚠️ Keyword index dim mismatch on add: index.d={int(self.faiss_keyword_index.d)} vs embedding_dim={int(keyword_embedding.shape[0])}; rebuilding from DB")
+                self._rebuild_faiss_indexes_from_db()
+                return
             
             # Normalize vectors
             viewpoint_norm = np.linalg.norm(viewpoint_embedding)
@@ -637,6 +748,10 @@ Example:
             
             # Vectorize the keyword query
             query_vector = self._get_embedding(keyword).reshape(1, -1)
+            if int(self.faiss_keyword_index.d) != int(query_vector.shape[1]):
+                print(f"⚠️ Keyword FAISS dim mismatch on search: index.d={int(self.faiss_keyword_index.d)} vs query_dim={int(query_vector.shape[1])}; rebuilding")
+                self._rebuild_faiss_indexes_from_db()
+                return {'similarity': 0.0, 'matched_keywords': None}
             query_norm = np.linalg.norm(query_vector)
             query_vector_normalized = query_vector / query_norm
             
@@ -652,7 +767,7 @@ Example:
             cursor = conn.cursor()
             
             # Collect all keywords in the order they were indexed
-            cursor.execute("SELECT DISTINCT key_words FROM viewpoints ORDER BY id")
+            cursor.execute("SELECT key_words FROM viewpoints ORDER BY id")
             db_keywords = [row[0] for row in cursor.fetchall()]
             
             conn.close()
@@ -693,6 +808,10 @@ Example:
             
             # Vectorize the opinion query
             query_vector = self._get_embedding(opinion).reshape(1, -1)
+            if int(self.faiss_viewpoint_index.d) != int(query_vector.shape[1]):
+                print(f"⚠️ Viewpoint FAISS dim mismatch on search: index.d={int(self.faiss_viewpoint_index.d)} vs query_dim={int(query_vector.shape[1])}; rebuilding")
+                self._rebuild_faiss_indexes_from_db()
+                return {'similarity': 0.0, 'viewpoint_id': None}
             query_vector_normalized = query_vector / np.linalg.norm(query_vector)
             
             # Search the FAISS index for the closest viewpoint
