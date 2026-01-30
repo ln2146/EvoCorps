@@ -3,6 +3,7 @@
 experiment_outputs/
 human_study/human_study_data.csv
 .vscode/
+.kiro/
 # General
 .DS_Store
 __pycache__/
