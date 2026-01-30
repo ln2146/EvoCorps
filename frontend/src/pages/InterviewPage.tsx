@@ -203,20 +203,6 @@ export default function InterviewPage() {
     setPostUserPages(prev => ({ ...prev, [postId]: page }))
   }
 
-  const getTotalUserCount = () => {
-    // 去重计算用户总数
-    const uniqueUsers = new Set<string>()
-    posts.forEach(post => {
-      post.interacted_users.forEach(user => {
-        uniqueUsers.add(user.user_id)
-      })
-    })
-    otherUsers.forEach(user => {
-      uniqueUsers.add(user.user_id)
-    })
-    return uniqueUsers.size
-  }
-
   const sendInterview = async () => {
     if (!question.trim() || selectedUsers.size === 0) {
       alert('请输入问题并选择至少一个用户')
@@ -412,7 +398,6 @@ export default function InterviewPage() {
                     const isExpanded = expandedPosts.has(post.post_id)
                     const postUserIds = post.interacted_users.map(u => u.user_id)
                     const allSelected = postUserIds.every(id => selectedUsers.has(id))
-                    const someSelected = postUserIds.some(id => selectedUsers.has(id))
                     
                     // 用户分页
                     const currentUserPage = getPostUserPage(post.post_id)

@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Home, Server, Activity, FlaskConical, BarChart3, Settings, ChevronLeft, ChevronRight, ArrowLeft, MessageSquare } from 'lucide-react'
+import { Home, Activity, FlaskConical, BarChart3, Settings, ChevronLeft, ChevronRight, ArrowLeft, MessageSquare } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 interface DashboardLayoutProps {

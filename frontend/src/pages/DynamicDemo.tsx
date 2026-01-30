@@ -1,7 +1,37 @@
-import { useMemo, useState, type ReactNode, type ElementType } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type ElementType } from 'react'
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { createInitialFlowState, routeLogLine, type FlowState, type Role } from '../lib/interventionFlow/logRouter'
+import { createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
+
+const DEMO_BACKEND_LOG_LINES: string[] = [
+  '2026-01-28 21:13:09,286 - INFO - 📊 Phase 1: perception and decision',
+  '2026-01-28 21:13:09,286 - INFO -   🔍 Analyst is analyzing content...',
+  '2026-01-28 21:13:42,092 - INFO -    📊 Analyst analysis completed:',
+  '2026-01-28 21:13:50,217 - INFO -       Viewpoint extremism: 8.6/10.0',
+  '2026-01-28 21:13:50,217 - INFO -       Overall sentiment: 0.10/1.0',
+  '2026-01-28 21:13:50,251 - INFO -       Needs intervention: yes',
+  '2026-01-28 21:13:50,251 - INFO -       Trigger reasons: Viewpoint extremism too high (8.6/10.0 >= 4.5) & Sentiment too low (0.10/1.0 <= 0.4)',
+  '2026-01-28 21:13:50,253 - INFO - ⚖️ Strategist is creating strategy...',
+  '2026-01-28 21:13:57,749 - INFO -      ❌ Intelligent learning system found no matching strategy, none available',
+  '2026-01-28 21:14:25,697 - INFO -         🎯 Selected optimal strategy: balanced_response',
+  '2026-01-28 21:14:49,879 - INFO - 🎯 Leader Agent starts USC process and generates candidate comments...',
+  '2026-01-28 21:15:42,523 - INFO -    Candidate 1: This post presents a claim that collapses under ba...',
+  '2026-01-28 21:18:33,636 - INFO - ✅ USC workflow completed',
+  '2026-01-28 21:18:33,637 - INFO - 💬 👑 Leader comment 1 on post post-18e9eb: This post raises serious allegations that warrant careful examination...',
+  '2026-01-28 21:18:33,877 - INFO - ⚖️ Activating Echo Agent cluster...',
+  '2026-01-28 21:18:33,892 - INFO -   🚀 Start parallel execution of 12 agent tasks...',
+  '2026-01-28 21:18:53,941 - INFO - 📊 Echo Agent results: 12 succeeded, 0 failed',
+  '2026-01-28 21:18:54,726 - INFO -   💖 Successfully added 240 likes to each of 2 leader comments (total: 480 likes)',
+  '2026-01-28 21:18:54,727 - INFO - 🎉 Workflow completed - effectiveness score: 10.0/10',
+  '2026-01-28 21:18:54,728 - INFO - 🔄 [Monitoring round 1/3]',
+  '2026-01-28 21:18:54,728 - INFO -   📊 Analyst Agent - generate baseline effectiveness report',
+  '2026-01-28 21:18:54,728 - INFO -   🔍 Analyst monitoring - establish baseline data',
+  '2026-01-28 21:24:38,434 - INFO - 🚀 Start workflow execution - Action ID: action_20260128_212438',
+  '2026-01-28 21:24:38,434 - INFO - ⚖️ Strategist is creating strategy...',
+  '2026-01-28 21:24:49,879 - INFO - 🎯 Leader Agent starts USC process and generates candidate comments...',
+]
 
 interface HeatPost {
   id: string
@@ -133,6 +163,33 @@ export default function DynamicDemo() {
   const [analysisOpen, setAnalysisOpen] = useState(false)
   const [analysisStatus, setAnalysisStatus] = useState<'Idle' | 'Running' | 'Done' | 'Error'>('Idle')
 
+  const [flowState, setFlowState] = useState<FlowState>(() => createInitialFlowState())
+  const streamRef = useRef<LogStream | null>(null)
+  const unsubscribeRef = useRef<null | (() => void)>(null)
+
+  useEffect(() => {
+    if (!enableEvoCorps) {
+      streamRef.current?.stop()
+      unsubscribeRef.current?.()
+      unsubscribeRef.current = null
+      streamRef.current = null
+    }
+  }, [enableEvoCorps])
+
+  useEffect(() => {
+    if (!isRunning || !enableEvoCorps) return
+    if (streamRef.current) return
+
+    const stream = createSimulatedLogStream({ lines: DEMO_BACKEND_LOG_LINES, intervalMs: 320 })
+    const unsubscribe = stream.subscribe((line) => {
+      setFlowState((prev) => routeLogLine(prev, line))
+    })
+    stream.start()
+
+    streamRef.current = stream
+    unsubscribeRef.current = unsubscribe
+  }, [enableEvoCorps, isRunning])
+
   const currentMetrics = data.metricsSeries[data.metricsSeries.length - 1]
 
   return (
@@ -142,10 +199,28 @@ export default function DynamicDemo() {
         onStart={() => {
           setIsRunning(true)
           sse.connect()
+          setFlowState(createInitialFlowState())
+
+          streamRef.current?.stop()
+          unsubscribeRef.current?.()
+          streamRef.current = null
+          unsubscribeRef.current = null
+
+          const stream = createSimulatedLogStream({ lines: DEMO_BACKEND_LOG_LINES, intervalMs: 320 })
+          const unsubscribe = stream.subscribe((line) => {
+            setFlowState((prev) => routeLogLine(prev, line))
+          })
+          stream.start()
+          streamRef.current = stream
+          unsubscribeRef.current = unsubscribe
         }}
         onStop={() => {
           setIsRunning(false)
           sse.disconnect()
+          streamRef.current?.stop()
+          unsubscribeRef.current?.()
+          unsubscribeRef.current = null
+          streamRef.current = null
         }}
         onBack={() => navigate('/')}
         enableAttack={enableAttack}
@@ -176,7 +251,7 @@ export default function DynamicDemo() {
 
         <div className="space-y-6">
           {enableEvoCorps ? (
-            <AgentLogsPanel logs={data.agentLogs} />
+            <InterventionFlowPanel state={flowState} />
           ) : (
             <div className="glass-card p-6 min-h-[720px] flex items-center justify-center">
               <div className="text-center space-y-3">
@@ -184,8 +259,8 @@ export default function DynamicDemo() {
                   <Shield className="text-slate-400" size={32} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-800">EvoCorps 日志面板</h3>
-                  <p className="text-sm text-slate-600">启用舆论平衡系统后展示 4 类 Agent 日志。</p>
+                  <h3 className="text-lg font-semibold text-slate-800">干预流程</h3>
+                  <p className="text-sm text-slate-600">启用舆论平衡系统后展示 4 类角色的干预流程。</p>
                 </div>
               </div>
             </div>
@@ -505,19 +580,12 @@ function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
   )
 }
 
-function AgentLogsPanel({ logs }: { logs: Record<AgentType, AgentLogItem[]> }) {
-  const [expanded, setExpanded] = useState<Record<AgentType, boolean>>({
-    Analyst: false,
-    Strategist: false,
-    Leader: false,
-    Amplifier: false,
-  })
-
-  const cards: { type: AgentType; tone: string }[] = [
-    { type: 'Analyst', tone: 'from-blue-500 to-cyan-500' },
-    { type: 'Strategist', tone: 'from-purple-500 to-blue-500' },
-    { type: 'Leader', tone: 'from-green-500 to-emerald-500' },
-    { type: 'Amplifier', tone: 'from-orange-500 to-red-500' },
+function InterventionFlowPanel({ state }: { state: FlowState }) {
+  const roles: { role: Role; tone: string; label: string }[] = [
+    { role: 'Analyst', tone: 'from-blue-500 to-cyan-500', label: 'Analyst' },
+    { role: 'Strategist', tone: 'from-purple-500 to-blue-500', label: 'Strategist' },
+    { role: 'Leader', tone: 'from-green-500 to-emerald-500', label: 'Leader' },
+    { role: 'Amplifier', tone: 'from-orange-500 to-red-500', label: 'Amplifier' },
   ]
 
   return (
@@ -526,86 +594,114 @@ function AgentLogsPanel({ logs }: { logs: Record<AgentType, AgentLogItem[]> }) {
         <div className="flex items-center gap-3">
           <Shield className="text-emerald-500" />
           <div>
-            <h2 className="text-xl font-bold text-slate-800">EvoCorps Agents 日志</h2>
-            <p className="text-sm text-slate-600">多智能体行动日志实时展示</p>
+            <h2 className="text-xl font-bold text-slate-800">干预流程</h2>
+            <p className="text-sm text-slate-600">当前运行角色高亮，运行中日志流式刷新</p>
           </div>
         </div>
       </div>
-      {cards.map((card) => (
-        <AgentLogCard
-          key={card.type}
-          title={card.type}
-          tone={card.tone}
-          logs={logs[card.type]}
-          expanded={expanded[card.type]}
-          onToggle={() =>
-            setExpanded((prev) => ({
-              ...prev,
-              [card.type]: !prev[card.type],
-            }))
-          }
+
+      {roles.map(({ role, tone, label }) => (
+        <RoleStepCard
+          key={role}
+          role={role}
+          label={label}
+          tone={tone}
+          isActive={state.activeRole === role}
+          status={state.roles[role].status}
+          before={state.roles[role].before}
+          during={state.roles[role].during}
+          after={state.roles[role].after}
         />
       ))}
     </div>
   )
 }
 
-function AgentLogCard({
-  title,
+function RoleStepCard({
+  role,
+  label,
   tone,
-  logs,
-  expanded,
-  onToggle,
+  isActive,
+  status,
+  before,
+  during,
+  after,
 }: {
-  title: AgentType
+  role: Role
+  label: string
   tone: string
-  logs: AgentLogItem[]
-  expanded: boolean
-  onToggle: () => void
+  isActive: boolean
+  status: 'idle' | 'running' | 'done' | 'error'
+  before: string
+  during: string[]
+  after?: string[]
 }) {
+  const statusTone: Record<'idle' | 'running' | 'done' | 'error', 'muted' | 'warning' | 'success' | 'danger'> = {
+    idle: 'muted',
+    running: 'warning',
+    done: 'success',
+    error: 'danger',
+  }
+
   return (
-    <div className="glass-card p-5">
-      <div className="flex items-center justify-between gap-3 mb-3">
+    <div
+      className={[
+        'glass-card transition-all duration-300',
+        isActive ? 'p-6 scale-[1.02] ring-2 ring-emerald-200 shadow-2xl' : 'p-4 opacity-90',
+      ].join(' ')}
+      aria-current={isActive ? 'step' : undefined}
+      data-role={role}
+    >
+      <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl bg-gradient-to-r ${tone} flex items-center justify-center text-white font-semibold`}>
-            {title.charAt(0)}
+          <div className={[
+            'w-10 h-10 rounded-xl bg-gradient-to-r flex items-center justify-center text-white font-semibold',
+            tone,
+          ].join(' ')}
+          >
+            {label.charAt(0)}
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
-            <p className="text-xs text-slate-500">实时日志流</p>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-slate-800">{label}</h3>
+              <StatusBadge label={status.toUpperCase()} tone={statusTone[status]} />
+            </div>
+            <p className="text-xs text-slate-600">{before}</p>
           </div>
         </div>
-        <button
-          onClick={onToggle}
-          className="w-9 h-9 rounded-full bg-white/80 border border-white/40 shadow-lg flex items-center justify-center text-slate-600 hover:bg-white transition-all"
-          title={expanded ? '折叠日志' : '展开日志'}
-        >
-          {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-        </button>
+
+        <div className="text-xs text-slate-500">
+          {isActive ? '运行中日志' : after?.length ? '上次结果' : '尚未运行'}
+        </div>
       </div>
-      {expanded ? (
-        <LogList logs={logs} />
-      ) : (
-        <div className="text-xs text-slate-500 bg-white/60 border border-white/40 rounded-xl px-3 py-2">
-          日志已折叠
+
+      {isActive ? (
+        <div className="mt-4 bg-white/60 border border-white/40 rounded-2xl p-4">
+          <div className="space-y-2 max-h-64 overflow-auto pr-1">
+            {during.length ? (
+              during.map((line, idx) => (
+                <div key={`${role}_${idx}`} className="text-sm text-slate-700 leading-relaxed break-words">
+                  {line}
+                </div>
+              ))
+            ) : (
+              <div className="text-sm text-slate-500">等待日志...</div>
+            )}
+          </div>
         </div>
-      )}
+      ) : after?.length ? (
+        <div className="mt-3 bg-white/60 border border-white/40 rounded-2xl px-4 py-3 space-y-1">
+          {after.slice(0, 2).map((line, idx) => (
+            <div key={`${role}_after_${idx}`} className="text-xs text-slate-600 break-words line-clamp-2">
+              {line}
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }
 
-function LogList({ logs }: { logs: AgentLogItem[] }) {
-  return (
-    <div className="space-y-2 max-h-48 overflow-auto pr-1">
-      {logs.map((log) => (
-        <div key={log.id} className="bg-white/70 rounded-xl p-3 text-sm text-slate-700 border border-white/40">
-          <div className="text-xs text-slate-500 mb-1">{log.ts}</div>
-          <p>{log.message}</p>
-        </div>
-      ))}
-    </div>
-  )
-}
 
 function CommentaryAnalysisPanel({ status, onOpenConfig, onRun }: { status: 'Idle' | 'Running' | 'Done' | 'Error'; onOpenConfig: () => void; onRun: () => void }) {
   return (

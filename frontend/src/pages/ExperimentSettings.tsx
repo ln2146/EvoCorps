@@ -127,7 +127,7 @@ export default function ExperimentSettings() {
     setLoading(serviceId)
     try {
       const payload = condaEnv.trim() ? { conda_env: condaEnv.trim() } : {}
-      const response = await axios.post(`/api/services/${serviceId}/start`, payload)
+      await axios.post(`/api/services/${serviceId}/start`, payload)
       await loadStatus()
       alert(`服务启动成功！请查看新打开的CMD窗口。`)
     } catch (error: any) {
