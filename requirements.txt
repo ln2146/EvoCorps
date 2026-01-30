@@ -39,3 +39,4 @@ wikipedia-api
 faiss-cpu
 flask
 flask-cors
+psutil
