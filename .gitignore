@@ -19,6 +19,7 @@ env.bak/
 venv.bak/
 .idea/
 organized_comments_from_jsonl
+/tests
 
 *.db
 *.db-shm
