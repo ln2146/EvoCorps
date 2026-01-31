@@ -6,6 +6,7 @@ import { createInitialFlowState, routeLogLine, type FlowState, type Role } from 
 import { createEventSourceLogStream, createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
 import { computeEffectiveRole, nextSelectedRoleOnTabClick } from '../lib/interventionFlow/selection'
 import { shouldShowDetailStatusLabel } from '../lib/interventionFlow/statusLabel'
+import { parsePostContent } from '../lib/interventionFlow/postContent'
 
 const DEMO_BACKEND_LOG_LINES: string[] = [
   '2026-01-28 21:13:09,286 - INFO - 📊 Phase 1: perception and decision',
@@ -727,15 +728,6 @@ function InterventionFlowPanel({ state, enabled }: { state: FlowState; enabled: 
   const roleState = state.roles[effectiveRole]
   const isLive = enabled && state.activeRole === effectiveRole && roleState.status === 'running'
 
-  // Hide internal fact labels like "Decision:" in the small selector cards.
-  const simplifySubtitle = (s: string) => {
-    const v = s.replace(/^[A-Za-z_ ]+:\s*/, '').trim()
-    if (!v) return null
-    if (v === '—') return null
-    if (v.toLowerCase() === 'pending') return null
-    return v
-  }
-
   return (
     <div className="glass-card p-6 h-[640px] flex flex-col min-h-0">
       <div className="flex items-start justify-between gap-4">
@@ -751,12 +743,6 @@ function InterventionFlowPanel({ state, enabled }: { state: FlowState; enabled: 
         roles={roles}
         activeRole={state.activeRole}
         effectiveRole={effectiveRole}
-        roleSubtitles={{
-          Analyst: simplifySubtitle(state.roles.Analyst.summary[0]),
-          Strategist: simplifySubtitle(state.roles.Strategist.summary[0]),
-          Leader: simplifySubtitle(state.roles.Leader.summary[3]),
-          Amplifier: simplifySubtitle(state.roles.Amplifier.summary[3]),
-        }}
         roleStatuses={{
           Analyst: state.roles.Analyst.status,
           Strategist: state.roles.Strategist.status,
@@ -776,6 +762,7 @@ function InterventionFlowPanel({ state, enabled }: { state: FlowState; enabled: 
         summary={roleState.summary}
         during={roleState.during}
         after={roleState.after}
+        context={state.context}
       />
     </div>
   )
@@ -786,7 +773,6 @@ function RoleTabsRow({
   roles,
   activeRole,
   effectiveRole,
-  roleSubtitles,
   roleStatuses,
   onSelect,
 }: {
@@ -794,22 +780,20 @@ function RoleTabsRow({
   roles: { role: Role; tone: string; label: string }[]
   activeRole: Role | null
   effectiveRole: Role
-  roleSubtitles: Record<Role, string | null>
   roleStatuses: Record<Role, 'idle' | 'running' | 'done' | 'error'>
   onSelect: (role: Role) => void
 }) {
   return (
     <div className="mt-4 grid grid-cols-2 gap-2">
       {roles.map(({ role, tone, label }) => {
-          const isSelected = effectiveRole === role
-          const isActive = enabled && activeRole === role
-          const status = roleStatuses[role]
-          const subtitle = roleSubtitles[role]
+        const isSelected = effectiveRole === role
+        const isActive = enabled && activeRole === role
+        const status = roleStatuses[role]
 
-          return (
-            <button
-              key={role}
-              onClick={() => onSelect(role)}
+        return (
+          <button
+            key={role}
+            onClick={() => onSelect(role)}
               className={[
                 'w-full rounded-2xl border transition-all duration-200 px-3 py-2 text-left min-w-0 box-border',
                 isSelected
@@ -829,7 +813,6 @@ function RoleTabsRow({
                   </div>
                   <div className="min-w-0">
                     <div className="text-sm font-semibold text-slate-800 truncate">{label}</div>
-                    {subtitle ? <div className="text-[11px] text-slate-600 truncate">{subtitle}</div> : null}
                   </div>
                 </div>
                 <div className="shrink-0 flex items-center gap-2">
@@ -859,6 +842,7 @@ function RoleDetailSection({
   summary,
   during,
   after,
+  context,
 }: {
   role: Role
   label: string
@@ -869,10 +853,28 @@ function RoleDetailSection({
   summary: string[]
   during: string[]
   after?: string[]
+  context: FlowState['context']
 }) {
   const displayLines = isLive ? during : (after ?? [])
   const emptyHintPrimary = !enabled ? '未启用：开启舆论平衡后自动接入实时日志流' : '等待系统输出…'
   const emptyHintSecondary = !enabled ? null : '开启舆论平衡后将自动订阅 workflow 日志流'
+  const [postExpanded, setPostExpanded] = useState(false)
+  const parsedPost = useMemo(() => {
+    if (!context.postContent) return null
+    return parsePostContent(context.postContent, { previewChars: 220 })
+  }, [context.postContent])
+
+  useEffect(() => {
+    // Switching role or post should collapse back to the compact preview to avoid long "walls of text".
+    setPostExpanded(false)
+  }, [role, context.postContent])
+
+  const pills = [
+    ...(typeof context.feedScore === 'number' ? [`热度分：${context.feedScore.toFixed(2)}`] : []),
+    ...summary
+      .map((s) => s.trim())
+      .filter((s) => Boolean(s) && !/^置信度：—$/.test(s)),
+  ]
 
   return (
     <div className="mt-4 min-h-0 flex-1 flex flex-col" aria-current="step" data-role={role}>
@@ -900,12 +902,71 @@ function RoleDetailSection({
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        {summary.slice(0, 4).map((line, idx) => (
-          <div key={`${role}_summary_${idx}`} className="text-xs text-slate-700 px-3 py-2 rounded-xl bg-white/60 border border-white/40 truncate">
-            {line}
-          </div>
-        ))}
+        {pills.length ? (
+          pills.slice(0, 4).map((line, idx) => (
+            <div key={`${role}_summary_${idx}`} className="text-xs text-slate-700 px-3 py-2 rounded-xl bg-white/60 border border-white/40 truncate">
+              {line}
+            </div>
+          ))
+        ) : (
+          <div className="col-span-2 text-xs text-slate-500">暂无关键指标</div>
+        )}
       </div>
+
+      {role === 'Analyst' && parsedPost ? (
+        <div className="mt-4 bg-white/60 border border-white/40 rounded-2xl p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <div className="text-xs font-semibold text-slate-700">帖子内容</div>
+                {parsedPost.tag ? (
+                  <span className="text-[10px] font-semibold text-slate-700 px-2 py-1 rounded-full bg-white/70 border border-white/40 shrink-0">
+                    {parsedPost.tag}
+                  </span>
+                ) : null}
+              </div>
+              {parsedPost.title ? (
+                <div className="mt-1 text-sm font-semibold text-slate-800 leading-snug line-clamp-2 break-words">
+                  {parsedPost.title}
+                </div>
+              ) : null}
+            </div>
+            {parsedPost.preview.endsWith('…') ? (
+              <button
+                type="button"
+                className="text-xs font-semibold text-slate-700 px-3 py-2 rounded-xl bg-white/70 border border-white/40 hover:bg-white/90 transition-colors shrink-0"
+                onClick={() => setPostExpanded((v) => !v)}
+              >
+                {postExpanded ? '收起全文' : '展开全文'}
+              </button>
+            ) : null}
+          </div>
+
+          <div className={postExpanded ? 'mt-3 max-h-56 overflow-auto pr-1' : 'mt-3'}>
+            <div
+              className={[
+                'text-sm text-slate-700 leading-relaxed break-words',
+                postExpanded ? 'whitespace-pre-wrap' : 'line-clamp-4',
+              ].join(' ')}
+            >
+              {postExpanded ? parsedPost.full : parsedPost.preview}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {role === 'Leader' && context.leaderComments.length ? (
+        <div className="mt-4 bg-white/60 border border-white/40 rounded-2xl p-4">
+          <div className="text-xs font-semibold text-slate-700 mb-2">领袖评论</div>
+          <div className="space-y-3">
+            {context.leaderComments.map((c, idx) => (
+              <div key={`leader_comment_${idx}`} className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words">
+                {c}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-4 bg-white/60 border border-white/40 rounded-2xl p-4 min-h-0 flex-1">
         <div className="space-y-2 h-full overflow-auto pr-1">

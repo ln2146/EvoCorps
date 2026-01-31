@@ -24,18 +24,18 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:13:09,286 - INFO -   🔍 Analyst is analyzing content...')
     expect(state.activeRole).toBe('Analyst')
     expect(state.roles.Analyst.status).toBe('running')
-    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('Analyst: Analysis started')
+    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('分析师：开始分析')
 
     state = routeLogLine(state, '2026-01-28 21:13:42,092 - INFO -    📊 Analyst analysis completed:')
     expect(state.activeRole).toBe('Analyst')
-    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('Analyst: Analysis completed')
+    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('分析师：完成分析')
 
     state = routeLogLine(state, '2026-01-28 21:13:50,253 - INFO - ⚖️ Strategist is creating strategy...')
     expect(state.activeRole).toBe('Strategist')
     expect(state.roles.Analyst.status).toBe('done')
     expect(state.roles.Analyst.after?.length).toBeGreaterThan(0)
     expect(state.roles.Analyst.during).toEqual([])
-    expect(state.roles.Strategist.during[state.roles.Strategist.during.length - 1]).toBe('Strategist: Strategy drafting')
+    expect(state.roles.Strategist.during[state.roles.Strategist.during.length - 1]).toBe('战略家：生成策略')
   })
 
   it('keeps lines under Amplifier after activating echo cluster (sticky) even if they contain Leader keywords', () => {
@@ -50,7 +50,7 @@ describe('routeLogLine', () => {
 
     state = routeLogLine(state, '2026-01-28 21:18:33,637 - INFO - 💬 👑 Leader comment 1 on post post-18e9eb: ...')
     expect(state.activeRole).toBe('Amplifier')
-    expect(state.roles.Amplifier.during[state.roles.Amplifier.during.length - 1]).toBe('Leader: Comment posted (1)')
+    expect(state.roles.Amplifier.during[state.roles.Amplifier.during.length - 1]).toBe('领袖：评论已发布（1）')
   })
 
   it('releases amplifier sticky on monitoring and allows switching back to Analyst', () => {
@@ -78,11 +78,11 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:13:50,251 - INFO -       Urgency level: 3')
     state = routeLogLine(state, '2026-01-28 21:13:50,251 - INFO -       Trigger reasons: Viewpoint extremism too high & Sentiment too low')
 
-    expect(state.roles.Analyst.summary[0]).toContain('Decision:')
+    expect(state.roles.Analyst.summary[0]).toContain('判定：')
     expect(state.roles.Analyst.summary[0]).toContain('U3')
     expect(state.roles.Analyst.summary[1]).toContain('8.6/10.0')
     expect(state.roles.Analyst.summary[2]).toContain('0.10/1.0')
-    expect(state.roles.Analyst.summary[3]).toContain('Trigger')
+    expect(state.roles.Analyst.summary[3]).toContain('触发原因：')
   })
 
   it('updates Strategist summary fields from strategy selection lines', () => {
@@ -94,9 +94,9 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:14:49,879 - INFO -      👑 Leader style: diplomatic')
     state = routeLogLine(state, '2026-01-28 21:14:49,879 - INFO -         💬 Tone: empathetic')
 
-    expect(state.roles.Strategist.summary.join(' ')).toContain('Strategy:')
+    expect(state.roles.Strategist.summary.join(' ')).toContain('策略：')
     expect(state.roles.Strategist.summary.join(' ')).toContain('balanced_response')
-    expect(state.roles.Strategist.summary.join(' ')).toContain('Confidence: 0.443')
+    expect(state.roles.Strategist.summary.join(' ')).toContain('置信度：0.443')
     expect(state.roles.Strategist.summary.join(' ')).toContain('diplomatic')
     expect(state.roles.Strategist.summary.join(' ')).toContain('empathetic')
   })
@@ -109,9 +109,9 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:18:33,636 - INFO -    🏆 Best selection: candidate_4 (total: 4.80)')
     state = routeLogLine(state, '2026-01-28 21:18:33,636 - INFO -    Best candidate score: 4.80/5.0')
 
-    expect(state.roles.Leader.summary.join(' ')).toContain('Candidates: 6')
-    expect(state.roles.Leader.summary.join(' ')).toContain('Selected: candidate_4')
-    expect(state.roles.Leader.summary.join(' ')).toContain('Score: 4.80')
+    expect(state.roles.Leader.summary.join(' ')).toContain('候选：6')
+    expect(state.roles.Leader.summary.join(' ')).toContain('选定：candidate_4')
+    expect(state.roles.Leader.summary.join(' ')).toContain('评分：4.80')
   })
 
   it('updates Leader publish summary when leader comment is posted', () => {
@@ -120,7 +120,7 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:14:49,879 - INFO - 🎯 Leader Agent starts USC process and generates candidate comments...')
     state = routeLogLine(state, '2026-01-28 21:18:33,637 - INFO - 💬 👑 Leader comment 1 on post post-18e9eb: ...')
 
-    expect(state.roles.Leader.summary[3]).toContain('Posted')
+    expect(state.roles.Leader.summary[3]).toContain('发布：')
     expect(state.roles.Leader.summary[3]).toContain('1')
   })
 
@@ -134,7 +134,25 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:18:54,727 - INFO - 🎉 Workflow completed - effectiveness score: 10.0/10')
 
     expect(state.roles.Amplifier.summary.join(' ')).toContain('12')
-    expect(state.roles.Amplifier.summary.join(' ')).toContain('Boost: +480')
-    expect(state.roles.Amplifier.summary.join(' ')).toContain('Effectiveness: 10.0/10')
+    expect(state.roles.Amplifier.summary.join(' ')).toContain('点赞：+480')
+    expect(state.roles.Amplifier.summary.join(' ')).toContain('效果：10.0/10')
+  })
+
+  it('stores full post content and feed score in context', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-28 21:24:38,434 - INFO - Feed score: 27.10')
+    state = routeLogLine(state, '2026-01-28 21:24:38,434 - INFO - Post content: [NEWS] Hello world...')
+
+    expect(state.context.feedScore).toBeCloseTo(27.1)
+    expect(state.context.postContent).toBe('[NEWS] Hello world...')
+  })
+
+  it('stores full leader comment bodies in context', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-28 21:18:33,637 - INFO - 💬 👑 Leader comment 1 on post post-18e9eb: Full body here')
+
+    expect(state.context.leaderComments).toEqual(['Full body here'])
   })
 })

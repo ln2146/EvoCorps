@@ -4,28 +4,33 @@ import { toUserMilestone } from './milestones'
 
 describe('toUserMilestone', () => {
   it('maps Analyst lines', () => {
-    expect(toUserMilestone('🔍 Analyst is analyzing content...')).toBe('Analyst: Analysis started')
-    expect(toUserMilestone('📊 Analyst analysis completed:')).toBe('Analyst: Analysis completed')
-    expect(toUserMilestone('Needs intervention: yes')).toBe('Analyst: Intervention required')
+    expect(toUserMilestone('🔍 Analyst is analyzing content...')).toBe('分析师：开始分析')
+    expect(toUserMilestone('📊 Analyst analysis completed:')).toBe('分析师：完成分析')
+    expect(toUserMilestone('📊 Total weight calculated: 34.0 (based on 4 comments: 2 hot + 2 latest)')).toBe('分析师：权重汇总')
+    expect(toUserMilestone('📊 Weighted per-comment sentiment: 0.10/1.0 (based on 4 selected comments: 2 hot + 2 latest)')).toBe('分析师：情绪汇总')
+    expect(toUserMilestone('Viewpoint extremism: 8.6/10.0')).toBe('分析师：极端度计算')
+    expect(toUserMilestone('Overall sentiment: 0.10/1.0')).toBe('分析师：情绪计算')
+    expect(toUserMilestone('Trigger reasons: Viewpoint extremism too high & Sentiment too low')).toBe('分析师：触发原因确定')
+    expect(toUserMilestone('Needs intervention: yes')).toBe('分析师：判定需要干预')
   })
 
   it('maps Strategist lines', () => {
-    expect(toUserMilestone('⚖️ Strategist is creating strategy...')).toBe('Strategist: Strategy drafting')
-    expect(toUserMilestone('🎯 Selected optimal strategy: balanced_response')).toBe('Strategist: Strategy selected (balanced_response)')
+    expect(toUserMilestone('⚖️ Strategist is creating strategy...')).toBe('战略家：生成策略')
+    expect(toUserMilestone('🎯 Selected optimal strategy: balanced_response')).toBe('战略家：策略选定（balanced_response）')
   })
 
   it('maps Leader lines', () => {
-    expect(toUserMilestone('✍️  Step 3: USC-Generate - generate 6 candidate comments')).toBe('Leader: Candidates generated (6)')
-    expect(toUserMilestone('🏆 Best selection: candidate_4 (total: 4.80)')).toBe('Leader: Best selection (candidate_4)')
-    expect(toUserMilestone('💬 👑 Leader comment 1 on post post-18e9eb: ...')).toBe('Leader: Comment posted (1)')
+    expect(toUserMilestone('✍️  Step 3: USC-Generate - generate 6 candidate comments')).toBe('领袖：生成候选（6）')
+    expect(toUserMilestone('🏆 Best selection: candidate_4 (total: 4.80)')).toBe('领袖：选定版本（candidate_4）')
+    expect(toUserMilestone('💬 👑 Leader comment 1 on post post-18e9eb: ...')).toBe('领袖：评论已发布（1）')
   })
 
   it('maps Amplifier lines', () => {
-    expect(toUserMilestone('⚖️ Activating Echo Agent cluster...')).toBe('Amplifier: Echo cluster activated')
-    expect(toUserMilestone('📋 Echo plan: total=12, role distribution={...}')).toBe('Amplifier: Echo plan (12)')
-    expect(toUserMilestone('✅ 12 echo responses generated')).toBe('Amplifier: Responses generated (12)')
-    expect(toUserMilestone('💖 Successfully added 240 likes to each of 2 leader comments (total: 480 likes)')).toBe('Amplifier: Likes boosted (+480)')
-    expect(toUserMilestone('🎉 Workflow completed - effectiveness score: 10.0/10')).toBe('Amplifier: Effectiveness (10.0/10)')
+    expect(toUserMilestone('⚖️ Activating Echo Agent cluster...')).toBe('扩音器：启动回声集群')
+    expect(toUserMilestone('📋 Echo plan: total=12, role distribution={...}')).toBe('扩音器：集群规模（12）')
+    expect(toUserMilestone('✅ 12 echo responses generated')).toBe('扩音器：生成回应（12）')
+    expect(toUserMilestone('💖 Successfully added 240 likes to each of 2 leader comments (total: 480 likes)')).toBe('扩音器：点赞放大（+480）')
+    expect(toUserMilestone('🎉 Workflow completed - effectiveness score: 10.0/10')).toBe('扩音器：效果评分（10.0/10）')
   })
 
   it('returns null for infra noise', () => {
@@ -34,5 +39,9 @@ describe('toUserMilestone', () => {
     expect(toUserMilestone('Wikipedia: language=en')).toBeNull()
     expect(toUserMilestone('📊 Cache status: embedding=1')).toBeNull()
   })
-})
 
+  it('returns null for full-rendered content lines', () => {
+    expect(toUserMilestone('Post content: hello world')).toBeNull()
+    expect(toUserMilestone('Feed score: 27.10')).toBeNull()
+  })
+})
