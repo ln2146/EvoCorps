@@ -1,3 +1,5 @@
+import { toUserMilestone } from './milestones'
+
 export type Role = 'Analyst' | 'Strategist' | 'Leader' | 'Amplifier'
 export type RoleStatus = 'idle' | 'running' | 'done' | 'error'
 
@@ -30,10 +32,10 @@ const ROLE_BEFORE_COPY: Record<Role, string> = {
 
 // Option B: 4 fixed rows per role (stable layout; values update as logs arrive).
 const ROLE_SUMMARY_DEFAULT: Record<Role, [string, string, string, string]> = {
-  Analyst: ['干预: 待评估', '极端度: —', '情绪: —', 'Trigger: —'],
-  Strategist: ['策略: —', '置信度: —', '风格: —', '论点: —'],
-  Leader: ['候选: —', '最优: —', '得分: —', '发布: —'],
-  Amplifier: ['Echo: —', '回应: —', '点赞: —', '效果: —'],
+  Analyst: ['Decision: pending', 'Extremism: —', 'Sentiment: —', 'Trigger: —'],
+  Strategist: ['Strategy: —', 'Confidence: —', 'Style: —', 'Core: —'],
+  Leader: ['Candidates: —', 'Selected: —', 'Score: —', 'Posted: —'],
+  Amplifier: ['Echo: —', 'Replies: —', 'Boost: —', 'Effectiveness: —'],
 }
 
 const analystAnchors = [
@@ -134,10 +136,10 @@ function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): 
   // Analyst: decision + core metrics.
   {
     const mExt = cleanLine.match(/Viewpoint extremism:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
-    if (mExt) update('Analyst', 1, `极端度: ${mExt[1].replace(/\s+/g, '')}`)
+    if (mExt) update('Analyst', 1, `Extremism: ${mExt[1].replace(/\s+/g, '')}`)
 
     const mSent = cleanLine.match(/Overall sentiment:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
-    if (mSent) update('Analyst', 2, `情绪: ${mSent[1].replace(/\s+/g, '')}`)
+    if (mSent) update('Analyst', 2, `Sentiment: ${mSent[1].replace(/\s+/g, '')}`)
 
     const mReasons = cleanLine.match(/Trigger reasons:\s*(.+)$/i)
     if (mReasons) update('Analyst', 3, `Trigger: ${truncateEnd(mReasons[1], 80)}`)
@@ -149,9 +151,10 @@ function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): 
       const curUrg = cur.match(/\bU(\d+)\b/i)
       const urgency = Number(urg?.[1] ?? curUrg?.[1] ?? NaN)
       const needTxt = needs ? (needs[1].toLowerCase() === 'yes' ? '需要' : '不需要') : undefined
-      const curNeed = cur.match(/^干预:\s*([^\s(]+)/)?.[1]
-      const finalNeed = needTxt ?? curNeed ?? '待评估'
-      const withUrg = Number.isFinite(urgency) ? `干预: ${finalNeed} (U${urgency})` : `干预: ${finalNeed}`
+      const curNeed = cur.match(/^Decision:\s*([^\s(]+)/)?.[1]
+      const finalNeed = needTxt ?? curNeed ?? 'pending'
+      const decision = finalNeed === '需要' ? 'required' : finalNeed === '不需要' ? 'not_required' : finalNeed
+      const withUrg = Number.isFinite(urgency) ? `Decision: ${decision} (U${urgency})` : `Decision: ${decision}`
       update('Analyst', 0, withUrg)
     }
   }
@@ -159,38 +162,48 @@ function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): 
   // Strategist: strategy selection + leader style.
   {
     const mSel = cleanLine.match(/Selected optimal strategy:\s*([a-z0-9_ -]+)/i)
-    if (mSel) update('Strategist', 0, `策略: ${mSel[1].trim()}`)
+    if (mSel) update('Strategist', 0, `Strategy: ${mSel[1].trim()}`)
 
     const mRec = cleanLine.match(/Recommended strategy:\s*([a-z0-9_ -]+),\s*confidence:\s*([0-9.]+)/i)
     if (mRec) {
-      update('Strategist', 0, `策略: ${mRec[1].trim()}`)
-      update('Strategist', 1, `置信度: ${mRec[2]}`)
+      update('Strategist', 0, `Strategy: ${mRec[1].trim()}`)
+      update('Strategist', 1, `Confidence: ${mRec[2]}`)
     }
 
     const style = cleanLine.match(/Leader style:\s*([a-z0-9_ -]+)/i)?.[1]?.trim()
     const tone = cleanLine.match(/Tone:\s*([a-z0-9_ -]+)/i)?.[1]?.trim()
     if (style || tone) {
-      const cur = roles.Strategist.summary[2].replace(/^风格:\s*/i, '').trim()
+      const cur = roles.Strategist.summary[2].replace(/^Style:\s*/i, '').trim()
       const parts = new Set<string>(cur && cur !== '—' ? cur.split('/').map((s) => s.trim()).filter(Boolean) : [])
       if (style) parts.add(style)
       if (tone) parts.add(tone)
-      update('Strategist', 2, `风格: ${parts.size ? Array.from(parts).join(' / ') : '—'}`)
+      update('Strategist', 2, `Style: ${parts.size ? Array.from(parts).join(' / ') : '—'}`)
     }
 
     const arg = cleanLine.match(/Core argument:\s*(.+)$/i)?.[1]?.trim()
-    if (arg) update('Strategist', 3, `论点: ${truncateEnd(arg, 80)}`)
+    if (arg) update('Strategist', 3, `Core: ${truncateEnd(arg, 80)}`)
   }
 
   // Leader: generation/vote outcomes.
   {
     const mGen = cleanLine.match(/generate\s+(\d+)\s+candidate comments/i)
-    if (mGen) update('Leader', 0, `候选: ${mGen[1]}`)
+    if (mGen) update('Leader', 0, `Candidates: ${mGen[1]}`)
 
     const mBest = cleanLine.match(/Best selection:\s*(candidate_\d+)/i)
-    if (mBest) update('Leader', 1, `最优: ${mBest[1]}`)
+    if (mBest) update('Leader', 1, `Selected: ${mBest[1]}`)
 
     const mScore = cleanLine.match(/Best candidate score:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
-    if (mScore) update('Leader', 2, `得分: ${mScore[1].replace(/\s+/g, '')}`)
+    if (mScore) update('Leader', 2, `Score: ${mScore[1].replace(/\s+/g, '')}`)
+
+    // Publish: use the ordinal in "Leader comment N on post ..." as a stable count signal.
+    const mPosted = cleanLine.match(/^💬\s*👑\s*Leader comment\s+(\d+)\s+on\s+post\b/i)
+    if (mPosted) {
+      const nextN = Number(mPosted[1])
+      const cur = roles.Leader.summary[3]
+      const curN = Number(cur.match(/\b(\d+)\b/)?.[1] ?? NaN)
+      const n = Number.isFinite(curN) ? Math.max(curN, nextN) : nextN
+      update('Leader', 3, `Posted: ${n}`)
+    }
   }
 
   // Amplifier: echo size + likes + effectiveness.
@@ -199,34 +212,24 @@ function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): 
     if (mTotal) update('Amplifier', 0, `Echo: ${mTotal[1]}`)
 
     const mResp = cleanLine.match(/(\d+)\s+echo responses generated/i)
-    if (mResp) update('Amplifier', 1, `回应: ${mResp[1]}`)
+    if (mResp) update('Amplifier', 1, `Replies: ${mResp[1]}`)
 
     const mLikes = cleanLine.match(/\(total:\s*(\d+)\s+likes\)/i)
-    if (mLikes) update('Amplifier', 2, `点赞: +${mLikes[1]}`)
+    if (mLikes) update('Amplifier', 2, `Boost: +${mLikes[1]}`)
 
     const mEff = cleanLine.match(/effectiveness score:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
-    if (mEff) update('Amplifier', 3, `效果: ${mEff[1].replace(/\s+/g, '')}`)
+    if (mEff) update('Amplifier', 3, `Effectiveness: ${mEff[1].replace(/\s+/g, '')}`)
   }
 
   return roles
 }
 
 function compressDisplayLine(cleanLine: string) {
-  // Keep the original language but drop huge bodies. (We still avoid timestamps in UI upstream.)
-  const leaderComment = cleanLine.match(/^💬\s*👑\s*Leader comment\s+(\d+)\s+on\s+post\b/i)
-  if (leaderComment) return `💬 👑 Leader comment posted (${leaderComment[1]})`
-
-  if (/^💬\s*🤖\s*Echo-\d+\b/i.test(cleanLine) && /\bcommented:/i.test(cleanLine)) {
-    return '💬 🤖 Echo commented'
-  }
-
-  if (cleanLine.length > 140) {
-    const idx = cleanLine.indexOf(':')
-    if (idx > 0 && idx < 80) return `${cleanLine.slice(0, idx + 1)} …`
-    return `${cleanLine.slice(0, 140)}…`
-  }
-
-  return cleanLine
+  const milestone = toUserMilestone(cleanLine)
+  if (milestone) return milestone
+  // Fallback: short truncated line, but avoid dumping full bodies.
+  if (cleanLine.length > 96) return `${cleanLine.slice(0, 95)}…`
+  return cleanLine.trim()
 }
 
 function pushAggregated(prev: string[], nextLine: string, maxLines: number) {
@@ -339,4 +342,3 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
     roles: nextRoles,
   }
 }
-

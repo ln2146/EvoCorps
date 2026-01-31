@@ -24,18 +24,18 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:13:09,286 - INFO -   🔍 Analyst is analyzing content...')
     expect(state.activeRole).toBe('Analyst')
     expect(state.roles.Analyst.status).toBe('running')
-    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('🔍 Analyst is analyzing content...')
+    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('Analyst: Analysis started')
 
     state = routeLogLine(state, '2026-01-28 21:13:42,092 - INFO -    📊 Analyst analysis completed:')
     expect(state.activeRole).toBe('Analyst')
-    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('📊 Analyst analysis completed:')
+    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('Analyst: Analysis completed')
 
     state = routeLogLine(state, '2026-01-28 21:13:50,253 - INFO - ⚖️ Strategist is creating strategy...')
     expect(state.activeRole).toBe('Strategist')
     expect(state.roles.Analyst.status).toBe('done')
     expect(state.roles.Analyst.after?.length).toBeGreaterThan(0)
     expect(state.roles.Analyst.during).toEqual([])
-    expect(state.roles.Strategist.during[state.roles.Strategist.during.length - 1]).toBe('⚖️ Strategist is creating strategy...')
+    expect(state.roles.Strategist.during[state.roles.Strategist.during.length - 1]).toBe('Strategist: Strategy drafting')
   })
 
   it('keeps lines under Amplifier after activating echo cluster (sticky) even if they contain Leader keywords', () => {
@@ -50,7 +50,7 @@ describe('routeLogLine', () => {
 
     state = routeLogLine(state, '2026-01-28 21:18:33,637 - INFO - 💬 👑 Leader comment 1 on post post-18e9eb: ...')
     expect(state.activeRole).toBe('Amplifier')
-    expect(state.roles.Amplifier.during[state.roles.Amplifier.during.length - 1]).toBe('💬 👑 Leader comment posted (1)')
+    expect(state.roles.Amplifier.during[state.roles.Amplifier.during.length - 1]).toBe('Leader: Comment posted (1)')
   })
 
   it('releases amplifier sticky on monitoring and allows switching back to Analyst', () => {
@@ -78,8 +78,8 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:13:50,251 - INFO -       Urgency level: 3')
     state = routeLogLine(state, '2026-01-28 21:13:50,251 - INFO -       Trigger reasons: Viewpoint extremism too high & Sentiment too low')
 
-    expect(state.roles.Analyst.summary[0]).toContain('干预')
-    expect(state.roles.Analyst.summary[0]).toContain('3')
+    expect(state.roles.Analyst.summary[0]).toContain('Decision:')
+    expect(state.roles.Analyst.summary[0]).toContain('U3')
     expect(state.roles.Analyst.summary[1]).toContain('8.6/10.0')
     expect(state.roles.Analyst.summary[2]).toContain('0.10/1.0')
     expect(state.roles.Analyst.summary[3]).toContain('Trigger')
@@ -94,8 +94,9 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:14:49,879 - INFO -      👑 Leader style: diplomatic')
     state = routeLogLine(state, '2026-01-28 21:14:49,879 - INFO -         💬 Tone: empathetic')
 
+    expect(state.roles.Strategist.summary.join(' ')).toContain('Strategy:')
     expect(state.roles.Strategist.summary.join(' ')).toContain('balanced_response')
-    expect(state.roles.Strategist.summary.join(' ')).toContain('0.443')
+    expect(state.roles.Strategist.summary.join(' ')).toContain('Confidence: 0.443')
     expect(state.roles.Strategist.summary.join(' ')).toContain('diplomatic')
     expect(state.roles.Strategist.summary.join(' ')).toContain('empathetic')
   })
@@ -108,9 +109,19 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:18:33,636 - INFO -    🏆 Best selection: candidate_4 (total: 4.80)')
     state = routeLogLine(state, '2026-01-28 21:18:33,636 - INFO -    Best candidate score: 4.80/5.0')
 
-    expect(state.roles.Leader.summary.join(' ')).toContain('6')
-    expect(state.roles.Leader.summary.join(' ')).toContain('candidate_4')
-    expect(state.roles.Leader.summary.join(' ')).toContain('4.80')
+    expect(state.roles.Leader.summary.join(' ')).toContain('Candidates: 6')
+    expect(state.roles.Leader.summary.join(' ')).toContain('Selected: candidate_4')
+    expect(state.roles.Leader.summary.join(' ')).toContain('Score: 4.80')
+  })
+
+  it('updates Leader publish summary when leader comment is posted', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-28 21:14:49,879 - INFO - 🎯 Leader Agent starts USC process and generates candidate comments...')
+    state = routeLogLine(state, '2026-01-28 21:18:33,637 - INFO - 💬 👑 Leader comment 1 on post post-18e9eb: ...')
+
+    expect(state.roles.Leader.summary[3]).toContain('Posted')
+    expect(state.roles.Leader.summary[3]).toContain('1')
   })
 
   it('updates Amplifier summary fields from echo/likes/effectiveness lines', () => {
@@ -123,8 +134,7 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:18:54,727 - INFO - 🎉 Workflow completed - effectiveness score: 10.0/10')
 
     expect(state.roles.Amplifier.summary.join(' ')).toContain('12')
-    expect(state.roles.Amplifier.summary.join(' ')).toContain('480')
-    expect(state.roles.Amplifier.summary.join(' ')).toContain('10.0/10')
+    expect(state.roles.Amplifier.summary.join(' ')).toContain('Boost: +480')
+    expect(state.roles.Amplifier.summary.join(' ')).toContain('Effectiveness: 10.0/10')
   })
 })
-

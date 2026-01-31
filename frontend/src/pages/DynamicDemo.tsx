@@ -4,7 +4,8 @@ import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, Ar
 import { useNavigate } from 'react-router-dom'
 import { createInitialFlowState, routeLogLine, type FlowState, type Role } from '../lib/interventionFlow/logRouter'
 import { createEventSourceLogStream, createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
-import { computeRoleFlexGrow } from '../lib/interventionFlow/layout'
+import { computeEffectiveRole, nextSelectedRoleOnTabClick } from '../lib/interventionFlow/selection'
+import { shouldShowDetailStatusLabel } from '../lib/interventionFlow/statusLabel'
 
 const DEMO_BACKEND_LOG_LINES: string[] = [
   '2026-01-28 21:13:09,286 - INFO - 📊 Phase 1: perception and decision',
@@ -372,16 +373,16 @@ export default function DynamicDemo() {
 
         <div className="space-y-6">
           {enableEvoCorps ? (
-            <InterventionFlowPanel state={flowState} />
+            <InterventionFlowPanel state={flowState} enabled={enableEvoCorps} />
           ) : (
-            <div className="glass-card p-6 min-h-[720px] flex items-center justify-center">
+            <div className="glass-card p-6 min-h-[640px] flex items-center justify-center">
               <div className="text-center space-y-3">
                 <div className="flex justify-center">
                   <Shield className="text-slate-400" size={32} />
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-slate-800">干预流程</h3>
-                  <p className="text-sm text-slate-600">启用舆论平衡系统后展示 4 类角色的干预流程。</p>
+                  <p className="text-sm text-slate-600">启用舆论平衡系统后展示实时干预过程。</p>
                 </div>
               </div>
             </div>
@@ -707,55 +708,154 @@ function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
   )
 }
 
-function InterventionFlowPanel({ state }: { state: FlowState }) {
+function InterventionFlowPanel({ state, enabled }: { state: FlowState; enabled: boolean }) {
   const roles: { role: Role; tone: string; label: string }[] = [
-    { role: 'Analyst', tone: 'from-blue-500 to-cyan-500', label: 'Analyst' },
-    { role: 'Strategist', tone: 'from-purple-500 to-blue-500', label: 'Strategist' },
-    { role: 'Leader', tone: 'from-green-500 to-emerald-500', label: 'Leader' },
-    { role: 'Amplifier', tone: 'from-orange-500 to-red-500', label: 'Amplifier' },
+    { role: 'Analyst', tone: 'from-blue-500 to-cyan-500', label: '分析师' },
+    { role: 'Strategist', tone: 'from-purple-500 to-blue-500', label: '战略家' },
+    { role: 'Leader', tone: 'from-green-500 to-emerald-500', label: '领袖' },
+    { role: 'Amplifier', tone: 'from-orange-500 to-red-500', label: '扩音器' },
   ]
 
+  // Review mode (A): once user clicks a tab, don't auto-jump when activeRole changes.
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null)
+  useEffect(() => {
+    if (!enabled) setSelectedRole(null)
+  }, [enabled])
+
+  const effectiveRole = computeEffectiveRole(selectedRole, state.activeRole)
+  const roleMeta = roles.find((r) => r.role === effectiveRole)
+  const roleState = state.roles[effectiveRole]
+  const isLive = enabled && state.activeRole === effectiveRole && roleState.status === 'running'
+
+  // Hide internal fact labels like "Decision:" in the small selector cards.
+  const simplifySubtitle = (s: string) => {
+    const v = s.replace(/^[A-Za-z_ ]+:\s*/, '').trim()
+    if (!v) return null
+    if (v === '—') return null
+    if (v.toLowerCase() === 'pending') return null
+    return v
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="glass-card p-6">
+    <div className="glass-card p-6 h-[640px] flex flex-col min-h-0">
+      <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <Shield className="text-emerald-500" />
-          <div>
-            <h2 className="text-xl font-bold text-slate-800">干预流程</h2>
-            <p className="text-sm text-slate-600">当前运行角色高亮，运行中日志流式刷新</p>
-          </div>
+          <h2 className="text-xl font-bold text-slate-800">干预流程</h2>
         </div>
+        {/* No follow button; user can exit review mode by clicking the active role tab. */}
       </div>
 
-      <div className="h-[720px] flex flex-col gap-4 min-h-0">
-        {roles.map(({ role, tone, label }) => (
-          <RoleStepCard
-            key={role}
-            role={role}
-            label={label}
-            tone={tone}
-            isActive={state.activeRole === role}
-            flexGrow={computeRoleFlexGrow(state.activeRole, role)}
-            status={state.roles[role].status}
-            before={state.roles[role].before}
-            summary={state.roles[role].summary}
-            during={state.roles[role].during}
-            after={state.roles[role].after}
-          />
-        ))}
-      </div>
+      <RoleTabsRow
+        enabled={enabled}
+        roles={roles}
+        activeRole={state.activeRole}
+        effectiveRole={effectiveRole}
+        roleSubtitles={{
+          Analyst: simplifySubtitle(state.roles.Analyst.summary[0]),
+          Strategist: simplifySubtitle(state.roles.Strategist.summary[0]),
+          Leader: simplifySubtitle(state.roles.Leader.summary[3]),
+          Amplifier: simplifySubtitle(state.roles.Amplifier.summary[3]),
+        }}
+        roleStatuses={{
+          Analyst: state.roles.Analyst.status,
+          Strategist: state.roles.Strategist.status,
+          Leader: state.roles.Leader.status,
+          Amplifier: state.roles.Amplifier.status,
+        }}
+        onSelect={(r) => setSelectedRole((prev) => nextSelectedRoleOnTabClick(prev, r, state.activeRole))}
+      />
+
+      <RoleDetailSection
+        role={effectiveRole}
+        label={roleMeta?.label ?? effectiveRole}
+        tone={roleMeta?.tone ?? 'from-slate-500 to-slate-600'}
+        enabled={enabled}
+        isLive={isLive}
+        status={roleState.status}
+        summary={roleState.summary}
+        during={roleState.during}
+        after={roleState.after}
+      />
     </div>
   )
 }
 
-function RoleStepCard({
+function RoleTabsRow({
+  enabled,
+  roles,
+  activeRole,
+  effectiveRole,
+  roleSubtitles,
+  roleStatuses,
+  onSelect,
+}: {
+  enabled: boolean
+  roles: { role: Role; tone: string; label: string }[]
+  activeRole: Role | null
+  effectiveRole: Role
+  roleSubtitles: Record<Role, string | null>
+  roleStatuses: Record<Role, 'idle' | 'running' | 'done' | 'error'>
+  onSelect: (role: Role) => void
+}) {
+  return (
+    <div className="mt-4 grid grid-cols-2 gap-2">
+      {roles.map(({ role, tone, label }) => {
+          const isSelected = effectiveRole === role
+          const isActive = enabled && activeRole === role
+          const status = roleStatuses[role]
+          const subtitle = roleSubtitles[role]
+
+          return (
+            <button
+              key={role}
+              onClick={() => onSelect(role)}
+              className={[
+                'w-full rounded-2xl border transition-all duration-200 px-3 py-2 text-left min-w-0 box-border',
+                isSelected
+                  ? 'bg-white/80 border-emerald-200 shadow-md ring-2 ring-inset ring-emerald-100'
+                  : 'bg-white/60 border-white/40 hover:bg-white/75',
+              ].join(' ')}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div
+                    className={[
+                      'w-8 h-8 rounded-xl bg-gradient-to-r flex items-center justify-center text-white font-semibold shrink-0',
+                      tone,
+                    ].join(' ')}
+                  >
+                    {label.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-slate-800 truncate">{label}</div>
+                    {subtitle ? <div className="text-[11px] text-slate-600 truncate">{subtitle}</div> : null}
+                  </div>
+                </div>
+                <div className="shrink-0 flex items-center gap-2">
+                  <span
+                    className={[
+                      'w-2 h-2 rounded-full',
+                      isActive ? 'bg-emerald-500 animate-pulse' : status === 'done' ? 'bg-emerald-400' : status === 'error' ? 'bg-red-500' : 'bg-slate-300',
+                    ].join(' ')}
+                    aria-label={isActive ? 'active' : 'inactive'}
+                  />
+                </div>
+              </div>
+            </button>
+          )
+        })}
+    </div>
+  )
+}
+
+function RoleDetailSection({
   role,
   label,
   tone,
-  isActive,
-  flexGrow,
+  enabled,
+  isLive,
   status,
-  before,
   summary,
   during,
   after,
@@ -763,84 +863,66 @@ function RoleStepCard({
   role: Role
   label: string
   tone: string
-  isActive: boolean
-  flexGrow: number
+  enabled: boolean
+  isLive: boolean
   status: 'idle' | 'running' | 'done' | 'error'
-  before: string
   summary: string[]
   during: string[]
   after?: string[]
 }) {
-  const statusTone: Record<'idle' | 'running' | 'done' | 'error', 'muted' | 'warning' | 'success' | 'danger'> = {
-    idle: 'muted',
-    running: 'warning',
-    done: 'success',
-    error: 'danger',
-  }
+  const displayLines = isLive ? during : (after ?? [])
+  const emptyHintPrimary = !enabled ? '未启用：开启舆论平衡后自动接入实时日志流' : '等待系统输出…'
+  const emptyHintSecondary = !enabled ? null : '开启舆论平衡后将自动订阅 workflow 日志流'
 
   return (
-    <div
-      className={[
-        'glass-card transition-[flex,transform,opacity] duration-300 min-h-0 overflow-hidden flex flex-col',
-        isActive ? 'p-6 scale-[1.01] ring-2 ring-emerald-200 shadow-2xl' : 'p-4 opacity-90',
-      ].join(' ')}
-      style={{ flex: flexGrow }}
-      aria-current={isActive ? 'step' : undefined}
-      data-role={role}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className={[
-            'w-10 h-10 rounded-xl bg-gradient-to-r flex items-center justify-center text-white font-semibold',
-            tone,
-          ].join(' ')}
-          >
+    <div className="mt-4 min-h-0 flex-1 flex flex-col" aria-current="step" data-role={role}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={['w-10 h-10 rounded-xl bg-gradient-to-r flex items-center justify-center text-white font-semibold shrink-0', tone].join(' ')}>
             {label.charAt(0)}
           </div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold text-slate-800">{label}</h3>
-              <StatusBadge label={status.toUpperCase()} tone={statusTone[status]} />
-            </div>
-            <p className="text-xs text-slate-600">{before}</p>
-            <div className="mt-1 grid grid-cols-1 gap-0.5">
-              {summary.slice(0, 4).map((line, idx) => (
-                <div key={`${role}_summary_${idx}`} className="text-xs text-slate-700/90 leading-snug break-words line-clamp-1">
-                  {line}
-                </div>
-              ))}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <h3 className="text-lg font-semibold text-slate-800 truncate">{label}</h3>
+              {shouldShowDetailStatusLabel(status) ? (
+                <span className="text-xs font-semibold text-slate-600 px-2 py-1 rounded-full bg-white/70 border border-white/40">
+                  {status.toUpperCase()}
+                </span>
+              ) : null}
+              {isLive ? (
+                <span className="text-xs font-semibold text-emerald-700 px-2 py-1 rounded-full bg-emerald-50 border border-emerald-100">
+                  LIVE
+                </span>
+              ) : null}
             </div>
           </div>
-        </div>
-
-        <div className="text-xs text-slate-500">
-          {isActive ? '运行中日志' : after?.length ? '上次结果' : '尚未运行'}
         </div>
       </div>
 
-      {isActive ? (
-        <div className="mt-4 bg-white/60 border border-white/40 rounded-2xl p-4 min-h-0 flex-1">
-          <div className="space-y-2 h-full overflow-auto pr-1">
-            {during.length ? (
-              during.map((line, idx) => (
-                <div key={`${role}_${idx}`} className="text-sm text-slate-700 leading-relaxed break-words">
-                  {line}
-                </div>
-              ))
-            ) : (
-              <div className="text-sm text-slate-500">等待日志...</div>
-            )}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {summary.slice(0, 4).map((line, idx) => (
+          <div key={`${role}_summary_${idx}`} className="text-xs text-slate-700 px-3 py-2 rounded-xl bg-white/60 border border-white/40 truncate">
+            {line}
           </div>
-        </div>
-      ) : after?.length ? (
-        <div className="mt-3 bg-white/60 border border-white/40 rounded-2xl px-4 py-3 space-y-1">
-          {after.slice(0, 2).map((line, idx) => (
-            <div key={`${role}_after_${idx}`} className="text-xs text-slate-600 break-words line-clamp-2">
-              {line}
+        ))}
+      </div>
+
+      <div className="mt-4 bg-white/60 border border-white/40 rounded-2xl p-4 min-h-0 flex-1">
+        <div className="space-y-2 h-full overflow-auto pr-1">
+          {displayLines.length ? (
+            displayLines.map((line, idx) => (
+              <div key={`${role}_${idx}`} className="text-sm text-slate-700 leading-relaxed break-words">
+                {line}
+              </div>
+            ))
+          ) : (
+            <div className="space-y-1">
+              <div className="text-sm text-slate-600">{emptyHintPrimary}</div>
+              {emptyHintSecondary ? <div className="text-xs text-slate-500">{emptyHintSecondary}</div> : null}
             </div>
-          ))}
+          )}
         </div>
-      ) : null}
+      </div>
     </div>
   )
 }
