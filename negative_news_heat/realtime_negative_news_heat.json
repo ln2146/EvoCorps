@@ -1,74 +1,7 @@
 {
-  "simulation_timestamp": "20260130_185950",
-  "created_at": "2026-01-30T19:16:20.453770",
-  "last_update": "2026-01-30T19:16:20.453770",
-  "total_timesteps": 3,
-  "posts": {
-    "post-88cecc": {
-      "info": {
-        "extremism_level": 3,
-        "news_type": "fake",
-        "bucket": "extreme",
-        "injection_timestep": 1
-      },
-      "history": [
-        {
-          "timestep": 1,
-          "comments": 4,
-          "likes": 0,
-          "shares": 0
-        },
-        {
-          "timestep": 2,
-          "comments": 10,
-          "likes": 0,
-          "shares": 0
-        },
-        {
-          "timestep": 3,
-          "comments": 13,
-          "likes": 0,
-          "shares": 0
-        }
-      ]
-    },
-    "post-d503e6": {
-      "info": {
-        "extremism_level": 3,
-        "news_type": "fake",
-        "bucket": "extreme",
-        "injection_timestep": 2
-      },
-      "history": [
-        {
-          "timestep": 2,
-          "comments": 4,
-          "likes": 0,
-          "shares": 0
-        },
-        {
-          "timestep": 3,
-          "comments": 8,
-          "likes": 0,
-          "shares": 0
-        }
-      ]
-    },
-    "post-a15aee": {
-      "info": {
-        "extremism_level": 3,
-        "news_type": "fake",
-        "bucket": "extreme",
-        "injection_timestep": 3
-      },
-      "history": [
-        {
-          "timestep": 3,
-          "comments": 4,
-          "likes": 0,
-          "shares": 0
-        }
-      ]
-    }
-  }
+  "simulation_timestamp": "20260201_014753",
+  "created_at": "2026-02-01T01:47:53.599232",
+  "last_update": "2026-02-01T01:47:53.599232",
+  "total_timesteps": 0,
+  "posts": {}
 }

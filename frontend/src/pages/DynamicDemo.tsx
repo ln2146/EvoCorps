@@ -7,6 +7,9 @@ import { createEventSourceLogStream, createSimulatedLogStream, type LogStream } 
 import { computeEffectiveRole, nextSelectedRoleOnTabClick } from '../lib/interventionFlow/selection'
 import { shouldShowDetailStatusLabel } from '../lib/interventionFlow/statusLabel'
 import { parsePostContent } from '../lib/interventionFlow/postContent'
+import { useLeaderboard } from '../hooks/useLeaderboard'
+import { usePostDetail } from '../hooks/usePostDetail'
+import { usePostComments } from '../hooks/usePostComments'
 
 const DEMO_BACKEND_LOG_LINES: string[] = [
   '2026-01-28 21:13:09,286 - INFO - 📊 Phase 1: perception and decision',
@@ -45,6 +48,15 @@ interface HeatPost {
   heat: number
   author: string
   createdAt: string
+  // 新增字段以支持真实 API 数据
+  feedScore?: number
+  excerpt?: string
+  authorId?: string
+  postId?: string
+  content?: string
+  likeCount?: number
+  shareCount?: number
+  commentCount?: number
 }
 
 interface CommentItem {
@@ -52,6 +64,10 @@ interface CommentItem {
   content: string
   likes: number
   createdAt: string
+  // 新增字段以支持真实 API 数据
+  commentId?: string
+  likeCount?: number
+  authorId?: string
 }
 
 interface MetricsPoint {
@@ -76,37 +92,71 @@ interface DynamicDemoData {
 }
 
 function useDynamicDemoApi() {
+  const [selectedPost, setSelectedPost] = useState<HeatPost | null>(null)
+  const [commentSort, setCommentSort] = useState<'likes' | 'time'>('likes')
+
+  // 使用 useLeaderboard Hook 获取热度榜数据
+  const {
+    data: leaderboardItems,
+    isLoading: leaderboardLoading,
+    error: leaderboardError
+  } = useLeaderboard({ enableSSE: true, limit: 20 })
+
+  // 使用 usePostDetail Hook 获取帖子详情
+  const {
+    data: postDetail,
+    isLoading: postDetailLoading,
+    error: postDetailError
+  } = usePostDetail(selectedPost?.postId || selectedPost?.id || null)
+
+  // 使用 usePostComments Hook 获取评论列表
+  const {
+    data: comments,
+    isLoading: commentsLoading,
+    error: commentsError
+  } = usePostComments(selectedPost?.postId || selectedPost?.id || null, commentSort)
+
+  // 将 API 数据转换为组件所需格式
+  const heatPosts: HeatPost[] = useMemo(() => {
+    if (!leaderboardItems) return []
+    return leaderboardItems.map(item => ({
+      id: item.postId,
+      postId: item.postId,
+      summary: item.excerpt,
+      excerpt: item.excerpt,
+      heat: item.score,
+      feedScore: item.score,
+      author: item.authorId,
+      authorId: item.authorId,
+      createdAt: item.createdAt,
+      likeCount: item.likeCount,
+      shareCount: item.shareCount,
+      commentCount: item.commentCount,
+    }))
+  }, [leaderboardItems])
+
+  // 将评论数据转换为组件所需格式
+  const commentItems: CommentItem[] = useMemo(() => {
+    if (!comments) return []
+    return comments.map(comment => ({
+      id: comment.commentId,
+      commentId: comment.commentId,
+      content: comment.content,
+      likes: comment.likeCount,
+      likeCount: comment.likeCount,
+      createdAt: comment.createdAt,
+      authorId: comment.authorId,
+    }))
+  }, [comments])
+
+  // 合并加载状态和错误状态
+  const isLoading = leaderboardLoading || (selectedPost ? (postDetailLoading || commentsLoading) : false)
+  const error = leaderboardError || postDetailError || commentsError
+
   const data = useMemo<DynamicDemoData>(() => {
     return {
-      heatPosts: [
-        { id: 'post_1024', summary: '极端言论在话题A中迅速扩散，引发两极分化讨论哈速度...', heat: 92, author: 'user_41', createdAt: '10:21' },
-        { id: 'post_1130', summary: '理性派用户发起反向引导，讨论开始回归事实...', heat: 88, author: 'user_12', createdAt: '10:20' },
-        { id: 'post_1207', summary: '热点事件引发情绪化评论，传播速度异常加快...', heat: 84, author: 'user_88', createdAt: '10:19' },
-        { id: 'post_1099', summary: '平台出现协调式引导行为，舆论呈现集体偏移...', heat: 81, author: 'user_07', createdAt: '10:18' },
-        { id: 'post_0981', summary: '多方观点对冲，话题温度下降但争议仍在...', heat: 79, author: 'user_33', createdAt: '10:17' },
-        { id: 'post_1312', summary: '核心观点被断章取义，用户情绪被持续放大...', heat: 76, author: 'user_58', createdAt: '10:16' },
-        { id: 'post_1404', summary: '事实核查内容开始传播，互动热度回落...', heat: 74, author: 'user_19', createdAt: '10:15' },
-        { id: 'post_1556', summary: '极端标签使用频率上升，舆论场对立明显...', heat: 72, author: 'user_76', createdAt: '10:14' },
-        { id: 'post_1660', summary: '主流媒体跟进报道，讨论重心出现转移...', heat: 70, author: 'user_05', createdAt: '10:13' },
-        { id: 'post_1711', summary: '多方观点交锋，评论区情绪波动加剧...', heat: 68, author: 'user_23', createdAt: '10:12' },
-        { id: 'post_1802', summary: '争议话题引发二次传播，热度持续升高...', heat: 66, author: 'user_64', createdAt: '10:11' },
-        { id: 'post_1925', summary: '辟谣信息出现，但传播速度较慢...', heat: 64, author: 'user_09', createdAt: '10:10' },
-        { id: 'post_2050', summary: '情绪化标题吸引关注，互动集中爆发...', heat: 62, author: 'user_37', createdAt: '10:09' },
-        { id: 'post_2144', summary: '讨论逐渐分化为多个子议题...', heat: 60, author: 'user_11', createdAt: '10:08' },
-        { id: 'post_2237', summary: '极端内容被举报增多，平台干预加强...', heat: 58, author: 'user_90', createdAt: '10:07' },
-        { id: 'post_2319', summary: '传播链条开始收敛，热度略有回落...', heat: 56, author: 'user_52', createdAt: '10:06' },
-        { id: 'post_2408', summary: '意见领袖介入讨论，带动新一轮互动...', heat: 54, author: 'user_28', createdAt: '10:05' },
-        { id: 'post_2566', summary: '话题焦点转向政策解读，情绪趋稳...', heat: 52, author: 'user_66', createdAt: '10:04' },
-        { id: 'post_2681', summary: '用户自发总结事件脉络，讨论更理性...', heat: 50, author: 'user_31', createdAt: '10:03' },
-        { id: 'post_2794', summary: '热度进入尾声阶段，互动逐步下降...', heat: 48, author: 'user_14', createdAt: '10:02' },
-      ],
-      comments: [
-        { id: 'c_01', content: '我觉得需要更多证据支持这个观点。', likes: 132, createdAt: '10:22' },
-        { id: 'c_02', content: '这类言论太极端了，应该理性讨论。', likes: 98, createdAt: '10:21' },
-        { id: 'c_03', content: '平台应该及时引导，避免情绪扩大。', likes: 81, createdAt: '10:19' },
-        { id: 'c_04', content: '情绪被带动很正常，但数据怎么看？', likes: 63, createdAt: '10:17' },
-        { id: 'c_05', content: '我赞同这种干预方式，但尺度要控制。', likes: 52, createdAt: '10:15' },
-      ],
+      heatPosts,
+      comments: commentItems,
       metricsSeries: [
         { time: '10:00', emotion: 0.42, extremity: 0.18 },
         { time: '10:05', emotion: 0.48, extremity: 0.21 },
@@ -134,9 +184,18 @@ function useDynamicDemoApi() {
         ],
       },
     }
-  }, [])
+  }, [heatPosts, commentItems])
 
-  return { data, isLoading: false, error: null }
+  return {
+    data,
+    isLoading,
+    error,
+    selectedPost,
+    setSelectedPost,
+    commentSort,
+    setCommentSort,
+    postDetail
+  }
 }
 
 function useDynamicDemoSSE() {
@@ -155,16 +214,22 @@ function useDynamicDemoSSE() {
 
 export default function DynamicDemo() {
   const navigate = useNavigate()
-  const { data } = useDynamicDemoApi()
+  const {
+    data,
+    isLoading,
+    error,
+    selectedPost,
+    setSelectedPost,
+    commentSort,
+    setCommentSort,
+    postDetail
+  } = useDynamicDemoApi()
   const sse = useDynamicDemoSSE()
 
   const [isRunning, setIsRunning] = useState(false)
   const [enableAttack, setEnableAttack] = useState(false)
   const [enableAftercare, setEnableAftercare] = useState(false)
   const [enableEvoCorps, setEnableEvoCorps] = useState(false)
-
-  const [selectedPost, setSelectedPost] = useState<HeatPost | null>(null)
-  const [commentSort, setCommentSort] = useState<'likes' | 'time'>('likes')
 
   const [analysisOpen, setAnalysisOpen] = useState(false)
   const [analysisStatus, setAnalysisStatus] = useState<'Idle' | 'Running' | 'Done' | 'Error'>('Idle')
@@ -174,6 +239,37 @@ export default function DynamicDemo() {
   const [flowState, setFlowState] = useState<FlowState>(() => createInitialFlowState())
   const streamRef = useRef<LogStream | null>(null)
   const unsubscribeRef = useRef<null | (() => void)>(null)
+
+  // 添加状态轮询机制
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const response = await fetch('/api/dynamic/status')
+        const data = await response.json()
+
+        // 检查 database 和 main 进程状态
+        const dbRunning = data.database?.status === 'running'
+        const mainRunning = data.main?.status === 'running'
+        const bothRunning = dbRunning && mainRunning
+
+        setIsRunning(bothRunning)
+
+        // 同步 enableEvoCorps 状态
+        const obRunning = data.opinion_balance?.status === 'running'
+        setEnableEvoCorps(obRunning)
+      } catch (error) {
+        console.error('Failed to check status:', error)
+      }
+    }
+
+    // 初始检查
+    checkStatus()
+
+    // 每 2 秒轮询一次
+    const interval = setInterval(checkStatus, 2000)
+
+    return () => clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     // Spec:
@@ -321,11 +417,12 @@ export default function DynamicDemo() {
               console.error('Error starting opinion balance:', error)
             }
           } else {
-            // 如果当前是启用状态，则显示确认对话框
+            // 显示确认对话框
             if (!confirm('是否确认关闭舆论平衡系统？')) {
               return
             }
 
+            // 如果当前是启用状态，则停止舆论平衡系统
             try {
               // 调用后端 API 停止舆论平衡系统
               const response = await fetch('/api/dynamic/opinion-balance/stop', {
@@ -358,11 +455,28 @@ export default function DynamicDemo() {
       <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr_1fr] gap-6">
         <div className="space-y-6">
           {!selectedPost ? (
-            <HeatLeaderboardCard posts={data.heatPosts} onSelect={setSelectedPost} />
+            <HeatLeaderboardCard
+              posts={data.heatPosts}
+              onSelect={setSelectedPost}
+              isLoading={isLoading}
+              error={error || undefined}
+            />
           ) : (
             <div className="space-y-6">
-              <PostDetailCard post={selectedPost} onBack={() => setSelectedPost(null)} />
-              <CommentsCard comments={data.comments} sort={commentSort} onSortChange={setCommentSort} />
+              <PostDetailCard
+                post={selectedPost}
+                postDetail={postDetail}
+                onBack={() => setSelectedPost(null)}
+                isLoading={isLoading}
+                error={error || undefined}
+              />
+              <CommentsCard
+                comments={data.comments}
+                sort={commentSort}
+                onSortChange={setCommentSort}
+                isLoading={isLoading}
+                error={error || undefined}
+              />
             </div>
           )}
         </div>
@@ -470,9 +584,9 @@ function DynamicDemoHeader({
               disabled={isRunning || isStarting}
             >
               <Play size={18} />
-              {isStarting ? '启动中...' : '开启演示'}
+              {isStarting ? '启动中...' : isRunning ? '运行中' : '开启演示'}
             </button>
-            <button className="btn-secondary inline-flex items-center gap-2" onClick={onStop} disabled={!isRunning}>
+            <button className="btn-secondary inline-flex items-center gap-2" onClick={onStop}>
               <Square size={18} />
               停止演示
             </button>
@@ -511,7 +625,17 @@ function DynamicDemoHeader({
   )
 }
 
-function HeatLeaderboardCard({ posts, onSelect }: { posts: HeatPost[]; onSelect: (post: HeatPost) => void }) {
+function HeatLeaderboardCard({
+  posts,
+  onSelect,
+  isLoading,
+  error
+}: {
+  posts: HeatPost[]
+  onSelect: (post: HeatPost) => void
+  isLoading?: boolean
+  error?: Error | null
+}) {
   return (
     <div className="glass-card p-6">
       <div className="flex items-center justify-between mb-4">
@@ -519,41 +643,80 @@ function HeatLeaderboardCard({ posts, onSelect }: { posts: HeatPost[]; onSelect:
           <Flame className="text-orange-500" />
           <div>
             <h2 className="text-xl font-bold text-slate-800">帖子热度榜</h2>
-            <p className="text-sm text-slate-600">实时热度排名（占位数据）</p>
+            <p className="text-sm text-slate-600">实时热度排名</p>
           </div>
         </div>
-        <StatusBadge label="Top 20" tone="info" />
+        <div className="flex items-center gap-2">
+          <StatusBadge label={`Top ${posts.length}`} tone="info" />
+          {isLoading && <StatusBadge label="加载中" tone="warning" />}
+        </div>
       </div>
 
+      {error && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-4">
+          <p className="text-sm text-red-700">加载失败：{error.message}</p>
+        </div>
+      )}
+
       <div className="space-y-3 h-[580px] overflow-y-auto pr-2">
-        {posts.slice(0, 20).map((post, index) => (
-          <button
-            key={post.id}
-            onClick={() => onSelect(post)}
-            className="w-full text-left bg-white/70 hover:bg-white transition-all rounded-2xl p-4 border border-white/40"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold text-slate-700">#{index + 1} · {post.id}</span>
-              <span className="text-sm font-bold text-orange-500">{post.heat}</span>
-            </div>
-            <p className="text-sm text-slate-700 line-clamp-2">{post.summary}</p>
-            <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
-              <span>{post.author}</span>
-              <span>{post.createdAt}</span>
-            </div>
-          </button>
-        ))}
+        {isLoading && posts.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-slate-500">加载中...</p>
+          </div>
+        ) : posts.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-slate-500">暂无数据</p>
+          </div>
+        ) : (
+          posts.slice(0, 20).map((post, index) => (
+            <button
+              key={post.postId || post.id}
+              onClick={() => onSelect(post)}
+              className="w-full text-left bg-white/70 hover:bg-white transition-all rounded-2xl p-4 border border-white/40"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-slate-700">#{index + 1} · {post.postId || post.id}</span>
+                <span className="text-sm font-bold text-orange-500">{(post.feedScore || post.heat).toFixed(2)}</span>
+              </div>
+              <p className="text-sm text-slate-700 line-clamp-2">{post.excerpt || post.summary}</p>
+              <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
+                <span>{post.authorId || post.author}</span>
+                <span>{new Date(post.createdAt).toLocaleString('zh-CN', {
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}</span>
+              </div>
+            </button>
+          ))
+        )}
       </div>
     </div>
   )
 }
 
-function PostDetailCard({ post, onBack }: { post: HeatPost; onBack: () => void }) {
+function PostDetailCard({
+  post,
+  postDetail,
+  onBack,
+  isLoading,
+  error
+}: {
+  post: HeatPost
+  postDetail?: any
+  onBack: () => void
+  isLoading?: boolean
+  error?: Error | null
+}) {
   const [expanded, setExpanded] = useState(false)
+
+  // 优先使用 postDetail 的完整内容，否则使用 post 的 summary
+  const fullContent = postDetail?.content || post.content || post.summary || post.excerpt || ''
   const previewText = useMemo(() => {
-    if (post.summary.length <= 180) return post.summary
-    return `${post.summary.slice(0, 180)}...`
-  }, [post.summary])
+    if (fullContent.length <= 180) return fullContent
+    return `${fullContent.slice(0, 180)}...`
+  }, [fullContent])
 
   return (
     <div className="glass-card p-6">
@@ -562,10 +725,13 @@ function PostDetailCard({ post, onBack }: { post: HeatPost; onBack: () => void }
           <MessageSquare className="text-blue-500" />
           <div>
             <h2 className="text-xl font-bold text-slate-800">帖子详情</h2>
-            <p className="text-sm text-slate-600">{post.id} · 热度 {post.heat}</p>
+            <p className="text-sm text-slate-600">
+              {post.postId || post.id} · 热度 {(post.feedScore || post.heat).toFixed(2)}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {isLoading && <StatusBadge label="加载中" tone="warning" />}
           <button
             onClick={() => setExpanded((prev) => !prev)}
             className="w-9 h-9 rounded-full bg-white/80 border border-white/40 shadow-lg flex items-center justify-center text-slate-600 hover:bg-white transition-all"
@@ -579,22 +745,52 @@ function PostDetailCard({ post, onBack }: { post: HeatPost; onBack: () => void }
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-4">
+          <p className="text-sm text-red-700">加载失败：{error.message}</p>
+        </div>
+      )}
+
       <div className="space-y-3 text-sm text-slate-700">
-        <p className="whitespace-pre-wrap break-words leading-relaxed">{expanded ? post.summary : previewText}</p>
+        <p className="whitespace-pre-wrap break-words leading-relaxed">
+          {expanded ? fullContent : previewText}
+        </p>
         <div className="flex items-center gap-4 text-xs text-slate-500">
-          <span>作者：{post.author}</span>
-          <span>发布时间：{post.createdAt}</span>
+          <span>作者：{post.authorId || post.author}</span>
+          <span>发布时间：{new Date(post.createdAt).toLocaleString('zh-CN')}</span>
+          {(post.likeCount !== undefined || postDetail?.likeCount !== undefined) && (
+            <span>点赞：{postDetail?.likeCount ?? post.likeCount}</span>
+          )}
+          {(post.shareCount !== undefined || postDetail?.shareCount !== undefined) && (
+            <span>分享：{postDetail?.shareCount ?? post.shareCount}</span>
+          )}
+          {(post.commentCount !== undefined || postDetail?.commentCount !== undefined) && (
+            <span>评论：{postDetail?.commentCount ?? post.commentCount}</span>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-function CommentsCard({ comments, sort, onSortChange }: { comments: CommentItem[]; sort: 'likes' | 'time'; onSortChange: (value: 'likes' | 'time') => void }) {
+function CommentsCard({
+  comments,
+  sort,
+  onSortChange,
+  isLoading,
+  error
+}: {
+  comments: CommentItem[]
+  sort: 'likes' | 'time'
+  onSortChange: (value: 'likes' | 'time') => void
+  isLoading?: boolean
+  error?: Error | null
+}) {
   const sorted = useMemo(() => {
     const list = [...comments]
     if (sort === 'likes') {
-      return list.sort((a, b) => b.likes - a.likes)
+      return list.sort((a, b) => (b.likeCount ?? b.likes) - (a.likeCount ?? a.likes))
     }
     return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   }, [comments, sort])
@@ -606,18 +802,43 @@ function CommentsCard({ comments, sort, onSortChange }: { comments: CommentItem[
           <h3 className="text-lg font-semibold text-slate-800">评论区</h3>
           <p className="text-sm text-slate-600">展示帖子实时评论流</p>
         </div>
-        <CommentSortTabs value={sort} onChange={onSortChange} />
+        <div className="flex items-center gap-2">
+          {isLoading && <StatusBadge label="加载中" tone="warning" />}
+          <CommentSortTabs value={sort} onChange={onSortChange} />
+        </div>
       </div>
+
+      {error && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-4">
+          <p className="text-sm text-red-700">加载失败：{error.message}</p>
+        </div>
+      )}
+
       <div className="space-y-3 max-h-[420px] overflow-auto pr-2">
-        {sorted.map((comment) => (
-          <div key={comment.id} className="bg-white/70 rounded-2xl p-4 border border-white/40">
-            <p className="text-sm text-slate-700">{comment.content}</p>
-            <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
-              <span>点赞 {comment.likes}</span>
-              <span>{comment.createdAt}</span>
-            </div>
+        {isLoading && comments.length === 0 ? (
+          <div className="flex items-center justify-center py-8">
+            <p className="text-slate-500">加载中...</p>
           </div>
-        ))}
+        ) : comments.length === 0 ? (
+          <div className="flex items-center justify-center py-8">
+            <p className="text-slate-500">暂无评论</p>
+          </div>
+        ) : (
+          sorted.map((comment) => (
+            <div key={comment.commentId || comment.id} className="bg-white/70 rounded-2xl p-4 border border-white/40">
+              <p className="text-sm text-slate-700">{comment.content}</p>
+              <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
+                <span>点赞 {comment.likeCount ?? comment.likes}</span>
+                <span>{new Date(comment.createdAt).toLocaleString('zh-CN', {
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}</span>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   )
@@ -794,40 +1015,40 @@ function RoleTabsRow({
           <button
             key={role}
             onClick={() => onSelect(role)}
-              className={[
-                'w-full rounded-2xl border transition-all duration-200 px-3 py-2 text-left min-w-0 box-border',
-                isSelected
-                  ? 'bg-white/80 border-emerald-200 shadow-md ring-2 ring-inset ring-emerald-100'
-                  : 'bg-white/60 border-white/40 hover:bg-white/75',
-              ].join(' ')}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div
-                    className={[
-                      'w-8 h-8 rounded-xl bg-gradient-to-r flex items-center justify-center text-white font-semibold shrink-0',
-                      tone,
-                    ].join(' ')}
-                  >
-                    {label.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-slate-800 truncate">{label}</div>
-                  </div>
+            className={[
+              'w-full rounded-2xl border transition-all duration-200 px-3 py-2 text-left min-w-0 box-border',
+              isSelected
+                ? 'bg-white/80 border-emerald-200 shadow-md ring-2 ring-inset ring-emerald-100'
+                : 'bg-white/60 border-white/40 hover:bg-white/75',
+            ].join(' ')}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className={[
+                    'w-8 h-8 rounded-xl bg-gradient-to-r flex items-center justify-center text-white font-semibold shrink-0',
+                    tone,
+                  ].join(' ')}
+                >
+                  {label.charAt(0)}
                 </div>
-                <div className="shrink-0 flex items-center gap-2">
-                  <span
-                    className={[
-                      'w-2 h-2 rounded-full',
-                      isActive ? 'bg-emerald-500 animate-pulse' : status === 'done' ? 'bg-emerald-400' : status === 'error' ? 'bg-red-500' : 'bg-slate-300',
-                    ].join(' ')}
-                    aria-label={isActive ? 'active' : 'inactive'}
-                  />
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-800 truncate">{label}</div>
                 </div>
               </div>
-            </button>
-          )
-        })}
+              <div className="shrink-0 flex items-center gap-2">
+                <span
+                  className={[
+                    'w-2 h-2 rounded-full',
+                    isActive ? 'bg-emerald-500 animate-pulse' : status === 'done' ? 'bg-emerald-400' : status === 'error' ? 'bg-red-500' : 'bg-slate-300',
+                  ].join(' ')}
+                  aria-label={isActive ? 'active' : 'inactive'}
+                />
+              </div>
+            </div>
+          </button>
+        )
+      })}
     </div>
   )
 }
