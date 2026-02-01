@@ -417,6 +417,9 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
     next.roles.Analyst = {
       ...next.roles.Analyst,
       status: 'running',
+      // Show stage immediately so we don't stream a bunch of Analyst lines while the
+      // stage header is still hidden (stage=-1). New rounds always start at stage 0.
+      stage: { current: 0, max: 0, order: [0] },
       during: displayLine ? [displayLine] : [],
     }
     return next

@@ -293,6 +293,13 @@ describe('routeLogLine', () => {
     // (avoids long silence before the first agent anchor arrives in replay logs).
     expect(state.activeRole).toBe('Analyst')
     for (const role of ['Analyst', 'Strategist', 'Leader', 'Amplifier'] as const) {
+      if (role === 'Analyst') {
+        // Analyst stage starts immediately at 0 so the UI stage header is visible from the first line.
+        expect(state.roles[role].stage.current).toBe(0)
+        expect(state.roles[role].stage.max).toBe(0)
+        expect(state.roles[role].stage.order).toEqual([0])
+        continue
+      }
       expect(state.roles[role].stage.current).toBe(-1)
       expect(state.roles[role].stage.max).toBe(-1)
       expect(state.roles[role].stage.order).toEqual([])
