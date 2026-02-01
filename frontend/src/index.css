@@ -9,8 +9,9 @@
   }
   body {
     @apply bg-gradient-to-r from-blue-50 via-cyan-50 to-green-50 text-slate-900 antialiased;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
       'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      'Microsoft YaHei', 'SimHei', 'PingFang SC', 'Hiragino Sans GB',
       sans-serif;
     min-height: 100vh;
     /* Always reserve scrollbar space to keep widths stable while content changes. */
