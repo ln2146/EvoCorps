@@ -654,14 +654,14 @@ function DynamicDemoHeader({
         </div>
         <div className="flex flex-col gap-3 items-center">
           <button
-            className="btn-secondary inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl"
+            className="btn-apple inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl"
             onClick={() => navigate('/dashboard')}
             title="进入静态演示"
           >
             <span>进入静态演示</span>
           </button>
           <button
-            className="btn-secondary inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl"
+            className="btn-apple inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl"
             onClick={onBack}
             title="返回首页"
           >

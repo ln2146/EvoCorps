@@ -6,6 +6,36 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        'sans': [
+          'Noto Serif SC',
+          'Inter',
+          'Space Grotesk',
+          'Segoe UI',
+          'Roboto',
+          'Helvetica Neue',
+          'Microsoft YaHei UI',
+          'Microsoft YaHei',
+          'PingFang SC',
+          'Hiragino Sans GB',
+          'SimHei',
+          'SimSun',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'sans-serif'
+        ],
+        'heading': [
+          'Space Grotesk',
+          'Inter',
+          'Noto Serif SC',
+          'Microsoft YaHei UI',
+          'PingFang SC',
+          'Hiragino Sans GB',
+          'SimHei',
+          'sans-serif'
+        ],
+        'mono': ['JetBrains Mono', 'Menlo', 'monospace'],
+      },
       colors: {
         primary: {
           50: '#eff6ff',

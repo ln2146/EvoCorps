@@ -4,18 +4,71 @@
 
 @layer base {
   html {
-    /* Prevent layout shifts when vertical scrollbars appear/disappear (common during streaming updates). */
     scrollbar-gutter: stable;
   }
+
   body {
     @apply bg-gradient-to-r from-blue-50 via-cyan-50 to-green-50 text-slate-900 antialiased;
-    font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-      'Microsoft YaHei', 'SimHei', 'PingFang SC', 'Hiragino Sans GB',
+    /* 思源宋体 + 科技感英文字体 */
+    font-family: 'Noto Serif SC', 'Inter', 'Space Grotesk',
+      'Segoe UI', 'Roboto', 'Helvetica Neue',
+      'Microsoft YaHei UI', 'Microsoft YaHei', 
+      'PingFang SC', 'Hiragino Sans GB',
+      'SimHei', 'SimSun', 
+      -apple-system, BlinkMacSystemFont,
       sans-serif;
     min-height: 100vh;
-    /* Always reserve scrollbar space to keep widths stable while content changes. */
     overflow-y: scroll;
+    letter-spacing: 0.3px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* 标题使用科幻风格 */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', 'Inter',
+      'Noto Serif SC',
+      'Microsoft YaHei UI', 'PingFang SC',
+      'Hiragino Sans GB', 'SimHei',
+      sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1 {
+    @apply text-4xl;
+    letter-spacing: -1px;
+    font-weight: 800;
+  }
+
+  h2 {
+    @apply text-3xl;
+    letter-spacing: -0.8px;
+    font-weight: 700;
+  }
+
+  h3 {
+    @apply text-2xl;
+    letter-spacing: -0.6px;
+    font-weight: 700;
+  }
+
+  /* 按钮和表单 */
+  button, input, select, textarea {
+    font-family: 'Inter', 'Space Grotesk',
+      'Noto Serif SC',
+      'Microsoft YaHei UI', 'PingFang SC',
+      'Hiragino Sans GB',
+      sans-serif;
+    letter-spacing: 0.2px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* 中文文本优化 */
+  p, span, div, li, td, th, label, a {
+    font-family: inherit;
   }
 }
 
@@ -34,6 +87,8 @@
 
   .nav-item {
     @apply flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200;
+    font-weight: 500;
+    letter-spacing: 0px;
   }
 
   .nav-item:hover {
@@ -42,14 +97,149 @@
 
   .nav-item.active {
     @apply bg-gradient-to-r from-blue-500 to-green-500 text-white shadow-lg;
+    font-weight: 600;
   }
 
   .btn-primary {
-    @apply px-6 py-3 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-2xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105;
+    @apply px-6 py-3 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-2xl font-medium shadow-lg transition-all duration-300 hover:scale-105;
+    position: relative;
+    overflow: hidden;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+  }
+
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+  }
+
+  .btn-primary:hover::before {
+    left: 100%;
+  }
+
+  .btn-primary:hover {
+    @apply shadow-xl;
+    transform: scale(1.05) translateY(-2px);
+  }
+
+  .btn-primary:active {
+    transform: scale(0.98);
   }
 
   .btn-secondary {
-    @apply px-6 py-3 bg-white/70 backdrop-blur-xl text-slate-700 rounded-2xl font-medium shadow-glass hover:shadow-glass-hover transition-all duration-200 border border-white/20;
+    @apply px-6 py-3 bg-white/70 backdrop-blur-xl text-slate-700 rounded-2xl font-medium shadow-glass border border-white/20 transition-all duration-300;
+    position: relative;
+    overflow: hidden;
+    font-weight: 500;
+    letter-spacing: 0px;
+  }
+
+  .btn-secondary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s ease;
+  }
+
+  .btn-secondary:hover::before {
+    left: 100%;
+  }
+
+  .btn-secondary:hover {
+    @apply shadow-glass-hover bg-white/80;
+    transform: translateY(-2px);
+  }
+
+  .btn-secondary:active {
+    transform: translateY(0);
+  }
+
+  /* 高级按钮样式 - 用于特殊场景 */
+  .btn-apple {
+    @apply px-6 py-3 bg-white/70 backdrop-blur-xl text-slate-700 rounded-2xl font-medium shadow-glass border border-white/20 transition-all duration-300;
+    position: relative;
+    overflow: hidden;
+    font-weight: 500;
+    letter-spacing: 0px;
+  }
+
+  .btn-apple::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.4), transparent);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.6s ease, height 0.6s ease;
+  }
+
+  .btn-apple:hover::before {
+    width: 300px;
+    height: 300px;
+  }
+
+  .btn-apple:hover {
+    @apply shadow-glass-hover bg-white/85;
+    transform: translateY(-3px);
+  }
+
+  .btn-apple:active {
+    transform: translateY(-1px);
+  }
+}
+
+/* 苹果风格的涟漪效果 */
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.ripple-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple-effect::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: ripple 0.6s ease-out;
+}
+
+/* Logo 点击粒子爆炸动画 */
+@keyframes particleExplode {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--end-x), var(--end-y)) scale(0);
+    opacity: 0;
   }
 }
 
