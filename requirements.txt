@@ -41,3 +41,7 @@ faiss-cpu
 flask
 flask-cors
 psutil
+
+# Control API server
+fastapi
+uvicorn

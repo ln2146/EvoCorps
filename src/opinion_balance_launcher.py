@@ -13,6 +13,14 @@ import sqlite3
 from datetime import datetime
 from typing import Dict, Any, Optional
 import argparse
+import threading
+
+import control_flags
+
+# HTTP control API for launcher
+from fastapi import FastAPI
+from pydantic import BaseModel
+import uvicorn
 
 # Add src directory to the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -25,6 +33,119 @@ except ImportError as e:
     print(f"❌ Failed to import modules: {e}")
     print("💡 Ensure you are running the script from the correct directory")
     sys.exit(1)
+
+
+# Global launcher reference for HTTP handlers
+GLOBAL_LAUNCHER = None
+_auto_status_thread = None
+
+
+def _auto_status_loop():
+    """Timed auto-status loop shared by CLI and HTTP control.
+
+    Runs every 30 seconds while control_flags.auto_status is True,
+    printing monitoring details and running a synchronous monitoring
+    pass. Exits automatically when auto_status is no longer True.
+    """
+    global GLOBAL_LAUNCHER
+
+    if GLOBAL_LAUNCHER is None:
+        print("❌ GLOBAL_LAUNCHER is not initialized; auto-status loop cannot run")
+        return
+
+    launcher = GLOBAL_LAUNCHER
+
+    import time
+    import traceback
+
+    cycle_count = 0
+    print("🔄 Auto-status loop started (every 30 seconds; controlled by control_flags.auto_status)")
+
+    while True:
+        if not control_flags.auto_status:
+            print("🔍 auto_status is not True; stopping auto-status loop")
+            break
+
+        time.sleep(30)
+        cycle_count += 1
+
+        print(f"\n⏰ [{time.strftime('%H:%M:%S')}] Timed status update (cycle {cycle_count}):")
+        print(f"📊 System status: {'running' if control_flags.auto_status else 'stopped'}")
+
+        # 每个周期都执行详情展示和同步监控
+        print("\n🔍 Current monitoring details (auto-status loop):")
+        try:
+            launcher._show_monitoring_details()
+        except Exception as e:
+            print(f"   ❌ Failed to get monitoring details: {e}")
+            traceback.print_exc()
+
+        if launcher.opinion_balance_manager:
+            print("\n🔍 Running opinion balance monitoring (auto-status loop)")
+            try:
+                launcher._monitor_trending_posts_sync()
+            except Exception as e:
+                print(f"   ❌ Monitoring execution failed: {e}")
+                traceback.print_exc()
+
+
+# FastAPI app for external control of the launcher
+launcher_control_app = FastAPI(title="Opinion Balance Launcher Control API", version="1.0.0")
+
+
+class AutoStatusRequest(BaseModel):
+    enabled: bool
+
+
+@launcher_control_app.post("/launcher/auto-status")
+def set_launcher_auto_status(body: AutoStatusRequest):
+    """HTTP endpoint to control auto-status loop.
+
+    - enabled = true: set control_flags.auto_status = True and start
+      the auto-status background loop if not already running.
+    - enabled = false: set control_flags.auto_status = False, loop
+      will exit on the next check.
+    """
+    global _auto_status_thread
+
+    # 通过端口同时支持开启和关闭：
+    # enabled = true  -> 设置 auto_status=True，并确保循环在运行
+    # enabled = false -> 设置 auto_status=False，循环在下一轮检查时自行退出
+
+    control_flags.auto_status = bool(body.enabled)
+
+    if control_flags.auto_status:
+        started = False
+        if _auto_status_thread is None or not _auto_status_thread.is_alive():
+            _auto_status_thread = threading.Thread(
+                target=_auto_status_loop,
+                daemon=True,
+                name="launcher-auto-status-loop",
+            )
+            _auto_status_thread.start()
+            started = True
+        return {"auto_status": True, "loop_started": started}
+    else:
+        loop_running = _auto_status_thread is not None and _auto_status_thread.is_alive()
+        return {"auto_status": False, "loop_started": loop_running}
+
+
+def start_launcher_control_api_server(host: str = "0.0.0.0", port: int = 8100) -> Optional[threading.Thread]:
+    """Start the FastAPI control server for the launcher in a background thread."""
+
+    def _run() -> None:
+        config = uvicorn.Config(launcher_control_app, host=host, port=port, log_level="info")
+        server = uvicorn.Server(config)
+        server.run()
+
+    try:
+        thread = threading.Thread(target=_run, daemon=True, name="launcher-control-api-server")
+        thread.start()
+        print(f"📡 Launcher Control API server started at http://{host}:{port}")
+        return thread
+    except Exception as e:
+        print(f"⚠️  Failed to start Launcher Control API server: {e}")
+        return None
 
 
 class OpinionBalanceLauncher:
@@ -278,9 +399,21 @@ class OpinionBalanceLauncher:
             print("="*60)
             
             while True:
+                # 全局 auto_status 是监控是否应当继续运行的唯一判定来源：
+                #   True  -> 继续自动监控
+                #   False/None -> 视为关闭，优雅地退出循环
+                if not control_flags.auto_status:
+                    print("🔍 auto_status is disabled; stopping opinion balance monitoring loop")
+                    break
+
                 # Wait for the trending posts scan interval
                 await asyncio.sleep(self.opinion_balance_manager.trending_posts_scan_interval * 60)
                 
+                # Re-check after sleep in case auto_status was changed
+                if not control_flags.auto_status:
+                    print("🔍 auto_status is disabled after sleep; stopping opinion balance monitoring loop")
+                    break
+
                 monitor_count += 1
                 print(f"\n🔍 [Monitoring cycle {monitor_count}] Starting opinion balance check...")
                 
@@ -834,8 +967,12 @@ Please analyze the opinion tendency of this post and whether intervention is nee
             return {"status": "not_initialized"}
         
         stats = self.opinion_balance_manager.get_system_stats()
+        # 运行状态完全依赖全局 control_flags.auto_status：
+        #   True  -> running
+        #   False/None -> stopped
+        run_status = "running" if control_flags.auto_status else "stopped"
         return {
-            "status": "running" if self.monitoring_task and not self.monitoring_task.done() else "stopped",
+            "status": run_status,
             "opinion_balance_stats": stats
         }
     
@@ -941,6 +1078,9 @@ async def main():
         config_path=args.config,
         db_path=args.db
     )
+    # Expose launcher instance to HTTP handlers
+    global GLOBAL_LAUNCHER
+    GLOBAL_LAUNCHER = launcher
     
     try:
         # Initialize system
@@ -948,9 +1088,15 @@ async def main():
             print("❌ System initialization failed, exiting")
             return
         
+        # Start HTTP control API for auto-status on a separate port
+        start_launcher_control_api_server()
+        
         if args.monitor_only:
             # Monitor-only mode
             print("🔍 Starting monitor-only mode...")
+            # 在监控专用模式下，显式开启全局 auto_status，
+            # 使端口/其他组件可通过该变量控制自动监控开关。
+            control_flags.auto_status = True
             await launcher.start_monitoring()
         else:
             # Interactive mode
@@ -976,6 +1122,9 @@ async def main():
                             print("⚠️ Monitoring is already running")
                         else:
                             print("🚀 Starting monitoring...")
+                            # Ensure global auto_status is on when user
+                            # explicitly starts monitoring from CLI.
+                            control_flags.auto_status = True
                             # Call sync method directly
                             try:
                                 result = launcher.start_monitoring_background()
@@ -1040,52 +1189,24 @@ async def main():
                             print("   ❌ Coordination system: not initialized")
                     
                     elif command == "auto-status":
-                        print("🔄 Starting timed status printing and monitoring (every 30 seconds, Ctrl+C to stop)")
-                        try:
-                            import time
-                            import asyncio
-                            cycle_count = 0
-                            
-                            while True:
-                                time.sleep(30)
-                                cycle_count += 1
-                                
-                                print(f"\n⏰ [{time.strftime('%H:%M:%S')}] Timed status update (cycle {cycle_count}):")
-                                status = launcher.get_system_status()
-                                print(f"📊 System status: {status['status']}")
-                                
-                                if 'opinion_balance_stats' in status:
-                                    stats = status['opinion_balance_stats']
-                                    if stats.get('enabled'):
-                                        monitoring = stats.get('monitoring', {})
-                                        interventions = stats.get('interventions', {})
-                                        print(f"   📊 Posts monitored: {monitoring.get('total_posts_monitored', 0)}")
-                                        print(f"   🚨 Interventions needed: {monitoring.get('intervention_needed', 0)}")
-                                        print(f"   ⚖️ Total interventions: {interventions.get('total_interventions', 0)}")
-                                        print(f"   📈 Average effectiveness: {interventions.get('average_effectiveness', 0):.1f}/10")
-                                        launcher._show_monitoring_details()
-                                
-                                # Run monitoring logic on the configured interval
-                                if launcher.opinion_balance_manager:
-                                    monitoring_interval_minutes = launcher.opinion_balance_manager.trending_posts_scan_interval
-                                    # Check every 30 seconds; run monitoring when interval is reached
-                                    if cycle_count * 30 >= monitoring_interval_minutes * 60:
-                                        print(f"\n🔍 Running opinion balance monitoring (interval: {monitoring_interval_minutes} minutes)")
-                                        try:
-                                            # Use the synchronous monitoring method
-                                            launcher._monitor_trending_posts_sync()
-                                            cycle_count = 0  # Reset counter
-                                        except Exception as e:
-                                            print(f"   ❌ Monitoring execution failed: {e}")
-                                            
-                        except KeyboardInterrupt:
-                            print("\n🛑 Timed status printing stopped")
+                            print("🔄 Starting timed status printing and monitoring (every 30 seconds, Ctrl+C to stop)")
+                            # 进入定时监控模式时，将全局 auto_status 标记为开启，
+                            # 并在当前线程中运行共享的 auto-status 循环。
+                            control_flags.auto_status = True
+                            try:
+                                _auto_status_loop()
+                            except KeyboardInterrupt:
+                                print("\n🛑 Timed status printing stopped by user")
                     
                     elif command == "stop":
                         launcher.stop_monitoring()
+                        # Reflect stopped state in global flag
+                        control_flags.auto_status = False
                     
                     elif command == "quit":
                         print("👋 Exiting system")
+                        # Ensure auto_status is turned off on exit
+                        control_flags.auto_status = False
                         break
                     
                     else:
