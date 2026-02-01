@@ -24,6 +24,7 @@ export default function DataVisualization() {
   const [networkData, setNetworkData] = useState<any>({
     nodes: [],
     edges: [],
+    processedNodes: [],
     stats: {}
   })
   
@@ -52,14 +53,21 @@ export default function DataVisualization() {
   // 当数据库改变时加载数据
   useEffect(() => {
     if (selectedDb) {
+      // 重置过滤选项和选中状态
+      setUserLimit(100)
+      setPostLimit(100)
+      setCommentLimit(100)
+      setSelectedNodes(new Map())
+      setHighlightLinks(new Set())
+      setHighlightNodes(new Set())
       loadData()
     }
   }, [selectedDb])
   
-  // 当过滤选项改变时重新加载数据
+  // 当过滤选项改变时重新应用过滤（不重新加载数据）
   useEffect(() => {
     if (selectedDb && networkData.nodes && networkData.nodes.length > 0) {
-      loadData()
+      applyFilters()
     }
   }, [showUsers, showPosts, showComments, userLimit, postLimit, commentLimit])
 
@@ -78,7 +86,7 @@ export default function DataVisualization() {
       
       setNetworkData(networkRes)
       
-      // 计算非0条数并设置默认值（仅在首次加载时）
+      // 计算非0条数并设置默认值
       if (networkRes.nodes && networkRes.nodes.length > 0) {
         const nonZeroUsers = networkRes.nodes.filter((n: any) => 
           n.type === 'user' && (n.follower_count > 0 || n.influence_score > 0)
@@ -90,10 +98,10 @@ export default function DataVisualization() {
           n.type === 'comment' && n.num_likes > 0
         ).length
         
-        // 只在首次加载时设置默认值
-        if (userLimit === 100) setUserLimit(nonZeroUsers)
-        if (postLimit === 100) setPostLimit(nonZeroPosts)
-        if (commentLimit === 100) setCommentLimit(nonZeroComments)
+        // 设置默认值为非0条数
+        setUserLimit(nonZeroUsers)
+        setPostLimit(nonZeroPosts)
+        setCommentLimit(nonZeroComments)
       }
       
       // 转换为ForceGraph格式
@@ -150,60 +158,75 @@ export default function DataVisualization() {
         }
       })
       
-      // 应用过滤
-      let filteredNodes = nodes
+      // 保存处理后的节点，供 applyFilters 使用
+      setNetworkData(prev => ({
+        ...prev,
+        processedNodes: nodes
+      }))
       
-      // 按类型分组并按热度排序
-      const userNodes = nodes
-        .filter((n: any) => n.type === 'user')
-        .sort((a: any, b: any) => (b.influence_score || 0) - (a.influence_score || 0)) // 按影响力排序
-      
-      const postNodes = nodes
-        .filter((n: any) => n.type === 'post')
-        .sort((a: any, b: any) => {
-          const engagementA = (a.num_likes || 0) + (a.num_comments || 0) + (a.num_shares || 0)
-          const engagementB = (b.num_likes || 0) + (b.num_comments || 0) + (b.num_shares || 0)
-          return engagementB - engagementA // 按互动量排序
-        })
-      
-      const commentNodes = nodes
-        .filter((n: any) => n.type === 'comment')
-        .sort((a: any, b: any) => (b.num_likes || 0) - (a.num_likes || 0)) // 按点赞数排序
-      
-      // 应用限制
-      const selectedUsers = showUsers ? userNodes.slice(0, userLimit) : []
-      const selectedPosts = showPosts ? postNodes.slice(0, postLimit) : []
-      const selectedComments = showComments ? commentNodes.slice(0, commentLimit) : []
-      
-      filteredNodes = [...selectedUsers, ...selectedPosts, ...selectedComments]
-      
-      // 获取保留节点的ID集合
-      const nodeIds = new Set(filteredNodes.map((n: any) => n.id))
-      
-      // 过滤边：只保留两端节点都存在的边
-      const links = (networkRes.edges || [])
-        .filter((edge: any) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
-        .map((edge: any) => ({
-          source: edge.source,
-          target: edge.target,
-          type: edge.type,
-          label: edge.label
-        }))
-      
-      console.log('Filtered graph data:', { 
-        nodes: filteredNodes.length, 
-        links: links.length,
-        users: selectedUsers.length,
-        posts: selectedPosts.length,
-        comments: selectedComments.length
-      })
-      setGraphData({ nodes: filteredNodes, links })
+      // 应用初始过滤
+      applyFiltersWithNodes(nodes, networkRes.edges || [])
     } catch (error) {
       console.error('Failed to load data:', error)
       alert('加载数据失败: ' + (error as Error).message)
     } finally {
       setLoading(false)
     }
+  }
+
+  // 应用过滤（使用已处理的节点）
+  const applyFilters = () => {
+    if (!networkData.processedNodes || networkData.processedNodes.length === 0) return
+    applyFiltersWithNodes(networkData.processedNodes, networkData.edges || [])
+  }
+
+  // 应用过滤的实现
+  const applyFiltersWithNodes = (nodes: any[], edges: any[]) => {
+    // 按类型分组并按热度排序
+    const userNodes = nodes
+      .filter((n: any) => n.type === 'user')
+      .sort((a: any, b: any) => (b.influence_score || 0) - (a.influence_score || 0)) // 按影响力排序
+    
+    const postNodes = nodes
+      .filter((n: any) => n.type === 'post')
+      .sort((a: any, b: any) => {
+        const engagementA = (a.num_likes || 0) + (a.num_comments || 0) + (a.num_shares || 0)
+        const engagementB = (b.num_likes || 0) + (b.num_comments || 0) + (b.num_shares || 0)
+        return engagementB - engagementA // 按互动量排序
+      })
+    
+    const commentNodes = nodes
+      .filter((n: any) => n.type === 'comment')
+      .sort((a: any, b: any) => (b.num_likes || 0) - (a.num_likes || 0)) // 按点赞数排序
+    
+    // 应用限制
+    const selectedUsers = showUsers ? userNodes.slice(0, userLimit) : []
+    const selectedPosts = showPosts ? postNodes.slice(0, postLimit) : []
+    const selectedComments = showComments ? commentNodes.slice(0, commentLimit) : []
+    
+    const filteredNodes = [...selectedUsers, ...selectedPosts, ...selectedComments]
+    
+    // 获取保留节点的ID集合
+    const nodeIds = new Set(filteredNodes.map((n: any) => n.id))
+    
+    // 过滤边：只保留两端节点都存在的边
+    const links = edges
+      .filter((edge: any) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
+      .map((edge: any) => ({
+        source: edge.source,
+        target: edge.target,
+        type: edge.type,
+        label: edge.label
+      }))
+    
+    console.log('Filtered graph data:', { 
+      nodes: filteredNodes.length, 
+      links: links.length,
+      users: selectedUsers.length,
+      posts: selectedPosts.length,
+      comments: selectedComments.length
+    })
+    setGraphData({ nodes: filteredNodes, links })
   }
 
   // 处理节点点击（支持多选）
