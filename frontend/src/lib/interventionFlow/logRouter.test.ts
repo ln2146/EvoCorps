@@ -185,6 +185,28 @@ describe('routeLogLine', () => {
     expect(state.context.leaderComments).toEqual(['Full body here'])
   })
 
+  it('appends non-prefixed continuation lines to leader comment bodies (multiline)', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-28 21:18:33,637 - INFO - 💬 👑 Leader comment 1 on post post-18e9eb: First line')
+    // Logger may emit subsequent lines without timestamp prefix (embedded newlines).
+    state = routeLogLine(state, 'Second line without prefix')
+    state = routeLogLine(state, 'Third line')
+
+    expect(state.context.leaderComments.length).toBe(1)
+    expect(state.context.leaderComments[0]).toBe('First line\nSecond line without prefix\nThird line')
+  })
+
+  it('appends non-prefixed continuation lines to post content (multiline)', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-28 21:24:38,434 - INFO - Post content: [NEWS] Hello')
+    state = routeLogLine(state, 'world line 2')
+    state = routeLogLine(state, 'line 3')
+
+    expect(state.context.postContent).toBe('[NEWS] Hello\nworld line 2\nline 3')
+  })
+
   it('deduplicates leader comments when the stream reconnects/replays', () => {
     let state = createInitialFlowState()
 

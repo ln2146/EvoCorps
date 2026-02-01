@@ -1185,7 +1185,7 @@ function RoleDetailSection({
           {pills.slice(0, 4).map((line, idx) => (
             <div
               key={`${role}_summary_${idx}`}
-              className="text-xs text-slate-700 px-3 py-2 rounded-xl bg-white/60 border border-white/40 whitespace-normal break-words leading-snug line-clamp-2"
+              className="text-xs text-slate-700 px-3 py-2 rounded-xl bg-white/60 border border-white/40 whitespace-pre-wrap break-words leading-snug max-h-16 overflow-y-auto"
             >
               {line}
             </div>

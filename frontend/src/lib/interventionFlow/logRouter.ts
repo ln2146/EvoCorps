@@ -25,6 +25,8 @@ export interface FlowState {
     feedScore?: number
     leaderComments: string[]
     leaderCommentKeys: Record<string, true>
+    leaderCommentIndices: Record<string, number>
+    pendingMultiline: null | { kind: 'postContent' | 'leaderComment'; key?: string }
   }
   roles: Record<Role, RoleCardState>
 }
@@ -101,7 +103,7 @@ export function createInitialFlowState(): FlowState {
     activeRole: null,
     amplifierSticky: false,
     noiseCounters: {},
-    context: { leaderComments: [], leaderCommentKeys: {} },
+    context: { leaderComments: [], leaderCommentKeys: {}, leaderCommentIndices: {}, pendingMultiline: null },
     roles: {
       Analyst: { before: ROLE_BEFORE_COPY.Analyst, status: 'idle', summary: [...ROLE_SUMMARY_DEFAULT.Analyst], stage: { current: -1, max: -1, order: [] }, during: [] },
       Strategist: { before: ROLE_BEFORE_COPY.Strategist, status: 'idle', summary: [...ROLE_SUMMARY_DEFAULT.Strategist], stage: { current: -1, max: -1, order: [] }, during: [] },
@@ -285,7 +287,7 @@ function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): 
     }
 
     const arg = cleanLine.match(/Core argument:\s*(.+)$/i)?.[1]?.trim()
-    if (arg) update('Strategist', 3, `核心论点：${truncateEnd(arg, 80)}`)
+    if (arg) update('Strategist', 3, `核心论点：${truncateEnd(arg, 220)}`)
   }
 
   // Leader: generation/vote outcomes.
@@ -358,8 +360,52 @@ function pushAggregated(prev: string[], nextLine: string, maxLines: number) {
 }
 
 export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
+  const hasPrefix = LOG_PREFIX_RE.test(rawLine)
   const cleanLine = stripLogPrefix(rawLine)
   if (!cleanLine) return prev
+
+  // If logger emitted embedded newlines, continuation lines often come without a timestamp prefix.
+  // In that case we append to the last captured field (post content / leader comment) and do not
+  // route as a standalone log line (prevents truncation and preserves full bodies for display).
+  if (!hasPrefix && prev.context.pendingMultiline) {
+    const pending = prev.context.pendingMultiline
+
+    if (pending.kind === 'postContent' && prev.context.postContent) {
+      return {
+        ...prev,
+        context: {
+          ...prev.context,
+          postContent: `${prev.context.postContent}\n${cleanLine}`,
+        },
+      }
+    }
+
+    if (pending.kind === 'leaderComment' && pending.key) {
+      const idx = prev.context.leaderCommentIndices[pending.key]
+      if (typeof idx === 'number' && prev.context.leaderComments[idx] != null) {
+        const nextComments = [...prev.context.leaderComments]
+        nextComments[idx] = `${nextComments[idx]}\n${cleanLine}`
+        return {
+          ...prev,
+          context: {
+            ...prev.context,
+            leaderComments: nextComments,
+          },
+        }
+      }
+    }
+  }
+
+  // Any prefixed line ends the previous multiline capture session.
+  if (hasPrefix && prev.context.pendingMultiline) {
+    prev = {
+      ...prev,
+      context: {
+        ...prev.context,
+        pendingMultiline: null,
+      },
+    }
+  }
 
   if (isNewRoundAnchor(cleanLine)) {
     // Reset per-round state but immediately attach the new round to Analyst so the UI
@@ -379,7 +425,11 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
   // Extract user-facing content that should be rendered in full (post body, leader comments, etc.)
   let nextContext = prev.context
   if (/^Post content:\s*/i.test(cleanLine)) {
-    nextContext = { ...nextContext, postContent: cleanLine.replace(/^Post content:\s*/i, '').trim() }
+    nextContext = {
+      ...nextContext,
+      postContent: cleanLine.replace(/^Post content:\s*/i, '').trim(),
+      pendingMultiline: { kind: 'postContent' },
+    }
   }
   const mFeed = cleanLine.match(/^Feed score:\s*([0-9.]+)/i)
   if (mFeed) {
@@ -395,10 +445,13 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
       const key = `${postId}:${ordinal}`
 
       if (!nextContext.leaderCommentKeys[key]) {
+        const nextIndex = nextContext.leaderComments.length
         nextContext = {
           ...nextContext,
           leaderCommentKeys: { ...nextContext.leaderCommentKeys, [key]: true },
+          leaderCommentIndices: { ...nextContext.leaderCommentIndices, [key]: nextIndex },
           leaderComments: [...nextContext.leaderComments, body],
+          pendingMultiline: { kind: 'leaderComment', key },
         }
       }
     }
