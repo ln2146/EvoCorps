@@ -88,6 +88,10 @@ const amplifierAnchors = [
 
 const monitoringAnchors = [
   /\[Monitoring round/i,
+  /^📈\s*Phase 3:/i,
+  /Starting monitoring task/i,
+  /Monitoring task started/i,
+  /Will continue monitoring/i,
   /Monitoring interval/i,
   ...analystAnchors,
 ]
@@ -124,11 +128,23 @@ function mapLineToStageIndex(role: Role, cleanLine: string): number | null {
   switch (role) {
     case 'Analyst': {
       // 内容识别 -> 评论抽样 -> 情绪度 -> 极端度 -> 干预判定 -> 监测评估
-      if (/Analyst is analyzing/i.test(cleanLine) || /^📊\s*Phase 1:/i.test(cleanLine) || /^Core viewpoint:/i.test(cleanLine)) return 0
+      if (
+        /^Post content:/i.test(cleanLine) ||
+        /Start opinion balance intervention system/i.test(cleanLine) ||
+        /Analyst is analyzing/i.test(cleanLine) ||
+        /^📊\s*Phase 1:/i.test(cleanLine) ||
+        /^Core viewpoint:/i.test(cleanLine)
+      ) return 0
       if (/Total weight calculated:/i.test(cleanLine) || /Comment\s+\d+\s+content:/i.test(cleanLine)) return 1
       if (/Weighted per-comment sentiment:/i.test(cleanLine) || /^Overall sentiment:/i.test(cleanLine)) return 2
       if (/^Viewpoint extremism:/i.test(cleanLine)) return 3
-      if (/Needs intervention:/i.test(cleanLine) || /Urgency level:/i.test(cleanLine) || /Analyst determined opinion balance intervention needed/i.test(cleanLine)) return 4
+      if (
+        /Needs intervention:/i.test(cleanLine) ||
+        /Urgency level:/i.test(cleanLine) ||
+        /Trigger reasons:/i.test(cleanLine) ||
+        /Analyst determined opinion balance intervention needed/i.test(cleanLine) ||
+        /Alert generated/i.test(cleanLine)
+      ) return 4
       if (
         /\[Monitoring round/i.test(cleanLine) ||
         /^📈\s*Phase 3:/i.test(cleanLine) ||
@@ -311,7 +327,9 @@ function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): 
   // Amplifier: echo size + likes + effectiveness.
   {
     const mTotal = cleanLine.match(/Echo plan:\s*total=(\d+)/i)
-    if (mTotal) update('Amplifier', 0, `Echo: ${mTotal[1]}`)
+    if (mTotal) update('Amplifier', 0, `Amplifiers: ${mTotal[1]}`)
+    // Expose the amplifier cluster size to Strategist pill row 2 for quick at-a-glance summary.
+    if (mTotal) update('Strategist', 1, `Amplifiers: ${mTotal[1]}`)
 
     const mResp = cleanLine.match(/(\d+)\s+echo responses generated/i)
     if (mResp) update('Amplifier', 1, `回应：${mResp[1]}`)
@@ -331,21 +349,31 @@ function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): 
 function compressDisplayLine(cleanLine: string) {
   // Suppress redundant "analysis completed" marker; we render the extracted core viewpoint instead.
   if (/Analyst analysis completed/i.test(cleanLine)) return ''
+  // Suppress redundant decision marker; we render the decision + alert milestones instead.
+  if (/Analyst determined opinion balance intervention needed/i.test(cleanLine)) return ''
+  // Suppress style/tone markers; they are reflected in Strategist pills.
+  if (/^\s*👑\s*Leader style:/i.test(cleanLine) || /^\s*💬\s*Tone:/i.test(cleanLine)) return ''
+  // Suppress raw post body/prompt lines in the stream (right panel focuses on the intervention workflow).
+  if (/^Post content:/i.test(cleanLine) || /^Please analyze\b/i.test(cleanLine)) return ''
+  // Suppress prelude meta lines: the UI already renders the post content and key metrics elsewhere.
+  if (
+    /^📋\s*Intervention ID:/i.test(cleanLine) ||
+    /^🎯\s*Target content:/i.test(cleanLine) ||
+    /^Post ID:/i.test(cleanLine) ||
+    /^Author:/i.test(cleanLine) ||
+    /^Total engagement:/i.test(cleanLine)
+  ) return ''
 
   const milestone = toUserMilestone(cleanLine)
   if (milestone) {
-    // For Analyst, when a value line appears, include it in the dynamic stream line as well
-    // so users can see the number inside the running panel (not only the summary cards).
-    const mSent = cleanLine.match(/^Overall sentiment:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
-    if (mSent) return `${milestone}（${mSent[1].replace(/\s+/g, '')}）`
-    const mExt = cleanLine.match(/^Viewpoint extremism:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
-    if (mExt) return `${milestone}（${mExt[1].replace(/\s+/g, '')}）`
     const mTrig = cleanLine.match(/^Trigger reasons:\s*(.+)$/i)
-    if (mTrig) return `${milestone}：${mTrig[1].trim()}`
+    // Milestone already includes the parsed reason text; do not append raw again.
+    if (mTrig) return milestone
     return milestone
   }
-  // Fallback: short truncated line, but avoid dumping full bodies.
-  return cleanLine.trim()
+  // Only surface infrastructure status lines; otherwise keep the stream compact (milestones-only).
+  if (/^(INFO|ERROR):/i.test(cleanLine)) return cleanLine.trim()
+  return ''
 }
 
 function pushAggregated(prev: string[], nextLine: string, maxLines: number) {

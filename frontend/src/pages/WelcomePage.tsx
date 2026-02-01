@@ -7,7 +7,7 @@ export default function WelcomePage() {
   const navigate = useNavigate()
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [isLoaded, setIsLoaded] = useState(false)
-  const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number }>>([])
+  const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; angle: number }>>([])
   const [isFlipped, setIsFlipped] = useState(false)
   const logoRef = useRef<HTMLDivElement>(null)
   const particleIdRef = useRef(0)

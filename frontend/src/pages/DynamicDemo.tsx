@@ -3,7 +3,7 @@ import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContai
 import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { createInitialFlowState, routeLogLine, type FlowState, type Role } from '../lib/interventionFlow/logRouter'
-import { createEventSourceLogStream, createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
+import { createEventSourceLogStream, createFetchReplayLogStream, createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
 import { computeEffectiveRole, nextSelectedRoleOnTabClick } from '../lib/interventionFlow/selection'
 import { parsePostContent } from '../lib/interventionFlow/postContent'
 import { getEmptyCopy } from '../lib/interventionFlow/emptyCopy'
@@ -55,6 +55,10 @@ const USE_SIMULATED_LOG_STREAM = false
 const USE_WORKFLOW_LOG_REPLAY = true
 // One full round only (a single "action_..." cycle) so the demo doesn't endlessly chain.
 const WORKFLOW_REPLAY_BACKEND_FILE = 'replay_workflow_20260130_round1.log'
+// Frontend-only replay: served from `frontend/public/workflow/` (so it works even when the backend isn't running).
+// Note: default is false to keep upstream behavior (SSE via backend).
+const USE_FRONTEND_ONLY_WORKFLOW_REPLAY = false
+const WORKFLOW_REPLAY_PUBLIC_FILE = 'replay_workflow_20260130_round1.txt'
 // Slower replay so the user can actually read the UI while it streams.
 const WORKFLOW_REPLAY_DELAY_MS = DEFAULT_WORKFLOW_REPLAY_DELAY_MS * 5
 
@@ -317,7 +321,9 @@ export default function DynamicDemo() {
 
     const stream = USE_SIMULATED_LOG_STREAM
       ? createSimulatedLogStream({ lines: DEMO_BACKEND_LOG_LINES, intervalMs: 320 })
-      : createEventSourceLogStream(OPINION_BALANCE_LOG_STREAM_URL)
+      : USE_WORKFLOW_LOG_REPLAY && USE_FRONTEND_ONLY_WORKFLOW_REPLAY
+        ? createFetchReplayLogStream({ url: `/workflow/${WORKFLOW_REPLAY_PUBLIC_FILE}`, delayMs: WORKFLOW_REPLAY_DELAY_MS })
+        : createEventSourceLogStream(OPINION_BALANCE_LOG_STREAM_URL)
     const unsubscribe = stream.subscribe((line) => {
       setFlowState((prev) => routeLogLine(prev, line))
     })

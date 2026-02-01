@@ -54,6 +54,25 @@ export function buildRolePills(
   }
 
   // Other roles: show their own summary lines (no heat).
+  if (role === 'Strategist') {
+    const strategy = summary.find((s) => s.startsWith('策略：')) ?? ''
+    const style = summary.find((s) => s.startsWith('风格：')) ?? ''
+    const amplifiers = summary.find((s) => s.startsWith('Amplifiers:')) ?? ''
+
+    const pills: string[] = []
+    if (strategy) pills.push(strategy)
+
+    const merged = [style, amplifiers].map((s) => s.trim()).filter(Boolean).join(' · ')
+    if (merged) pills.push(merged)
+
+    // Strategist core argument is displayed in the dynamic panel (it can be long), so don't duplicate it here.
+    return pills.slice(0, 4)
+  }
+
+  if (role === 'Amplifier') {
+    const amplifiers = summary.find((s) => s.startsWith('Amplifiers:')) ?? ''
+    return amplifiers ? [amplifiers] : []
+  }
+
   return summary.slice(0, 4)
 }
-

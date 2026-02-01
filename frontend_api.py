@@ -65,9 +65,42 @@ class ProcessManager:
         }
         self.temp_files = []       # 临时文件列表，用于清理
         self.python_exe = sys.executable  # 当前 Python 解释器路径
+        # Cache a full process scan to avoid `psutil.process_iter(cmdline=...)` on every request.
+        # On Windows, enumerating cmdlines can be slow enough to effectively hang the API.
+        self._last_process_scan_ts = 0.0
+        self._process_scan_interval_sec = 5.0
         
         # 启动时清理所有旧的临时文件
         self._cleanup_all_temp_files()
+
+    def _scan_processes_for_keywords(self) -> Dict[str, Optional[int]]:
+        """Scan all processes once and locate PIDs by keyword.
+
+        Returns a mapping {process_name: pid_or_None}. This is intentionally cached via
+        `_last_process_scan_ts` so status polling won't block the whole API server.
+        """
+        keywords = {
+            'database': 'start_database_service.py',
+            'main': 'main.py',
+            'opinion_balance': 'opinion_balance_launcher.py'
+        }
+
+        found: Dict[str, Optional[int]] = {k: None for k in keywords.keys()}
+        for proc in psutil.process_iter(['pid', 'cmdline']):
+            try:
+                cmdline = proc.info.get('cmdline') or []
+                # Convert to string once to avoid repeated str() calls.
+                joined = ' '.join(str(x) for x in cmdline)
+                for name, kw in keywords.items():
+                    if found[name] is None and kw in joined:
+                        found[name] = proc.info.get('pid')
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+            except Exception:
+                # Best-effort: never let a single process entry hang or crash the scan.
+                continue
+
+        return found
     
     def _is_process_running(self, process_name: str) -> bool:
         """检查进程是否运行（内部方法）
@@ -97,21 +130,17 @@ class ProcessManager:
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
         
-        # 如果没有记录，扫描所有进程
-        keywords = {
-            'database': 'start_database_service.py',
-            'main': 'main.py',
-            'opinion_balance': 'opinion_balance_launcher.py'
-        }
-        
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-            try:
-                cmdline = proc.info.get('cmdline')
-                if cmdline and any(keywords[process_name] in str(cmd) for cmd in cmdline):
-                    self.processes[process_name] = proc.info['pid']
-                    return True
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                continue
+        # 如果没有记录，不要在每次调用时都扫描全系统进程（Windows 上可能非常慢）。
+        # 改为按固定频率缓存扫描一次。
+        now = time.time()
+        if (now - self._last_process_scan_ts) >= self._process_scan_interval_sec:
+            self._last_process_scan_ts = now
+            found = self._scan_processes_for_keywords()
+            for name, pid in found.items():
+                if pid:
+                    self.processes[name] = pid
+            if found.get(process_name):
+                return True
         
         return False
     
@@ -235,48 +264,54 @@ class ProcessManager:
             self._cleanup_all_temp_files()
             
             # 检查数据库和主程序是否已运行
-            if self._is_process_running('database'):
+            db_running = self._is_process_running('database')
+            main_running = self._is_process_running('main')
+
+            # If everything is already running, treat it as success (idempotent start).
+            if db_running and main_running:
                 return {
-                    'success': False,
-                    'message': 'Database service is already running',
-                    'error': 'ProcessAlreadyRunning'
+                    'success': True,
+                    'message': 'Dynamic demo is already running',
+                    'processes': {
+                        'database': {
+                            'pid': self.processes.get('database'),
+                            'status': 'running'
+                        },
+                        'main': {
+                            'pid': self.processes.get('main'),
+                            'status': 'running'
+                        }
+                    }
                 }
             
-            if self._is_process_running('main'):
-                return {
-                    'success': False,
-                    'message': 'Main program is already running',
-                    'error': 'ProcessAlreadyRunning'
-                }
-            
-            # 启动数据库服务
-            db_script = 'src/start_database_service.py'
-            if not os.path.exists(db_script):
-                return {
-                    'success': False,
-                    'message': f'Database script not found: {db_script}',
-                    'error': 'FileNotFound'
-                }
-            
-            db_process = self._start_process_in_terminal(
-                script_path=db_script,
-                title='EvoCorps-Database',
-                auto_inputs=None,
-                conda_env=conda_env
-            )
-            
-            # 记录数据库进程（注意：由于是在新终端启动，我们无法直接获取子进程的 PID）
-            # 我们需要等待进程启动后通过 _is_process_running 来获取 PID
-            time.sleep(2)  # 等待进程启动
-            
-            # 尝试获取数据库进程 PID
-            db_pid = None
-            if self._is_process_running('database'):
-                db_pid = self.processes.get('database')
-            
-            # 等待 5 秒让数据库初始化
-            print("等待数据库服务初始化...")
-            time.sleep(5)
+            db_pid = self.processes.get('database') if db_running else None
+            main_pid = self.processes.get('main') if main_running else None
+
+            # 启动数据库服务（如果尚未运行）
+            if not db_running:
+                db_script = 'src/start_database_service.py'
+                if not os.path.exists(db_script):
+                    return {
+                        'success': False,
+                        'message': f'Database script not found: {db_script}',
+                        'error': 'FileNotFound'
+                    }
+                
+                self._start_process_in_terminal(
+                    script_path=db_script,
+                    title='EvoCorps-Database',
+                    auto_inputs=None,
+                    conda_env=conda_env
+                )
+                
+                # 等待进程启动后通过 _is_process_running 来获取 PID
+                time.sleep(2)
+                if self._is_process_running('database'):
+                    db_pid = self.processes.get('database')
+                
+                # 等待 5 秒让数据库初始化
+                print("等待数据库服务初始化...")
+                time.sleep(5)
             
             # 创建自动输入脚本并启动主程序
             main_script = 'src/main.py'
@@ -287,23 +322,22 @@ class ProcessManager:
                     'error': 'FileNotFound'
                 }
             
-            # 输入序列：n, y, n, n, Enter
-            auto_inputs = ['n', 'y', 'n', 'n', '']
-            
-            main_process = self._start_process_in_terminal(
-                script_path=main_script,
-                title='EvoCorps-Main',
-                auto_inputs=auto_inputs,
-                conda_env=conda_env
-            )
-            
-            # 等待主程序启动
-            time.sleep(2)
-            
-            # 尝试获取主程序进程 PID
-            main_pid = None
-            if self._is_process_running('main'):
-                main_pid = self.processes.get('main')
+            # 启动主程序（如果尚未运行）
+            if not main_running:
+                # 输入序列：n, y, n, n, Enter
+                auto_inputs = ['n', 'y', 'n', 'n', '']
+                
+                self._start_process_in_terminal(
+                    script_path=main_script,
+                    title='EvoCorps-Main',
+                    auto_inputs=auto_inputs,
+                    conda_env=conda_env
+                )
+                
+                # 等待主程序启动
+                time.sleep(2)
+                if self._is_process_running('main'):
+                    main_pid = self.processes.get('main')
             
             return {
                 'success': True,
@@ -3196,23 +3230,25 @@ def get_leaderboard():
         # 获取当前时间步
         current_time_step = calculator.get_current_time_step()
         
-        # 查询所有符合条件的帖子
+        # 查询所有符合条件的帖子 + 一次性取出 post_time_step（避免 N+1 查询导致 API 卡死）
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
-        # 只查询必需字段，过滤条件：status IS NULL OR status != 'taken_down'
         cursor.execute("""
             SELECT 
-                post_id,
-                summary,
-                content,
-                author_id,
-                created_at,
-                num_likes,
-                num_shares,
-                num_comments
-            FROM posts
-            WHERE status IS NULL OR status != 'taken_down'
+                p.post_id,
+                p.summary,
+                p.content,
+                p.author_id,
+                p.created_at,
+                p.num_likes,
+                p.num_shares,
+                p.num_comments,
+                pt.time_step
+            FROM posts p
+            LEFT JOIN post_timesteps pt
+                ON pt.post_id = p.post_id
+            WHERE p.status IS NULL OR p.status != 'taken_down'
         """)
         
         # 计算每个帖子的热度评分
@@ -3226,11 +3262,16 @@ def get_leaderboard():
                 'created_at': row[4],
                 'num_likes': row[5] or 0,
                 'num_shares': row[6] or 0,
-                'num_comments': row[7] or 0
+                'num_comments': row[7] or 0,
+                'time_step': row[8]
             }
             
-            # 计算热度评分
-            score = calculator.calculate_score(post, current_time_step)
+            # 计算热度评分（与 agent_user.py 保持一致）
+            engagement = post['num_comments'] + post['num_shares'] + post['num_likes']
+            post_time_step = post.get('time_step')
+            age = max(0, current_time_step - post_time_step) if post_time_step is not None else 0
+            freshness = max(calculator.MIN_FRESHNESS, 1.0 - calculator.LAMBDA_DECAY * age)
+            score = (engagement + calculator.BETA_BIAS) * freshness
             
             # 处理 excerpt 字段（优先使用 summary，否则截断 content）
             if post['summary']:

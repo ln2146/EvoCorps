@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Database, MessageSquare, CheckCircle2, User, Loader2, Info, X, ThumbsUp, MessageCircle, TrendingUp, ChevronDown, ChevronUp, Users, ChevronLeft, ChevronRight, Check, Send } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { MessageSquare, CheckCircle2, User, Loader2, Info, X, ThumbsUp, MessageCircle, TrendingUp, ChevronDown, ChevronUp, Users, ChevronLeft, ChevronRight, Check, Send } from 'lucide-react'
 import axios from 'axios'
 import DatabaseSelector from '../components/DatabaseSelector'
 
@@ -76,12 +76,6 @@ export default function InterviewPage() {
 
   // 使用 useRef 追踪最新的采访记录和流状态
   const historyRef = useRef<InterviewHistory[]>(interviewHistory)
-  const abortControllerRef = useRef<AbortController | null>(null)
-  const streamStateRef = useRef<{
-    isStreaming: boolean
-    historyId: string
-  }>({ isStreaming: false, historyId: '' })
-
   // 更新 ref 当 interviewHistory 改变时
   useEffect(() => {
     historyRef.current = interviewHistory

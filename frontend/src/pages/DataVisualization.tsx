@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Database, Network, Maximize2, Minimize2 } from 'lucide-react'
+import { Network, Maximize2, Minimize2 } from 'lucide-react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { getDatabases, getNetworkData } from '../services/api'
 import DatabaseSelector from '../components/DatabaseSelector'
@@ -159,7 +159,7 @@ export default function DataVisualization() {
       })
       
       // 保存处理后的节点，供 applyFilters 使用
-      setNetworkData(prev => ({
+      setNetworkData((prev: any) => ({
         ...prev,
         processedNodes: nodes
       }))

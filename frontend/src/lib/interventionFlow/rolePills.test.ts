@@ -21,6 +21,8 @@ describe('buildRolePills', () => {
     })
     expect(strategist[0]).toBe('策略：balanced_response')
     expect(strategist.join(' ')).not.toContain('热度')
+    // Strategist core argument should be shown in the dynamic panel, not duplicated in the summary pills.
+    expect(strategist.join(' ')).not.toContain('核心论点：')
 
     const leader = buildRolePills('Leader', {
       feedScore: 999.9,
@@ -35,6 +37,6 @@ describe('buildRolePills', () => {
       summary: ['策略：x', '置信度：—', '风格：y', '核心论点：z'],
     })
     expect(strategist.join(' ')).not.toContain('置信度：—')
+    expect(strategist.join(' ')).not.toContain('核心论点：')
   })
 })
-
