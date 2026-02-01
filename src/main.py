@@ -52,6 +52,12 @@ class ToggleRequest(BaseModel):
     enabled: bool
 
 
+class PostCommentsAnalysisRequest(BaseModel):
+    """Request body for analyzing a single post and its comments."""
+
+    post_id: str
+
+
 @control_app.get("/control/status")
 def get_control_status():
     """Return current values of all runtime control flags."""
@@ -119,6 +125,131 @@ def get_auto_status_flag():
     """Get current opinion-balance auto monitoring/intervention status."""
 
     return {"auto_status": control_flags.auto_status}
+
+
+@control_app.post("/analysis/post-comments")
+def analyze_post_comments(body: PostCommentsAnalysisRequest):
+    """针对单个帖子及其评论区，进行情绪度、极端度与观点结构分析。
+
+    步骤：
+    1. 从 SQLite 数据库中按 post_id 读取帖子内容及其所有评论；
+    2. 构造一个包含「主帖 + 评论列表」的分析提示词；
+    3. 使用多模型选择器创建 LLM 客户端，生成分析结果；
+    4. 返回帖子基础信息与模型生成的分析文本。
+    """
+
+    from multi_model_selector import MultiModelSelector
+    from database_manager import DatabaseManager
+
+    post_id = body.post_id
+
+    # 1) 打开数据库并读取帖子与评论
+    project_root = os.path.dirname(os.path.dirname(__file__))
+    db_path = os.path.join(project_root, "database", "simulation.db")
+
+    db_manager = DatabaseManager(db_path, reset_db=False)
+    conn = db_manager.get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT post_id, content, author_id, created_at, num_comments
+        FROM posts
+        WHERE post_id = ?
+        """,
+        (post_id,),
+    )
+    post_row = cursor.fetchone()
+
+    if not post_row:
+        return {"error": f"Post {post_id} not found"}
+
+    cursor.execute(
+        """
+        SELECT comment_id, content, author_id, created_at, num_likes
+        FROM comments
+        WHERE post_id = ?
+        ORDER BY created_at ASC
+        """,
+        (post_id,),
+    )
+    comment_rows = cursor.fetchall()
+
+    # 2) 构造提示词
+    post_content = post_row["content"] or ""
+    post_author = post_row["author_id"]
+
+    comments_block_lines = []
+    for idx, c in enumerate(comment_rows, start=1):
+        comments_block_lines.append(
+            f"[{idx}] author={c['author_id']} likes={c['num_likes']}: {c['content']}"
+        )
+    comments_block = "\n".join(comments_block_lines) if comments_block_lines else "(暂无评论)"
+
+    system_prompt = (
+        "你是一名严谨的舆论分析助手，专门分析某个帖子评论区的情绪氛围、观点极端程度，"
+        "并用自然语言总结多数观点与少数观点。回答尽量简洁、结构清晰。"
+    )
+
+    user_prompt = f"""请基于下面的内容进行分析：
+
+[主帖]
+作者: {post_author}
+内容: {post_content}
+
+[评论区]
+{comments_block}
+
+请完成以下任务：
+1. 针对评论区中的“每一条评论”逐条进行情绪与极端度评分：
+    - 对第 i 条评论给出 sentiment_score_i 和 extremeness_score_i，二者的取值都必须是以下五个离散值之一：0, 0.25, 0.5, 0.75, 1。
+      · 对于 sentiment_score_i：0 表示极度消极，1 表示极度积极，0.5 约为中性。
+      · 对于 extremeness_score_i：0 表示完全温和理性，1 表示极端、煽动性或仇恨情绪非常强。
+    - 对每条评论用一行类似格式输出，例如：
+      「评论 [编号]: sentiment_score=0.75, extremeness_score=0.25, 说明: ……」。
+2. 在完成单条评分后，再根据“全部评论的评分和内容”给出整体评估：
+    - 给出一个整体情绪度评分 sentiment_score_overall，取值也必须是 0, 0.25, 0.5, 0.75, 1 之一；
+    - 给出一个整体极端度评分 extremeness_score_overall，取值也必须是 0, 0.25, 0.5, 0.75, 1 之一；
+    - 简要说明整体评分是如何由各条评论的评分与内容综合得出的（例如大致的情绪分布、极端言论占比等）。
+3. 用一段话总结评论区的主要观点结构，形式类似：
+    「评论区中的大多数人认为……，少部分人认为……，还有个别观点认为……」。
+
+请用中文回答，并在文本中明确写出每条评论的 sentiment_score_i / extremeness_score_i，
+以及整体的 sentiment_score_overall 和 extremeness_score_overall 的数值。"""
+
+    # 3) 调用多模型选择器创建 LLM 客户端并生成分析
+    selector = MultiModelSelector()
+    try:
+        client, model_name = selector.create_openai_client(role="summary")
+
+        model_name = "gemini-3-flash-preview"
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            max_tokens=600,
+            temperature=0.5,
+        )
+        analysis_text = response.choices[0].message.content
+    except Exception as e:
+        logging.error(f"Post comments analysis failed for {post_id}: {e}")
+        analysis_text = f"LLM analysis failed: {e}"
+
+    # 4) 关闭数据库连接
+    try:
+        db_manager.close()
+    except Exception:
+        pass
+
+    return {
+        "post_id": post_id,
+        "post_content": post_content,
+        "num_comments": len(comment_rows),
+        "analysis": analysis_text,
+    }
 
 
 def start_control_api_server(host: str = "0.0.0.0", port: int = 8000) -> Optional[threading.Thread]:
