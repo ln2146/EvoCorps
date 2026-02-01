@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type ElementType } from 'react'
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
+import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, ArrowLeft, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { createInitialFlowState, routeLogLine, type FlowState, type Role } from '../lib/interventionFlow/logRouter'
 import { createEventSourceLogStream, createFetchReplayLogStream, createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
@@ -1289,9 +1289,12 @@ function CommentaryAnalysisPanel({ status, onOpenConfig, onRun }: { status: 'Idl
     <div className="glass-card p-6">
       <div className="flex flex-col gap-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-800">评论区总体状态分析</h2>
-            <p className="text-sm text-slate-600">LLM 周期性分析评论情绪与极化趋势</p>
+          <div className="flex items-center gap-3">
+            <BarChart3 size={32} className="text-blue-500" />
+            <div>
+              <h2 className="text-2xl font-bold text-slate-800">评论区总体状态分析</h2>
+              <p className="text-sm text-slate-600">LLM 周期性分析评论情绪与极化趋势</p>
+            </div>
           </div>
           <div className="flex items-center gap-3 bg-white/70 border border-white/40 rounded-2xl p-4 shrink-0 shadow-lg">
             <button className="btn-secondary" onClick={onOpenConfig}>分析配置</button>
