@@ -1067,17 +1067,22 @@ function RoleTabsRow({
                     <div className="text-sm font-semibold text-slate-800 truncate">{label}</div>
                   </div>
                 </div>
+                <div className="shrink-0 flex items-center gap-2">
+                  <span
+                    className={[
+                      'w-2 h-2 rounded-full',
+                      isActive
+                        ? 'bg-emerald-500 animate-pulse'
+                        : status === 'done'
+                          ? 'bg-emerald-400'
+                          : status === 'error'
+                            ? 'bg-red-500'
+                            : 'bg-slate-300',
+                    ].join(' ')}
+                    aria-label={isActive ? 'active' : 'inactive'}
+                  />
+                </div>
               </div>
-              <div className="shrink-0 flex items-center gap-2">
-                <span
-                  className={[
-                    'w-2 h-2 rounded-full',
-                    isActive ? 'bg-emerald-500 animate-pulse' : status === 'done' ? 'bg-emerald-400' : status === 'error' ? 'bg-red-500' : 'bg-slate-300',
-                  ].join(' ')}
-                  aria-label={isActive ? 'active' : 'inactive'}
-                />
-              </div>
-            </div>
           </button>
         )
       })}
