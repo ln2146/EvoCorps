@@ -343,8 +343,8 @@ export default function DataVisualization() {
             <Network size={24} className="text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">关系图谱</h1>
-            <p className="text-slate-600">可视化用户、帖子、评论之间的关系网络</p>
+            <h1 className="text-4xl font-bold text-slate-800">关系图谱</h1>
+            <p className="text-lg text-slate-600">可视化用户、帖子、评论之间的关系网络</p>
           </div>
         </div>
       </div>
@@ -362,7 +362,7 @@ export default function DataVisualization() {
       {/* 过滤控制面板 */}
       {selectedDb && (
         <div className="glass-card p-6">
-          <h3 className="text-lg font-bold text-slate-800 mb-4">节点过滤</h3>
+          <h3 className="text-2xl font-bold text-slate-800 mb-4">节点过滤</h3>
           <div className="grid grid-cols-3 gap-6">
             {/* 用户节点 */}
             <div className="space-y-3">
@@ -374,23 +374,23 @@ export default function DataVisualization() {
                   onChange={(e) => setShowUsers(e.target.checked)}
                   className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                 />
-                <label htmlFor="showUsers" className="text-sm font-medium text-slate-700">
+                <label htmlFor="showUsers" className="text-base font-medium text-slate-700">
                   显示用户节点 (共 {networkData.nodes?.filter((n: any) => n.type === 'user').length || 0} 条, 
                   非0: {networkData.nodes?.filter((n: any) => n.type === 'user' && (n.follower_count > 0 || n.influence_score > 0)).length || 0} 条)
                 </label>
               </div>
               {showUsers && (
                 <div className="ml-6">
-                  <label className="text-xs text-slate-600">显示前</label>
+                  <label className="text-sm text-slate-600">显示前</label>
                   <input
                     type="number"
                     value={userLimit}
                     onChange={(e) => setUserLimit(Math.max(1, parseInt(e.target.value) || 100))}
                     min="1"
                     max="10000"
-                    className="ml-2 w-20 px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="ml-2 w-20 px-2 py-1 text-base border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <span className="ml-2 text-xs text-slate-600">条</span>
+                  <span className="ml-2 text-sm text-slate-600">条</span>
                 </div>
               )}
             </div>
@@ -405,7 +405,7 @@ export default function DataVisualization() {
                   onChange={(e) => setShowPosts(e.target.checked)}
                   className="w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
                 />
-                <label htmlFor="showPosts" className="text-sm font-medium text-slate-700">
+                <label htmlFor="showPosts" className="text-base font-medium text-slate-700">
                   显示帖子节点 (共 {networkData.nodes?.filter((n: any) => n.type === 'post').length || 0} 条, 
                   非0: {networkData.nodes?.filter((n: any) => n.type === 'post' && (n.num_likes > 0 || n.num_comments > 0 || n.num_shares > 0)).length || 0} 条)
                 </label>
@@ -464,8 +464,8 @@ export default function DataVisualization() {
       {loading ? (
         <div className="glass-card p-12 text-center">
           <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-slate-600 text-lg font-medium">正在加载关系图谱...</p>
-          <p className="text-slate-500 text-sm mt-2">数据量较大，请稍候</p>
+          <p className="text-slate-600 text-xl font-medium">正在加载关系图谱...</p>
+          <p className="text-slate-500 text-base mt-2">数据量较大，请稍候</p>
         </div>
       ) : (
         <>
@@ -473,7 +473,7 @@ export default function DataVisualization() {
           {graphData.nodes && graphData.nodes.length > 0 ? (
             <div className="glass-card p-6" ref={graphContainerRef}>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-slate-800">关系图谱</h2>
+                <h2 className="text-2xl font-bold text-slate-800">关系图谱</h2>
                 <div className="flex items-center gap-6">
                   {/* 全屏按钮 */}
                   <button

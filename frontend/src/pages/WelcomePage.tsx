@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart3, Activity, ArrowRight } from 'lucide-react'
+import { motion } from 'framer-motion'
 
 export default function WelcomePage() {
   const navigate = useNavigate()
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [isLoaded, setIsLoaded] = useState(false)
   const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number }>>([])
+  const [isFlipped, setIsFlipped] = useState(false)
   const logoRef = useRef<HTMLDivElement>(null)
   const particleIdRef = useRef(0)
 
@@ -54,6 +56,8 @@ export default function WelcomePage() {
 
   // Logo 点击特效
   const handleLogoClick = () => {
+    setIsFlipped(!isFlipped)
+    
     if (!logoRef.current) return
 
     const rect = logoRef.current.getBoundingClientRect()
@@ -95,24 +99,40 @@ export default function WelcomePage() {
         className="w-1/2 flex items-center justify-end pr-32"
         ref={logoRef}
       >
-        <div
-          className={`transition-all duration-1000 ease-out transform ${
-            isLoaded 
-              ? 'opacity-100 scale-100' 
-              : 'opacity-0 scale-75'
-          }`}
-          onClick={handleLogoClick}
-          style={{
-            cursor: 'pointer',
-            filter: isLoaded ? 'drop-shadow(0 20px 25px rgba(0, 0, 0, 0.1))' : 'drop-shadow(0 0 0 rgba(0, 0, 0, 0))',
-          }}
+        <motion.div
+          className="flex flex-col items-center"
+          initial={{ opacity: 0, x: -50 }}
+          animate={isLoaded ? { opacity: 1, x: 0 } : { opacity: 0, x: -50 }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
         >
-          <img 
-            src="/logo.png" 
-            alt="EvoCorps Logo" 
-            className="w-full max-w-md hover:scale-105 transition-transform duration-300"
-          />
-        </div>
+          <motion.div
+            onClick={handleLogoClick}
+            style={{
+              cursor: 'pointer',
+              filter: isLoaded ? 'drop-shadow(0 20px 25px rgba(0, 0, 0, 0.1))' : 'drop-shadow(0 0 0 rgba(0, 0, 0, 0))',
+            }}
+            whileHover={{ scale: 1.05 }}
+            animate={{ rotateY: isFlipped ? 360 : 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 10, duration: 0.6 }}
+          >
+            <img 
+              src="/logo.png" 
+              alt="EvoCorps Logo" 
+              className="w-full max-w-lg"
+            />
+          </motion.div>
+          
+          <motion.div
+            className="text-center mt-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={isLoaded ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+            transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
+          >
+            <p className="text-lg text-slate-600 font-medium">
+              An Evolutionary Multi-Agent Framework for Depolarizing Online Discourse
+            </p>
+          </motion.div>
+        </motion.div>
       </div>
 
       {/* 右侧选择区域 */}
@@ -133,12 +153,12 @@ export default function WelcomePage() {
 
         {/* 滑动选择器容器 */}
         <div 
-          className="relative z-10 w-full max-w-xl"
+          className="relative z-10 w-full max-w-xl pl-24"
           onWheel={handleWheel}
         >
           {/* 卡片容器 */}
-          <div className="relative h-[400px] flex items-center justify-center">
-            {modes.map((mode, index) => {
+          <div className="relative h-[500px] flex items-center justify-center">
+          {modes.map((mode, index) => {
               const Icon = mode.icon
               const offset = (index - selectedIndex) * 120
               const isSelected = index === selectedIndex
@@ -148,38 +168,56 @@ export default function WelcomePage() {
               const cardDelay = index * 200
 
               return (
-                <div
+                <motion.div
                   key={mode.id}
-                  className="absolute transition-all duration-500 ease-out cursor-pointer"
-                  style={{
-                    transform: `translateY(${offset}px) scale(${scale})`,
+                  className="absolute cursor-pointer"
+                  animate={{
+                    y: offset,
+                    scale: scale,
                     opacity: isLoaded ? opacity : 0,
                     filter: `blur(${blur}px)`,
+                  }}
+                  transition={{
+                    type: 'spring',
+                    stiffness: 300,
+                    damping: 30,
+                    delay: isLoaded ? 0 : cardDelay / 1000,
+                  }}
+                  style={{
                     pointerEvents: isSelected ? 'auto' : 'none',
-                    transitionDelay: isLoaded ? '0ms' : `${cardDelay}ms`,
                   }}
                   onClick={() => isSelected && navigate(mode.path)}
                 >
-                  <div className="glass-card p-8 w-[480px] hover:shadow-2xl transition-shadow">
-                    <div className="flex items-center gap-6">
-                      <div className={`w-20 h-20 rounded-2xl bg-gradient-to-r ${mode.gradient} flex items-center justify-center shadow-lg flex-shrink-0`}>
-                        <Icon size={40} className="text-white" />
+                  <motion.div 
+                    className="bg-white/80 backdrop-blur-xl rounded-3xl p-12 w-[560px] shadow-xl hover:shadow-2xl transition-shadow border border-white/40"
+                    whileHover={{ scale: 1.02 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 10 }}
+                  >
+                    <div className="flex items-start gap-8">
+                      <div className={`w-24 h-24 rounded-2xl bg-gradient-to-r ${mode.gradient} flex items-center justify-center shadow-lg flex-shrink-0`}>
+                        <Icon size={48} className="text-white" />
                       </div>
-                      <div className="flex-1">
-                        <h3 className="text-3xl font-bold text-slate-800 mb-2">
+                      <div className="flex-1 pt-2">
+                        <h3 className="text-4xl font-bold text-slate-800 mb-3">
                           {mode.title}
                         </h3>
-                        <p className="text-slate-600 text-lg">{mode.description}</p>
+                        <p className="text-slate-500 text-lg">{mode.description}</p>
                       </div>
                       {isSelected && (
-                        <ArrowRight 
-                          size={32} 
-                          className="text-slate-400 animate-pulse flex-shrink-0" 
-                        />
+                        <motion.div
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ type: 'spring', stiffness: 300, damping: 10 }}
+                        >
+                          <ArrowRight 
+                            size={32} 
+                            className="text-slate-400 flex-shrink-0 mt-2" 
+                          />
+                        </motion.div>
                       )}
                     </div>
-                  </div>
-                </div>
+                  </motion.div>
+                </motion.div>
               )
             })}
           </div>

@@ -79,10 +79,10 @@ export default function HomePage() {
       <div className="glass-card p-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
+            <h1 className="text-5xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
               欢迎使用 EvoCorps
             </h1>
-            <p className="text-slate-600 text-lg">
+            <p className="text-slate-600 text-xl">
               面向网络舆论去极化的进化式多智能体框架
             </p>
           </div>
@@ -103,7 +103,7 @@ export default function HomePage() {
             onSelect={setSelectedDb}
             label="选择数据库："
           />
-          {loading && <span className="text-sm text-slate-500">加载中...</span>}
+          {loading && <span className="text-base text-slate-500">加载中...</span>}
         </div>
       </div>
 
@@ -118,8 +118,8 @@ export default function HomePage() {
                   <Icon size={24} className="text-white" />
                 </div>
               </div>
-              <p className="text-3xl font-bold text-slate-800 mb-1">{stat.value.toLocaleString()}</p>
-              <p className="text-sm text-slate-600">{stat.label}</p>
+              <p className="text-4xl font-bold text-slate-800 mb-1">{stat.value.toLocaleString()}</p>
+              <p className="text-base text-slate-600">{stat.label}</p>
             </div>
           )
         })}
@@ -127,7 +127,7 @@ export default function HomePage() {
 
       {/* 功能特性 */}
       <div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-6">核心功能</h2>
+        <h2 className="text-3xl font-bold text-slate-800 mb-6">核心功能</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {features.map((feature, index) => {
             const Icon = feature.icon
@@ -136,8 +136,8 @@ export default function HomePage() {
                 <div className={`w-14 h-14 rounded-2xl bg-gradient-to-r ${feature.gradient} flex items-center justify-center shadow-lg mb-4`}>
                   <Icon size={28} className="text-white" />
                 </div>
-                <h3 className="text-xl font-semibold text-slate-800 mb-2">{feature.title}</h3>
-                <p className="text-slate-600">{feature.description}</p>
+                <h3 className="text-2xl font-semibold text-slate-800 mb-2">{feature.title}</h3>
+                <p className="text-slate-600 text-base">{feature.description}</p>
               </div>
             )
           })}

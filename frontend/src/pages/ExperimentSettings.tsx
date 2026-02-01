@@ -206,8 +206,8 @@ export default function ExperimentSettings() {
             <Settings size={24} className="text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">实验设置</h1>
-            <p className="text-slate-600">管理服务和配置实验参数</p>
+            <h1 className="text-4xl font-bold text-slate-800">实验设置</h1>
+            <p className="text-lg text-slate-600">管理服务和配置实验参数</p>
           </div>
         </div>
       </div>

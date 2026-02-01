@@ -382,8 +382,8 @@ export default function InterviewPage() {
             <MessageSquare size={24} className="text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">采访功能</h1>
-            <p className="text-slate-600">向模拟用户发送问卷问题并收集回答</p>
+            <h1 className="text-4xl font-bold text-slate-800">采访功能</h1>
+            <p className="text-lg text-slate-600">向模拟用户发送问卷问题并收集回答</p>
           </div>
         </div>
       </div>
@@ -397,7 +397,7 @@ export default function InterviewPage() {
             onSelect={setSelectedDb}
             label="选择数据库:"
           />
-          <div className="ml-auto text-sm text-slate-600">
+          <div className="ml-auto text-base text-slate-600">
             已选择 <span className="font-bold text-green-600">{selectedUsers.size}</span> / {totalUniqueUsers} 个用户
           </div>
         </div>
@@ -410,12 +410,12 @@ export default function InterviewPage() {
           <div className="col-span-2 glass-card p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-xl font-bold text-slate-800">选择采访对象</h2>
-                <p className="text-sm text-slate-500 mt-1">按帖子热度组织，点击展开查看互动用户</p>
+                <h2 className="text-2xl font-bold text-slate-800">选择采访对象</h2>
+                <p className="text-base text-slate-500 mt-1">按帖子热度组织，点击展开查看互动用户</p>
               </div>
               <button
                 onClick={selectAllUsers}
-                className="px-4 py-2 bg-green-700 text-white rounded-xl font-medium hover:bg-green-800 transition-all duration-200 shadow-lg"
+                className="px-4 py-2 bg-green-700 text-white rounded-xl font-medium text-base hover:bg-green-800 transition-all duration-200 shadow-lg"
               >
                 {selectedUsers.size === totalUniqueUsers ? '取消全选' : '选择全部用户'}
               </button>
@@ -424,7 +424,7 @@ export default function InterviewPage() {
             {loading ? (
               <div className="text-center py-12">
                 <Loader2 size={48} className="mx-auto mb-4 animate-spin text-green-500" />
-                <p className="text-slate-600">加载数据中...</p>
+                <p className="text-lg text-slate-600">加载数据中...</p>
               </div>
             ) : (
               <div className="space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">

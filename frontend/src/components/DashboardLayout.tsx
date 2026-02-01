@@ -49,10 +49,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <Zap size={24} className="text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
                   EvoCorps
                 </h1>
-                <p className="text-xs text-slate-500">静态演示</p>
+                <p className="text-sm text-slate-500">静态演示</p>
               </div>
             </div>
           )}
@@ -78,7 +78,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 title={isCollapsed ? item.label : ''}
               >
                 <Icon size={20} />
-                {!isCollapsed && <span className="font-medium">{item.label}</span>}
+                {!isCollapsed && <span className="font-medium text-lg">{item.label}</span>}
               </Link>
             )
           })}
@@ -89,13 +89,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="p-4 border-t border-white/20 space-y-2">
             <button
               onClick={() => navigate('/dynamic')}
-              className="btn-apple w-full flex items-center justify-center gap-2 text-slate-700 font-medium text-sm"
+              className="btn-apple w-full flex items-center justify-center gap-2 text-slate-700 font-medium text-base"
             >
               <span>进入动态演示</span>
             </button>
             <button
               onClick={() => navigate('/')}
-              className="btn-apple w-full flex items-center justify-center gap-2 text-slate-700 font-medium text-sm"
+              className="btn-apple w-full flex items-center justify-center gap-2 text-slate-700 font-medium text-base"
             >
               <ArrowLeft size={18} />
               <span>返回首页</span>

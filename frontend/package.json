@@ -8,6 +8,7 @@
     "axios": "^1.6.2",
     "d3-force": "^3.0.0",
     "force-graph": "^1.51.0",
+    "framer-motion": "^12.29.2",
     "lucide-react": "^0.294.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

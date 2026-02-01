@@ -127,8 +127,8 @@ export default function ExperimentManagement() {
             <Database size={24} className="text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">实验管理</h1>
-            <p className="text-slate-600">保存和加载模拟实验快照</p>
+            <h1 className="text-4xl font-bold text-slate-800">实验管理</h1>
+            <p className="text-lg text-slate-600">保存和加载模拟实验快照</p>
           </div>
         </div>
       </div>

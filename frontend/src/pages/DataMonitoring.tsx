@@ -211,8 +211,8 @@ export default function DataMonitoring() {
             <Activity size={24} className="text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">数据监控</h1>
-            <p className="text-slate-600">查看用户和帖子的详细信息</p>
+            <h1 className="text-4xl font-bold text-slate-800">数据监控</h1>
+            <p className="text-lg text-slate-600">查看用户和帖子的详细信息</p>
           </div>
         </div>
       </div>
@@ -282,22 +282,22 @@ export default function DataMonitoring() {
       {viewType === 'user' && selectedUserId && userDetail && (
         <>
           <div className="glass-card p-6">
-            <h2 className="text-xl font-bold text-slate-800 mb-4">基本信息</h2>
+            <h2 className="text-2xl font-bold text-slate-800 mb-4">基本信息</h2>
             <div className="space-y-4">
               <div className="p-4 bg-white/50 rounded-xl">
-                <p className="text-sm text-slate-600 mb-3">用户人设</p>
+                <p className="text-base text-slate-600 mb-3">用户人设</p>
                 <PersonaDisplay persona={userDetail.basic_info.persona} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 bg-white/50 rounded-xl">
-                  <p className="text-sm text-slate-600 mb-2">创建时间</p>
-                  <p className="text-slate-800">{new Date(userDetail.basic_info.creation_time).toLocaleString('zh-CN')}</p>
+                  <p className="text-base text-slate-600 mb-2">创建时间</p>
+                  <p className="text-lg text-slate-800">{new Date(userDetail.basic_info.creation_time).toLocaleString('zh-CN')}</p>
                 </div>
                 <div className="p-4 bg-white/50 rounded-xl">
-                  <p className="text-sm text-slate-600 mb-2">影响力分数</p>
-                  <p className="text-2xl font-bold text-slate-800">{userDetail.basic_info.influence_score.toFixed(2)}</p>
+                  <p className="text-base text-slate-600 mb-2">影响力分数</p>
+                  <p className="text-3xl font-bold text-slate-800">{userDetail.basic_info.influence_score.toFixed(2)}</p>
                   {userDetail.basic_info.is_influencer && (
-                    <span className="inline-block mt-2 px-2 py-1 bg-orange-100 text-orange-600 text-xs rounded-lg font-medium">影响者</span>
+                    <span className="inline-block mt-2 px-2 py-1 bg-orange-100 text-orange-600 text-sm rounded-lg font-medium">影响者</span>
                   )}
                 </div>
               </div>
@@ -305,27 +305,27 @@ export default function DataMonitoring() {
           </div>
 
           <div className="glass-card p-6">
-            <h2 className="text-xl font-bold text-slate-800 mb-4">活动统计</h2>
+            <h2 className="text-2xl font-bold text-slate-800 mb-4">活动统计</h2>
             <div className="grid grid-cols-5 gap-4">
               <div className="p-4 rounded-xl bg-gradient-to-br from-blue-600 to-blue-400 text-white">
-                <p className="text-3xl font-bold mb-1">{userDetail.activity_stats.post_count}</p>
-                <p className="text-sm opacity-90">发帖数</p>
+                <p className="text-4xl font-bold mb-1">{userDetail.activity_stats.post_count}</p>
+                <p className="text-base opacity-90">发帖数</p>
               </div>
               <div className="p-4 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 text-white">
-                <p className="text-3xl font-bold mb-1">{userDetail.activity_stats.comment_count}</p>
-                <p className="text-sm opacity-90">评论数</p>
+                <p className="text-4xl font-bold mb-1">{userDetail.activity_stats.comment_count}</p>
+                <p className="text-base opacity-90">评论数</p>
               </div>
               <div className="p-4 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-500 text-white">
-                <p className="text-3xl font-bold mb-1">{userDetail.activity_stats.follower_count}</p>
-                <p className="text-sm opacity-90">粉丝数</p>
+                <p className="text-4xl font-bold mb-1">{userDetail.activity_stats.follower_count}</p>
+                <p className="text-base opacity-90">粉丝数</p>
               </div>
               <div className="p-4 rounded-xl bg-gradient-to-br from-teal-500 to-green-500 text-white">
-                <p className="text-3xl font-bold mb-1">{userDetail.activity_stats.likes_received}</p>
-                <p className="text-sm opacity-90">获赞数</p>
+                <p className="text-4xl font-bold mb-1">{userDetail.activity_stats.likes_received}</p>
+                <p className="text-base opacity-90">获赞数</p>
               </div>
               <div className="p-4 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 text-white">
-                <p className="text-3xl font-bold mb-1">{userDetail.activity_stats.avg_engagement.toFixed(1)}</p>
-                <p className="text-sm opacity-90">平均互动</p>
+                <p className="text-4xl font-bold mb-1">{userDetail.activity_stats.avg_engagement.toFixed(1)}</p>
+                <p className="text-base opacity-90">平均互动</p>
               </div>
             </div>
           </div>
