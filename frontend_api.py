@@ -2675,6 +2675,7 @@ def stream_opinion_balance_logs():
     """
     from flask import Response, stream_with_context
     from log_tail import find_latest_file, tail_lines
+    from log_replay import resolve_log_path, iter_log_lines, replay_log_lines
 
     # source=workflow streams from logs/workflow (preferred for real-time UI);
     # source=opinion_balance streams from logs/opinion_balance (legacy).
@@ -2692,6 +2693,12 @@ def stream_opinion_balance_logs():
     follow_latest = request.args.get('follow_latest', default='true')
     follow_latest = str(follow_latest).lower() not in ('0', 'false', 'no', 'off')
 
+    replay = request.args.get('replay', default='false')
+    replay = str(replay).lower() in ('1', 'true', 'yes', 'on')
+    replay_file = request.args.get('file', default=None, type=str)
+    delay_ms = request.args.get('delay_ms', default=40, type=int)
+    delay_sec = max(0.0, min(2000, int(delay_ms))) / 1000.0
+
     poll_interval_sec = 0.25
     heartbeat_sec = 15.0
 
@@ -2701,6 +2708,30 @@ def stream_opinion_balance_logs():
 
     def generate():
         os.makedirs(base_dir, exist_ok=True)
+
+        if replay:
+            try:
+                if replay_file:
+                    current_path = resolve_log_path(base_dir, replay_file)
+                    if not os.path.exists(current_path):
+                        yield sse_data(f"ERROR: replay file not found: {os.path.basename(current_path)}")
+                        return
+                else:
+                    current_path = find_latest_file(base_dir, pattern="*.log")
+                    if not current_path:
+                        yield sse_data(f"ERROR: no log file found under {os.path.relpath(base_dir, os.path.dirname(__file__))}")
+                        return
+            except Exception as e:
+                yield sse_data(f"ERROR: invalid replay file: {e}")
+                return
+
+            yield sse_data(f"INFO: replaying {os.path.basename(current_path)}")
+            try:
+                for line in replay_log_lines(iter_log_lines(current_path), delay_sec=delay_sec):
+                    yield sse_data(line)
+            except Exception as e:
+                yield sse_data(f"ERROR: replay stopped unexpectedly: {e}")
+            return
 
         current_path = find_latest_file(base_dir, pattern="*.log")
         if not current_path:

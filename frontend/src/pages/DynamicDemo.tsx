@@ -5,8 +5,18 @@ import { useNavigate } from 'react-router-dom'
 import { createInitialFlowState, routeLogLine, type FlowState, type Role } from '../lib/interventionFlow/logRouter'
 import { createEventSourceLogStream, createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
 import { computeEffectiveRole, nextSelectedRoleOnTabClick } from '../lib/interventionFlow/selection'
-import { shouldShowDetailStatusLabel } from '../lib/interventionFlow/statusLabel'
 import { parsePostContent } from '../lib/interventionFlow/postContent'
+import { getEmptyCopy } from '../lib/interventionFlow/emptyCopy'
+import { isPreRunEmptyState } from '../lib/interventionFlow/emptyState'
+import { DEFAULT_WORKFLOW_REPLAY_DELAY_MS, getOpinionBalanceLogStreamUrl, shouldCallOpinionBalanceProcessApi } from '../lib/interventionFlow/replayConfig'
+import { getRoleTabButtonClassName } from '../lib/interventionFlow/roleTabStyles'
+import { getInterventionFlowPanelClassName, getLeaderCommentsContainerClassName } from '../lib/interventionFlow/panelLayout'
+import { buildRolePills } from '../lib/interventionFlow/rolePills'
+import { getHeatLeaderboardCardClassName, getHeatLeaderboardListClassName } from '../lib/interventionFlow/heatLeaderboardLayout'
+import { getAnalystCombinedCardClassName, getAnalystCombinedPostBodyClassName, getAnalystCombinedStreamClassName } from '../lib/interventionFlow/analystCombinedLayout'
+import { buildStageStepperModel } from '../lib/interventionFlow/stageStepper'
+import { getLiveBadgeClassName, getStageHeaderContainerClassName, getStageHeaderTextClassName, getStageSegmentClassName } from '../lib/interventionFlow/detailHeaderLayout'
+import { getDynamicDemoGridClassName } from '../lib/interventionFlow/pageGridLayout'
 
 const DEMO_BACKEND_LOG_LINES: string[] = [
   '2026-01-28 21:13:09,286 - INFO - 📊 Phase 1: perception and decision',
@@ -37,7 +47,19 @@ const DEMO_BACKEND_LOG_LINES: string[] = [
 ]
 
 const USE_SIMULATED_LOG_STREAM = false
-const OPINION_BALANCE_LOG_STREAM_URL = '/api/opinion-balance/logs/stream?source=workflow&tail=0&follow_latest=true'
+// Replay mode: read a fixed workflow log file and stream it via the backend SSE endpoint.
+// Flip this to false when switching back to true real-time backend streaming.
+const USE_WORKFLOW_LOG_REPLAY = true
+// One full round only (a single "action_..." cycle) so the demo doesn't endlessly chain.
+const WORKFLOW_REPLAY_FILE = 'replay_workflow_20260130_round1.log'
+// Slower replay so the user can actually read the UI while it streams.
+const WORKFLOW_REPLAY_DELAY_MS = DEFAULT_WORKFLOW_REPLAY_DELAY_MS
+
+const OPINION_BALANCE_LOG_STREAM_URL = getOpinionBalanceLogStreamUrl({
+  replay: USE_WORKFLOW_LOG_REPLAY,
+  replayFile: WORKFLOW_REPLAY_FILE,
+  delayMs: WORKFLOW_REPLAY_DELAY_MS,
+})
 
 interface HeatPost {
   id: string
@@ -293,8 +315,15 @@ export default function DynamicDemo() {
         onToggleAttack={() => setEnableAttack((prev) => !prev)}
         onToggleAftercare={() => setEnableAftercare((prev) => !prev)}
         onToggleEvoCorps={async () => {
+          const manageProcess = shouldCallOpinionBalanceProcessApi(USE_WORKFLOW_LOG_REPLAY)
           // 如果当前是禁用状态，则启用并调用 API
           if (!enableEvoCorps) {
+            if (!manageProcess) {
+              // Replay-only mode: do not start any backend workflow process, just connect to the SSE replay stream.
+              setEnableEvoCorps(true)
+              return
+            }
+
             try {
               // 调用后端 API 启动舆论平衡系统
               const response = await fetch('/api/dynamic/opinion-balance/start', {
@@ -323,6 +352,12 @@ export default function DynamicDemo() {
           } else {
             // 如果当前是启用状态，则显示确认对话框
             if (!confirm('是否确认关闭舆论平衡系统？')) {
+              return
+            }
+
+            if (!manageProcess) {
+              // Replay-only mode: no backend process to stop.
+              setEnableEvoCorps(false)
               return
             }
 
@@ -355,7 +390,7 @@ export default function DynamicDemo() {
         sseStatus={sse.status}
       />
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr_1fr] gap-6">
+      <div className={getDynamicDemoGridClassName()}>
         <div className="space-y-6">
           {!selectedPost ? (
             <HeatLeaderboardCard posts={data.heatPosts} onSelect={setSelectedPost} />
@@ -513,7 +548,7 @@ function DynamicDemoHeader({
 
 function HeatLeaderboardCard({ posts, onSelect }: { posts: HeatPost[]; onSelect: (post: HeatPost) => void }) {
   return (
-    <div className="glass-card p-6">
+    <div className={getHeatLeaderboardCardClassName()}>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <Flame className="text-orange-500" />
@@ -525,7 +560,7 @@ function HeatLeaderboardCard({ posts, onSelect }: { posts: HeatPost[]; onSelect:
         <StatusBadge label="Top 20" tone="info" />
       </div>
 
-      <div className="space-y-3 h-[580px] overflow-y-auto pr-2">
+      <div className={getHeatLeaderboardListClassName()}>
         {posts.slice(0, 20).map((post, index) => (
           <button
             key={post.id}
@@ -729,7 +764,7 @@ function InterventionFlowPanel({ state, enabled }: { state: FlowState; enabled: 
   const isLive = enabled && state.activeRole === effectiveRole && roleState.status === 'running'
 
   return (
-    <div className="glass-card p-6 h-[640px] flex flex-col min-h-0">
+    <div className={getInterventionFlowPanelClassName()}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <Shield className="text-emerald-500" />
@@ -759,6 +794,7 @@ function InterventionFlowPanel({ state, enabled }: { state: FlowState; enabled: 
         enabled={enabled}
         isLive={isLive}
         status={roleState.status}
+        stage={roleState.stage}
         summary={roleState.summary}
         during={roleState.during}
         after={roleState.after}
@@ -794,12 +830,7 @@ function RoleTabsRow({
           <button
             key={role}
             onClick={() => onSelect(role)}
-              className={[
-                'w-full rounded-2xl border transition-all duration-200 px-3 py-2 text-left min-w-0 box-border',
-                isSelected
-                  ? 'bg-white/80 border-emerald-200 shadow-md ring-2 ring-inset ring-emerald-100'
-                  : 'bg-white/60 border-white/40 hover:bg-white/75',
-              ].join(' ')}
+            className={getRoleTabButtonClassName(isSelected)}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
@@ -839,6 +870,7 @@ function RoleDetailSection({
   enabled,
   isLive,
   status,
+  stage,
   summary,
   during,
   after,
@@ -850,107 +882,119 @@ function RoleDetailSection({
   enabled: boolean
   isLive: boolean
   status: 'idle' | 'running' | 'done' | 'error'
+  stage: { current: number; max: number; order: number[] }
   summary: string[]
   during: string[]
   after?: string[]
   context: FlowState['context']
 }) {
   const displayLines = isLive ? during : (after ?? [])
-  const emptyHintPrimary = !enabled ? '未启用：开启舆论平衡后自动接入实时日志流' : '等待系统输出…'
-  const emptyHintSecondary = !enabled ? null : '开启舆论平衡后将自动订阅 workflow 日志流'
-  const [postExpanded, setPostExpanded] = useState(false)
+  const emptyCopy = useMemo(() => getEmptyCopy({ enabled }), [enabled])
   const parsedPost = useMemo(() => {
     if (!context.postContent) return null
-    return parsePostContent(context.postContent, { previewChars: 220 })
+    return parsePostContent(context.postContent, { previewChars: 160 })
   }, [context.postContent])
 
-  useEffect(() => {
-    // Switching role or post should collapse back to the compact preview to avoid long "walls of text".
-    setPostExpanded(false)
-  }, [role, context.postContent])
-
-  const pills = [
-    ...(typeof context.feedScore === 'number' ? [`热度分：${context.feedScore.toFixed(2)}`] : []),
-    ...summary
-      .map((s) => s.trim())
-      .filter((s) => Boolean(s) && !/^置信度：—$/.test(s)),
-  ]
+  const pills = buildRolePills(role, {
+    feedScore: context.feedScore,
+    summary,
+  })
+  const preRunEmpty = isPreRunEmptyState({ enabled, status, linesCount: displayLines.length })
+  const stageModel = useMemo(() => buildStageStepperModel(role, stage), [role, stage.current, stage.max, stage.order])
+  const shouldShowStage =
+    enabled &&
+    status !== 'idle' &&
+    stageModel.currentPos >= 0 &&
+    stageModel.total > 0 &&
+    stageModel.seenCount > 0 &&
+    stageModel.currentLabel
 
   return (
     <div className="mt-4 min-h-0 flex-1 flex flex-col" aria-current="step" data-role={role}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <div className={['w-10 h-10 rounded-xl bg-gradient-to-r flex items-center justify-center text-white font-semibold shrink-0', tone].join(' ')}>
             {label.charAt(0)}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 min-w-0">
-              <h3 className="text-lg font-semibold text-slate-800 truncate">{label}</h3>
-              {shouldShowDetailStatusLabel(status) ? (
-                <span className="text-xs font-semibold text-slate-600 px-2 py-1 rounded-full bg-white/70 border border-white/40">
-                  {status.toUpperCase()}
-                </span>
-              ) : null}
+              <h3 className="text-lg font-semibold text-slate-800 whitespace-nowrap">{label}</h3>
               {isLive ? (
-                <span className="text-xs font-semibold text-emerald-700 px-2 py-1 rounded-full bg-emerald-50 border border-emerald-100">
-                  LIVE
+                <span className={getLiveBadgeClassName()}>
+                  实时
                 </span>
               ) : null}
             </div>
           </div>
         </div>
+
+        {shouldShowStage ? (
+          <div className={getStageHeaderContainerClassName()} title={stageModel.tooltip}>
+            <div className={getStageHeaderTextClassName()}>
+              阶段：{stageModel.currentLabel}（{stageModel.seenCount}/{stageModel.total}）
+            </div>
+            <div className="mt-1 flex items-center justify-end gap-1">
+              {stageModel.stages.map((_, idx) => {
+                const isDone = stageModel.maxPos >= 0 ? idx < stageModel.maxPos : false
+                const isCurrent = idx === stageModel.currentPos
+                return (
+                  <span
+                    key={`${role}_stage_${idx}`}
+                    className={getStageSegmentClassName(isCurrent ? 'current' : isDone ? 'done' : 'todo')}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        ) : null}
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        {pills.length ? (
-          pills.slice(0, 4).map((line, idx) => (
+      {!preRunEmpty && pills.length ? (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {pills.slice(0, 4).map((line, idx) => (
             <div key={`${role}_summary_${idx}`} className="text-xs text-slate-700 px-3 py-2 rounded-xl bg-white/60 border border-white/40 truncate">
               {line}
             </div>
-          ))
-        ) : (
-          <div className="col-span-2 text-xs text-slate-500">暂无关键指标</div>
-        )}
-      </div>
+          ))}
+        </div>
+      ) : null}
 
-      {role === 'Analyst' && parsedPost ? (
-        <div className="mt-4 bg-white/60 border border-white/40 rounded-2xl p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <div className="text-xs font-semibold text-slate-700">帖子内容</div>
-                {parsedPost.tag ? (
-                  <span className="text-[10px] font-semibold text-slate-700 px-2 py-1 rounded-full bg-white/70 border border-white/40 shrink-0">
-                    {parsedPost.tag}
-                  </span>
-                ) : null}
-              </div>
-              {parsedPost.title ? (
-                <div className="mt-1 text-sm font-semibold text-slate-800 leading-snug line-clamp-2 break-words">
-                  {parsedPost.title}
+      {role === 'Analyst' ? (
+        <div className={getAnalystCombinedCardClassName()}>
+          {parsedPost ? (
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="text-xs font-semibold text-slate-700 shrink-0">帖子与分析</div>
+                  {parsedPost.tag ? (
+                    <span className="text-[10px] font-semibold text-slate-700 px-2 py-1 rounded-full bg-white/70 border border-white/40 shrink-0">
+                      {parsedPost.tag}
+                    </span>
+                  ) : null}
                 </div>
-              ) : null}
-            </div>
-            {parsedPost.preview.endsWith('…') ? (
-              <button
-                type="button"
-                className="text-xs font-semibold text-slate-700 px-3 py-2 rounded-xl bg-white/70 border border-white/40 hover:bg-white/90 transition-colors shrink-0"
-                onClick={() => setPostExpanded((v) => !v)}
-              >
-                {postExpanded ? '收起全文' : '展开全文'}
-              </button>
-            ) : null}
-          </div>
+                {/* Always show full post content; no expand/collapse. */}
+              </div>
 
-          <div className={postExpanded ? 'mt-3 max-h-56 overflow-auto pr-1' : 'mt-3'}>
-            <div
-              className={[
-                'text-sm text-slate-700 leading-relaxed break-words',
-                postExpanded ? 'whitespace-pre-wrap' : 'line-clamp-4',
-              ].join(' ')}
-            >
-              {postExpanded ? parsedPost.full : parsedPost.preview}
+              <div className="mt-2">
+                <div className={getAnalystCombinedPostBodyClassName()}>
+                  {parsedPost.full}
+                </div>
+              </div>
             </div>
+          ) : null}
+
+          <div className="h-px bg-white/60" />
+
+          <div className={getAnalystCombinedStreamClassName()}>
+            {displayLines.length ? (
+              displayLines.map((line, idx) => (
+                <div key={`${role}_${idx}`} className="text-sm text-slate-700 leading-relaxed break-all">
+                  {line}
+                </div>
+              ))
+            ) : (
+              <div className="text-sm text-slate-600">{emptyCopy.stream}</div>
+            )}
           </div>
         </div>
       ) : null}
@@ -958,9 +1002,9 @@ function RoleDetailSection({
       {role === 'Leader' && context.leaderComments.length ? (
         <div className="mt-4 bg-white/60 border border-white/40 rounded-2xl p-4">
           <div className="text-xs font-semibold text-slate-700 mb-2">领袖评论</div>
-          <div className="space-y-3">
+          <div className={getLeaderCommentsContainerClassName()}>
             {context.leaderComments.map((c, idx) => (
-              <div key={`leader_comment_${idx}`} className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words">
+              <div key={`leader_comment_${idx}`} className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-all">
                 {c}
               </div>
             ))}
@@ -968,22 +1012,23 @@ function RoleDetailSection({
         </div>
       ) : null}
 
-      <div className="mt-4 bg-white/60 border border-white/40 rounded-2xl p-4 min-h-0 flex-1">
-        <div className="space-y-2 h-full overflow-auto pr-1">
-          {displayLines.length ? (
-            displayLines.map((line, idx) => (
-              <div key={`${role}_${idx}`} className="text-sm text-slate-700 leading-relaxed break-words">
-                {line}
+      {role !== 'Analyst' ? (
+        <div className="mt-4 bg-white/60 border border-white/40 rounded-2xl p-4 min-h-0 flex-1">
+          <div className="space-y-2 h-full overflow-y-auto overflow-x-hidden pr-1">
+            {displayLines.length ? (
+              displayLines.map((line, idx) => (
+                <div key={`${role}_${idx}`} className="text-sm text-slate-700 leading-relaxed break-all">
+                  {line}
+                </div>
+              ))
+            ) : (
+              <div className="space-y-1">
+                <div className="text-sm text-slate-600">{emptyCopy.stream}</div>
               </div>
-            ))
-          ) : (
-            <div className="space-y-1">
-              <div className="text-sm text-slate-600">{emptyHintPrimary}</div>
-              {emptyHintSecondary ? <div className="text-xs text-slate-500">{emptyHintSecondary}</div> : null}
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   )
 }

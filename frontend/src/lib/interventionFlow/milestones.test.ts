@@ -3,9 +3,17 @@ import { describe, expect, it } from 'vitest'
 import { toUserMilestone } from './milestones'
 
 describe('toUserMilestone', () => {
+  it('suppresses noisy phase headers (they duplicate role milestones)', () => {
+    expect(toUserMilestone('📊 Phase 1: perception and decision')).toBeNull()
+    expect(toUserMilestone('📈 Phase 3: feedback and iteration')).toBeNull()
+  })
+
   it('maps Analyst lines', () => {
     expect(toUserMilestone('🔍 Analyst is analyzing content...')).toBe('分析师：开始分析')
-    expect(toUserMilestone('📊 Analyst analysis completed:')).toBe('分析师：完成分析')
+    expect(toUserMilestone('📊 Analyst analysis completed:')).toBeNull()
+    expect(toUserMilestone('Core viewpoint: Government overreach and privacy violation.')).toBe(
+      '核心观点：Government overreach and privacy violation.',
+    )
     expect(toUserMilestone('📊 Total weight calculated: 34.0 (based on 4 comments: 2 hot + 2 latest)')).toBe('分析师：权重汇总')
     expect(toUserMilestone('📊 Weighted per-comment sentiment: 0.10/1.0 (based on 4 selected comments: 2 hot + 2 latest)')).toBe('分析师：情绪汇总')
     expect(toUserMilestone('Viewpoint extremism: 8.6/10.0')).toBe('分析师：极端度计算')
@@ -29,8 +37,8 @@ describe('toUserMilestone', () => {
     expect(toUserMilestone('⚖️ Activating Echo Agent cluster...')).toBe('扩音器：启动回声集群')
     expect(toUserMilestone('📋 Echo plan: total=12, role distribution={...}')).toBe('扩音器：集群规模（12）')
     expect(toUserMilestone('✅ 12 echo responses generated')).toBe('扩音器：生成回应（12）')
-    expect(toUserMilestone('💖 Successfully added 240 likes to each of 2 leader comments (total: 480 likes)')).toBe('扩音器：点赞放大（+480）')
-    expect(toUserMilestone('🎉 Workflow completed - effectiveness score: 10.0/10')).toBe('扩音器：效果评分（10.0/10）')
+    expect(toUserMilestone('💖 Successfully added 240 likes to each of 2 leader comments (total: 480 likes)')).toBe('扩音器：点赞放大')
+    expect(toUserMilestone('🎉 Workflow completed - effectiveness score: 10.0/10')).toBe('扩音器：扩散完成')
   })
 
   it('returns null for infra noise', () => {

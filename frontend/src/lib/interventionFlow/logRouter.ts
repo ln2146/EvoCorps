@@ -7,6 +7,11 @@ export interface RoleCardState {
   before: string
   status: RoleStatus
   summary: string[] // fixed 4-line summary; content can update, layout stays stable
+  // Stage progress:
+  // - current: what the system is doing *now* (best-effort; can move non-monotonically if logs interleave)
+  // - max: furthest reached in this round (monotonic)
+  // - order: first-seen order of stages in this round (Option A UI: render only observed stages in log order)
+  stage: { current: number; max: number; order: number[] }
   during: string[]
   after?: string[]
 }
@@ -19,6 +24,7 @@ export interface FlowState {
     postContent?: string
     feedScore?: number
     leaderComments: string[]
+    leaderCommentKeys: Record<string, true>
   }
   roles: Record<Role, RoleCardState>
 }
@@ -90,13 +96,82 @@ export function createInitialFlowState(): FlowState {
     activeRole: null,
     amplifierSticky: false,
     noiseCounters: {},
-    context: { leaderComments: [] },
+    context: { leaderComments: [], leaderCommentKeys: {} },
     roles: {
-      Analyst: { before: ROLE_BEFORE_COPY.Analyst, status: 'idle', summary: [...ROLE_SUMMARY_DEFAULT.Analyst], during: [] },
-      Strategist: { before: ROLE_BEFORE_COPY.Strategist, status: 'idle', summary: [...ROLE_SUMMARY_DEFAULT.Strategist], during: [] },
-      Leader: { before: ROLE_BEFORE_COPY.Leader, status: 'idle', summary: [...ROLE_SUMMARY_DEFAULT.Leader], during: [] },
-      Amplifier: { before: ROLE_BEFORE_COPY.Amplifier, status: 'idle', summary: [...ROLE_SUMMARY_DEFAULT.Amplifier], during: [] },
+      Analyst: { before: ROLE_BEFORE_COPY.Analyst, status: 'idle', summary: [...ROLE_SUMMARY_DEFAULT.Analyst], stage: { current: -1, max: -1, order: [] }, during: [] },
+      Strategist: { before: ROLE_BEFORE_COPY.Strategist, status: 'idle', summary: [...ROLE_SUMMARY_DEFAULT.Strategist], stage: { current: -1, max: -1, order: [] }, during: [] },
+      Leader: { before: ROLE_BEFORE_COPY.Leader, status: 'idle', summary: [...ROLE_SUMMARY_DEFAULT.Leader], stage: { current: -1, max: -1, order: [] }, during: [] },
+      Amplifier: { before: ROLE_BEFORE_COPY.Amplifier, status: 'idle', summary: [...ROLE_SUMMARY_DEFAULT.Amplifier], stage: { current: -1, max: -1, order: [] }, during: [] },
     },
+  }
+}
+
+function isNewRoundAnchor(cleanLine: string) {
+  // Option A: when a new workflow execution round starts, reset stage progress and streaming buffers.
+  return /Start workflow execution\s*-\s*Action ID:/i.test(cleanLine)
+}
+
+function mapLineToStageIndex(role: Role, cleanLine: string): number | null {
+  switch (role) {
+    case 'Analyst': {
+      // 内容识别 -> 评论抽样 -> 情绪度 -> 极端度 -> 干预判定 -> 监测评估
+      if (/Analyst is analyzing/i.test(cleanLine) || /^📊\s*Phase 1:/i.test(cleanLine) || /^Core viewpoint:/i.test(cleanLine)) return 0
+      if (/Total weight calculated:/i.test(cleanLine) || /Comment\s+\d+\s+content:/i.test(cleanLine)) return 1
+      if (/Weighted per-comment sentiment:/i.test(cleanLine) || /^Overall sentiment:/i.test(cleanLine)) return 2
+      if (/^Viewpoint extremism:/i.test(cleanLine)) return 3
+      if (/Needs intervention:/i.test(cleanLine) || /Urgency level:/i.test(cleanLine) || /Analyst determined opinion balance intervention needed/i.test(cleanLine)) return 4
+      if (/\[Monitoring round/i.test(cleanLine) || /^📈\s*Phase 3:/i.test(cleanLine) || /Starting monitoring task/i.test(cleanLine)) return 5
+      return null
+    }
+    case 'Strategist': {
+      // 确认告警 -> 检索历史 -> 生成方案 -> 选择策略 -> 输出指令
+      if (/Alert generated/i.test(cleanLine) || /Confirm alert information/i.test(cleanLine) || /Strategist is creating strategy/i.test(cleanLine)) return 0
+      if (/Query historical successful strategies/i.test(cleanLine) || /Retrieved \d+ results from action_logs/i.test(cleanLine) || /Found \d+ related historical strategies/i.test(cleanLine)) return 1
+      if (/Tree-of-Thought/i.test(cleanLine) || /Generated \d+ strategy options/i.test(cleanLine)) return 2
+      if (/Selected optimal strategy:/i.test(cleanLine)) return 3
+      if (/Format as agent instructions/i.test(cleanLine) || /Strategy creation completed/i.test(cleanLine)) return 4
+      return null
+    }
+    case 'Leader': {
+      // 解析指令 -> 检索论据 -> 生成候选 -> 投票选优 -> 发布评论
+      if (/Parse strategist instructions/i.test(cleanLine) || /starting USC workflow/i.test(cleanLine)) return 0
+      if (/Search cognitive memory/i.test(cleanLine) || /Retrieved \d+ relevant arguments/i.test(cleanLine)) return 1
+      if (/USC-Generate/i.test(cleanLine) || /generate\s+\d+\s+candidate comments/i.test(cleanLine)) return 2
+      if (/USC-Vote/i.test(cleanLine) || /Best selection:/i.test(cleanLine) || /Best candidate score:/i.test(cleanLine)) return 3
+      if (/^💬\s*👑\s*Leader comment\s+\d+\s+on\s+post\b/i.test(cleanLine)) return 4
+      return null
+    }
+    case 'Amplifier': {
+      // 启动集群 -> 生成回应 -> 点赞放大 -> 扩散完成
+      if (/Activating Echo Agent cluster/i.test(cleanLine) || /Echo plan:\s*total=/i.test(cleanLine)) return 0
+      if (/Start parallel execution/i.test(cleanLine) || /\d+\s+echo responses generated/i.test(cleanLine) || /Echo Agent results:/i.test(cleanLine)) return 1
+      if (/start liking leader comments/i.test(cleanLine) || /Bulk like/i.test(cleanLine) || /\(total:\s*\d+\s+likes\)/i.test(cleanLine)) return 2
+      if (/Workflow completed\s*-\s*effectiveness score:/i.test(cleanLine) || /Base effectiveness score:/i.test(cleanLine)) return 3
+      return null
+    }
+  }
+}
+
+function applyStageUpdateForRole(prevRoles: FlowState['roles'], role: Role, cleanLine: string): FlowState['roles'] {
+  const nextIndex = mapLineToStageIndex(role, cleanLine)
+  if (nextIndex === null) return prevRoles
+
+  const cur = prevRoles[role]
+  const order = cur.stage.order.includes(nextIndex) ? cur.stage.order : [...cur.stage.order, nextIndex]
+  const nextStage = {
+    current: nextIndex,
+    max: Math.max(cur.stage.max, nextIndex),
+    order,
+  }
+
+  if (
+    cur.stage.current === nextStage.current &&
+    cur.stage.max === nextStage.max &&
+    cur.stage.order.length === nextStage.order.length
+  ) return prevRoles
+  return {
+    ...prevRoles,
+    [role]: { ...cur, stage: nextStage },
   }
 }
 
@@ -228,16 +303,21 @@ function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): 
     if (mResp) update('Amplifier', 1, `回应：${mResp[1]}`)
 
     const mLikes = cleanLine.match(/\(total:\s*(\d+)\s+likes\)/i)
-    if (mLikes) update('Amplifier', 2, `点赞：+${mLikes[1]}`)
+    // Do not show exact like counts in the UI; keep it as a qualitative signal.
+    if (mLikes) update('Amplifier', 2, '点赞：放大')
 
     const mEff = cleanLine.match(/effectiveness score:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
-    if (mEff) update('Amplifier', 3, `效果：${mEff[1].replace(/\s+/g, '')}`)
+    // Do not display effectiveness score; the stage stepper already communicates completion.
+    if (mEff) update('Amplifier', 3, '')
   }
 
   return roles
 }
 
 function compressDisplayLine(cleanLine: string) {
+  // Suppress redundant "analysis completed" marker; we render the extracted core viewpoint instead.
+  if (/Analyst analysis completed/i.test(cleanLine)) return ''
+
   const milestone = toUserMilestone(cleanLine)
   if (milestone) return milestone
   // Fallback: short truncated line, but avoid dumping full bodies.
@@ -265,6 +345,10 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
   const cleanLine = stripLogPrefix(rawLine)
   if (!cleanLine) return prev
 
+  if (isNewRoundAnchor(cleanLine)) {
+    return createInitialFlowState()
+  }
+
   // Extract user-facing content that should be rendered in full (post body, leader comments, etc.)
   let nextContext = prev.context
   if (/^Post content:\s*/i.test(cleanLine)) {
@@ -276,14 +360,26 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
   }
   // Keep the full leader comment body for display (do not truncate).
   {
-    const m = cleanLine.match(/^💬\s*👑\s*Leader comment\s+\d+\s+on\s+post\s+\S+:\s*(.+)$/i)
+    const m = cleanLine.match(/^💬\s*👑\s*Leader comment\s+(\d+)\s+on\s+post\s+(\S+):\s*(.+)$/i)
     if (m) {
-      nextContext = { ...nextContext, leaderComments: [...nextContext.leaderComments, m[1]] }
+      const ordinal = m[1]
+      const postId = m[2]
+      const body = m[3]
+      const key = `${postId}:${ordinal}`
+
+      if (!nextContext.leaderCommentKeys[key]) {
+        nextContext = {
+          ...nextContext,
+          leaderCommentKeys: { ...nextContext.leaderCommentKeys, [key]: true },
+          leaderComments: [...nextContext.leaderComments, body],
+        }
+      }
     }
   }
 
   const rolesAfterSummary = applySummaryUpdates(prev.roles, cleanLine)
-  const stateAfterSummary = (rolesAfterSummary === prev.roles && nextContext === prev.context) ? prev : { ...prev, roles: rolesAfterSummary, context: nextContext }
+  const stateAfterSummary =
+    (rolesAfterSummary === prev.roles && nextContext === prev.context) ? prev : { ...prev, roles: rolesAfterSummary, context: nextContext }
 
   // Noise collection: keep UI clean while still signaling background activity.
   if (cleanLine.startsWith('HTTP Request:')) {
@@ -323,17 +419,29 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
 
   const activeRole = stateAfterSummary.activeRole
 
+  // Update stage progress for the same role that will receive this line in the UI.
+  // This keeps stage and content aligned (especially important when Amplifier is sticky).
+  const roleForStage: Role | null = !activeRole
+    ? nextRole
+    : (nextRole ?? activeRole)
+
+  const rolesAfterStage =
+    roleForStage ? applyStageUpdateForRole(stateAfterSummary.roles, roleForStage, cleanLine) : stateAfterSummary.roles
+
+  const stateAfterStage =
+    rolesAfterStage === stateAfterSummary.roles ? stateAfterSummary : { ...stateAfterSummary, roles: rolesAfterStage }
+
   // No active role yet: only start when we have an anchor to bind to.
   if (!activeRole) {
-    if (!nextRole) return { ...stateAfterSummary, amplifierSticky }
-    const nextRoles = { ...stateAfterSummary.roles }
+    if (!nextRole) return { ...stateAfterStage, amplifierSticky }
+    const nextRoles = { ...stateAfterStage.roles }
     nextRoles[nextRole] = {
       ...nextRoles[nextRole],
       status: 'running',
       during: pushAggregated(nextRoles[nextRole].during, displayLine, MAX_DURING_LINES),
     }
     return {
-      ...stateAfterSummary,
+      ...stateAfterStage,
       amplifierSticky: amplifierSticky || matchesAny(cleanLine, [/Activating Echo Agent cluster/i]),
       activeRole: nextRole,
       roles: nextRoles,
@@ -342,31 +450,31 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
 
   // No anchor (and not sticky): attribute line to current active role.
   if (!nextRole) {
-    const nextRoles = { ...stateAfterSummary.roles }
+    const nextRoles = { ...stateAfterStage.roles }
     const cur = nextRoles[activeRole]
     nextRoles[activeRole] = {
       ...cur,
       during: pushAggregated(cur.during, displayLine, MAX_DURING_LINES),
     }
-    return { ...stateAfterSummary, amplifierSticky, roles: nextRoles }
+    return { ...stateAfterStage, amplifierSticky, roles: nextRoles }
   }
 
   // Anchor resolves to the same active role: keep streaming.
   if (nextRole === activeRole) {
-    const nextRoles = { ...stateAfterSummary.roles }
+    const nextRoles = { ...stateAfterStage.roles }
     nextRoles[activeRole] = appendDuringWithCap(nextRoles[activeRole], displayLine, MAX_DURING_LINES)
     const nextSticky = amplifierSticky || matchesAny(cleanLine, [/Activating Echo Agent cluster/i])
-    return { ...stateAfterSummary, amplifierSticky: nextSticky, roles: nextRoles }
+    return { ...stateAfterStage, amplifierSticky: nextSticky, roles: nextRoles }
   }
 
   // Role switch: freeze previous role and start streaming to the new role.
-  const nextRoles = { ...stateAfterSummary.roles }
+  const nextRoles = { ...stateAfterStage.roles }
   nextRoles[activeRole] = freezeAfter(nextRoles[activeRole])
   nextRoles[nextRole] = appendDuringWithCap({ ...nextRoles[nextRole], status: 'running' }, displayLine, MAX_DURING_LINES)
 
   const nextSticky = amplifierSticky || matchesAny(cleanLine, [/Activating Echo Agent cluster/i])
   return {
-    ...stateAfterSummary,
+    ...stateAfterStage,
     activeRole: nextRole,
     amplifierSticky: nextSticky,
     roles: nextRoles,

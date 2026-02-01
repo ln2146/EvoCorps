@@ -15,13 +15,20 @@ export function toUserMilestone(cleanLine: string): string | null {
   if (s.startsWith('Request URL:')) return null
   if (s.startsWith('Wikipedia:')) return null
   if (s.startsWith('📊 Cache status:')) return null
+  // Phase headers are redundant in the UI (they often duplicate the role-level milestones).
+  if (/^📊\s*Phase\s+\d+:/i.test(s)) return null
+  if (/^📈\s*Phase\s+\d+:/i.test(s)) return null
   // Content that we render separately in full.
   if (s.startsWith('Post content:')) return null
   if (s.startsWith('Feed score:')) return null
 
   // Analyst
   if (/Analyst is analyzing/i.test(s)) return '分析师：开始分析'
-  if (/Analyst analysis completed/i.test(s)) return '分析师：完成分析'
+  // Prefer rendering the extracted core viewpoint line, so we don't show two "analysis done" lines.
+  {
+    const m = s.match(/^Core viewpoint:\s*(.+)$/i)
+    if (m) return truncate(`核心观点：${m[1].trim()}`)
+  }
   if (/Total weight calculated:/i.test(s)) return '分析师：权重汇总'
   if (/Weighted per-comment sentiment:/i.test(s)) return '分析师：情绪汇总'
   if (/^Viewpoint extremism:/i.test(s)) return '分析师：极端度计算'
@@ -63,11 +70,11 @@ export function toUserMilestone(cleanLine: string): string | null {
   }
   {
     const m = s.match(/\(total:\s*(\d+)\s+likes\)/i)
-    if (m) return `扩音器：点赞放大（+${m[1]}）`
+    if (m) return '扩音器：点赞放大'
   }
   {
     const m = s.match(/effectiveness score:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
-    if (m) return `扩音器：效果评分（${m[1].replace(/\s+/g, '')}）`
+    if (m) return '扩音器：扩散完成'
   }
 
   return null

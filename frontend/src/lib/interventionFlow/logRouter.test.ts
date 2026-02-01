@@ -28,7 +28,8 @@ describe('routeLogLine', () => {
 
     state = routeLogLine(state, '2026-01-28 21:13:42,092 - INFO -    📊 Analyst analysis completed:')
     expect(state.activeRole).toBe('Analyst')
-    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('分析师：完成分析')
+    // "analysis completed" marker is suppressed to avoid duplicate analysis rows; core viewpoint line is rendered instead.
+    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('分析师：开始分析')
 
     state = routeLogLine(state, '2026-01-28 21:13:50,253 - INFO - ⚖️ Strategist is creating strategy...')
     expect(state.activeRole).toBe('Strategist')
@@ -85,6 +86,16 @@ describe('routeLogLine', () => {
     expect(state.roles.Analyst.summary[3]).toContain('触发原因：')
   })
 
+  it('suppresses Analyst "analysis completed" line to avoid duplicate analysis rows', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-30 23:20:18,455 - INFO -   🔍 Analyst is analyzing content...')
+    expect(state.roles.Analyst.during).toEqual(['分析师：开始分析'])
+
+    state = routeLogLine(state, '2026-01-30 23:20:29,476 - INFO -    📊 Analyst analysis completed:')
+    expect(state.roles.Analyst.during.join('\n')).not.toMatch(/analysis completed/i)
+  })
+
   it('updates Strategist summary fields from strategy selection lines', () => {
     let state = createInitialFlowState()
 
@@ -134,8 +145,8 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:18:54,727 - INFO - 🎉 Workflow completed - effectiveness score: 10.0/10')
 
     expect(state.roles.Amplifier.summary.join(' ')).toContain('12')
-    expect(state.roles.Amplifier.summary.join(' ')).toContain('点赞：+480')
-    expect(state.roles.Amplifier.summary.join(' ')).toContain('效果：10.0/10')
+    expect(state.roles.Amplifier.summary.join(' ')).toContain('点赞：放大')
+    expect(state.roles.Amplifier.summary.join(' ')).not.toContain('10.0/10')
   })
 
   it('stores full post content and feed score in context', () => {
@@ -154,5 +165,80 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:18:33,637 - INFO - 💬 👑 Leader comment 1 on post post-18e9eb: Full body here')
 
     expect(state.context.leaderComments).toEqual(['Full body here'])
+  })
+
+  it('deduplicates leader comments when the stream reconnects/replays', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-30 23:22:30,595 - INFO - 💬 👑 Leader comment 1 on post post-f053ef: Same body')
+    state = routeLogLine(state, '2026-01-30 23:22:30,595 - INFO - 💬 👑 Leader comment 1 on post post-f053ef: Same body')
+
+    expect(state.context.leaderComments).toEqual(['Same body'])
+  })
+
+  it('advances Analyst stage index across the core calculation steps', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-28 21:13:09,286 - INFO -   🔍 Analyst is analyzing content...')
+    expect(state.roles.Analyst.stage.current).toBe(0)
+    expect(state.roles.Analyst.stage.max).toBe(0)
+    expect(state.roles.Analyst.stage.order).toEqual([0])
+
+    state = routeLogLine(state, '2026-01-28 21:13:46,170 - INFO -     📊 Total weight calculated: 34.0 (based on 4 comments: 2 hot + 2 latest)')
+    expect(state.roles.Analyst.stage.current).toBe(1)
+    expect(state.roles.Analyst.stage.max).toBe(1)
+    expect(state.roles.Analyst.stage.order).toEqual([0, 1])
+
+    state = routeLogLine(state, '2026-01-28 21:13:50,217 - INFO -       Overall sentiment: 0.10/1.0')
+    expect(state.roles.Analyst.stage.current).toBe(2)
+    expect(state.roles.Analyst.stage.max).toBe(2)
+    expect(state.roles.Analyst.stage.order).toEqual([0, 1, 2])
+
+    state = routeLogLine(state, '2026-01-28 21:13:50,217 - INFO -       Viewpoint extremism: 8.6/10.0')
+    expect(state.roles.Analyst.stage.current).toBe(3)
+    expect(state.roles.Analyst.stage.max).toBe(3)
+    expect(state.roles.Analyst.stage.order).toEqual([0, 1, 2, 3])
+
+    state = routeLogLine(state, '2026-01-28 21:13:50,251 - INFO -       Needs intervention: yes')
+    expect(state.roles.Analyst.stage.current).toBe(4)
+    expect(state.roles.Analyst.stage.max).toBe(4)
+    expect(state.roles.Analyst.stage.order).toEqual([0, 1, 2, 3, 4])
+
+    state = routeLogLine(state, '2026-01-28 21:18:54,728 - INFO - 🔄 [Monitoring round 1/3]')
+    expect(state.roles.Analyst.stage.current).toBe(5)
+    expect(state.roles.Analyst.stage.max).toBe(5)
+    expect(state.roles.Analyst.stage.order).toEqual([0, 1, 2, 3, 4, 5])
+  })
+
+  it('keeps stage current aligned with latest log line even if computation order interleaves', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-30 23:20:18,455 - INFO -   🔍 Analyst is analyzing content...')
+    state = routeLogLine(state, '2026-01-30 23:20:39,304 - INFO -       Viewpoint extremism: 8.0/10.0')
+    expect(state.roles.Analyst.stage.current).toBe(3) // 极端度
+    expect(state.roles.Analyst.stage.max).toBe(3)
+    expect(state.roles.Analyst.stage.order).toEqual([0, 3])
+
+    // If sentiment arrives after extremism, current should switch to 情绪度 without losing the max stage reached.
+    state = routeLogLine(state, '2026-01-30 23:20:39,304 - INFO -       Overall sentiment: 0.13/1.0')
+    expect(state.roles.Analyst.stage.current).toBe(2) // 情绪度
+    expect(state.roles.Analyst.stage.max).toBe(3)
+    expect(state.roles.Analyst.stage.order).toEqual([0, 3, 2])
+  })
+
+  it('resets stage progress on a new workflow round anchor (option A)', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-28 21:13:09,286 - INFO -   🔍 Analyst is analyzing content...')
+    state = routeLogLine(state, '2026-01-28 21:13:50,251 - INFO -       Needs intervention: yes')
+    expect(state.roles.Analyst.stage.max).toBeGreaterThanOrEqual(0)
+
+    state = routeLogLine(state, '2026-01-28 21:24:38,434 - INFO - 🚀 Start workflow execution - Action ID: action_20260128_212438')
+    expect(state.activeRole).toBe(null)
+    for (const role of ['Analyst', 'Strategist', 'Leader', 'Amplifier'] as const) {
+      expect(state.roles[role].stage.current).toBe(-1)
+      expect(state.roles[role].stage.max).toBe(-1)
+      expect(state.roles[role].stage.order).toEqual([])
+    }
   })
 })
