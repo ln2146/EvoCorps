@@ -37,17 +37,30 @@ export function toUserMilestone(cleanLine: string): string | null {
   }
   if (/Total weight calculated:/i.test(s)) return '分析师：权重汇总'
   if (/Weighted per-comment sentiment:/i.test(s)) return '分析师：情绪汇总'
-  if (/^Viewpoint extremism:/i.test(s)) return '分析师：极端度计算'
-  if (/^Overall sentiment:/i.test(s)) return '分析师：情绪计算'
-  if (/^Trigger reasons:/i.test(s)) return '分析师：触发原因确定'
   if (/Needs intervention:\s*yes\b/i.test(s)) return '分析师：判定需要干预'
   if (/Needs intervention:\s*no\b/i.test(s)) return '分析师：判定无需干预'
+  {
+    const m = s.match(/^Overall sentiment:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
+    if (m) return `分析师：情绪度 ${m[1].replace(/\s+/g, '')}`
+  }
+  {
+    const m = s.match(/^Viewpoint extremism:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
+    if (m) return `分析师：极端度 ${m[1].replace(/\s+/g, '')}`
+  }
+  {
+    const m = s.match(/^Trigger reasons:\s*(.+)$/i)
+    if (m) return truncate(`分析师：触发原因 ${m[1].trim()}`)
+  }
 
   // Strategist
   if (/Strategist is creating strategy/i.test(s)) return '战略家：生成策略'
   {
     const m = s.match(/Selected optimal strategy:\s*([a-z0-9_ -]+)/i)
     if (m) return truncate(`战略家：策略选定（${m[1].trim()}）`)
+  }
+  // Strategist workflow steps: align stage text with log "Step 4: Format as agent instructions"
+  if (/Step\s*4:\s*Format as agent instructions/i.test(s) || /Format as agent instructions/i.test(s)) {
+    return '战略家：输出指令'
   }
 
   // Leader

@@ -52,6 +52,8 @@ const ROLE_SUMMARY_DEFAULT: Record<Role, [string, string, string, string]> = {
   Amplifier: ['', '', '', ''],
 }
 
+// (reserved) summary parsing helpers can be added here when needed.
+
 const analystAnchors = [
   /Analyst is analyzing/i,
   /Analyst monitoring/i,
@@ -142,7 +144,7 @@ function mapLineToStageIndex(role: Role, cleanLine: string): number | null {
       if (/Query historical successful strategies/i.test(cleanLine) || /Retrieved \d+ results from action_logs/i.test(cleanLine) || /Found \d+ related historical strategies/i.test(cleanLine)) return 1
       if (/Tree-of-Thought/i.test(cleanLine) || /Generated \d+ strategy options/i.test(cleanLine)) return 2
       if (/Selected optimal strategy:/i.test(cleanLine)) return 3
-      if (/Format as agent instructions/i.test(cleanLine) || /Strategy creation completed/i.test(cleanLine)) return 4
+      if (/Step\s*4:\s*Format as agent instructions/i.test(cleanLine) || /Format as agent instructions/i.test(cleanLine) || /Strategy creation completed/i.test(cleanLine)) return 4
       return null
     }
     case 'Leader': {
@@ -337,7 +339,17 @@ function compressDisplayLine(cleanLine: string) {
   if (/Analyst analysis completed/i.test(cleanLine)) return ''
 
   const milestone = toUserMilestone(cleanLine)
-  if (milestone) return milestone
+  if (milestone) {
+    // For Analyst, when a value line appears, include it in the dynamic stream line as well
+    // so users can see the number inside the running panel (not only the summary cards).
+    const mSent = cleanLine.match(/^Overall sentiment:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
+    if (mSent) return `${milestone}（${mSent[1].replace(/\s+/g, '')}）`
+    const mExt = cleanLine.match(/^Viewpoint extremism:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
+    if (mExt) return `${milestone}（${mExt[1].replace(/\s+/g, '')}）`
+    const mTrig = cleanLine.match(/^Trigger reasons:\s*(.+)$/i)
+    if (mTrig) return truncateEnd(`${milestone}：${mTrig[1].trim()}`, 120)
+    return milestone
+  }
   // Fallback: short truncated line, but avoid dumping full bodies.
   if (cleanLine.length > 96) return `${cleanLine.slice(0, 95)}…`
   return cleanLine.trim()

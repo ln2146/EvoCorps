@@ -16,15 +16,18 @@ describe('toUserMilestone', () => {
     )
     expect(toUserMilestone('📊 Total weight calculated: 34.0 (based on 4 comments: 2 hot + 2 latest)')).toBe('分析师：权重汇总')
     expect(toUserMilestone('📊 Weighted per-comment sentiment: 0.10/1.0 (based on 4 selected comments: 2 hot + 2 latest)')).toBe('分析师：情绪汇总')
-    expect(toUserMilestone('Viewpoint extremism: 8.6/10.0')).toBe('分析师：极端度计算')
-    expect(toUserMilestone('Overall sentiment: 0.10/1.0')).toBe('分析师：情绪计算')
-    expect(toUserMilestone('Trigger reasons: Viewpoint extremism too high & Sentiment too low')).toBe('分析师：触发原因确定')
+    expect(toUserMilestone('Viewpoint extremism: 8.6/10.0')).toBe('分析师：极端度 8.6/10.0')
+    expect(toUserMilestone('Overall sentiment: 0.10/1.0')).toBe('分析师：情绪度 0.10/1.0')
+    expect(toUserMilestone('Trigger reasons: Viewpoint extremism too high & Sentiment too low')).toBe(
+      '分析师：触发原因 Viewpoint extremism too high & Sentiment too low',
+    )
     expect(toUserMilestone('Needs intervention: yes')).toBe('分析师：判定需要干预')
   })
 
   it('maps Strategist lines', () => {
     expect(toUserMilestone('⚖️ Strategist is creating strategy...')).toBe('战略家：生成策略')
     expect(toUserMilestone('🎯 Selected optimal strategy: balanced_response')).toBe('战略家：策略选定（balanced_response）')
+    expect(toUserMilestone('📋 Step 4: Format as agent instructions')).toBe('战略家：输出指令')
   })
 
   it('maps Leader lines', () => {
