@@ -77,15 +77,22 @@ def set_aftercare_flag(body: ToggleRequest):
 
 @control_app.post("/control/auto-status")
 def set_auto_status_flag(body: ToggleRequest):
-    """Enable or disable opinion-balance auto monitoring/intervention."""
+    """Enable or disable opinion-balance auto monitoring/intervention via port 8000.
+
+    语义：WSL 侧只需要调用 8000 端口，实际由 main.py 在
+
+        http://localhost:8100/launcher/auto-status
+
+    上转发同样的 enabled=true/false 给启动器，实现跨环境控制。
+    """
 
     enabled = bool(body.enabled)
 
     # 1) 更新当前进程的全局控制变量
     control_flags.auto_status = enabled
 
-    # 2) 通过启动器端口在开启/关闭两种情况下都进行封装调用
-    #    对应：
+    # 2) 将 enabled 原样转发给启动器端口
+    #    等价于：
     #    curl -X POST http://localhost:8100/launcher/auto-status \
     #         -H "Content-Type: application/json" \
     #         -d '{"enabled": true/false}'
