@@ -200,7 +200,7 @@ curl -X POST "http://localhost:8000/control/auto-status" \
 # 5）针对某个帖子的评论区情绪与极端度分析
 curl -X POST "http://localhost:8000/analysis/post-comments" \
   -H "Content-Type: application/json" \
-  -d '{"post_id": "post-c94ae6"}'
+  -d '{"post_id": "post-17321c"}'
 ```
 
 其中 `/control/auto-status` 还会在内部封装调用 `opinion_balance_launcher` 暴露的 `http://localhost:8100/launcher/auto-status` 端口，实现对舆论平衡监控线程的启停控制。

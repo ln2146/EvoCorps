@@ -19,6 +19,9 @@ from pydantic import BaseModel
 import uvicorn
 import requests
 
+from openai import OpenAI
+from keys import OPENAI_API_KEY, OPENAI_BASE_URL
+
 import control_flags
 
 # Add src directory to path to import the config manager
@@ -129,16 +132,11 @@ def get_auto_status_flag():
 
 @control_app.post("/analysis/post-comments")
 def analyze_post_comments(body: PostCommentsAnalysisRequest):
-    """针对单个帖子及其评论区，进行情绪度、极端度与观点结构分析。
-
-    步骤：
-    1. 从 SQLite 数据库中按 post_id 读取帖子内容及其所有评论；
-    2. 构造一个包含「主帖 + 评论列表」的分析提示词；
-    3. 使用多模型选择器创建 LLM 客户端，生成分析结果；
-    4. 返回帖子基础信息与模型生成的分析文本。
-    """
-
-    from multi_model_selector import MultiModelSelector
+    import os
+    import json
+    import logging
+    import sqlite3
+    import requests
     from database_manager import DatabaseManager
 
     post_id = body.post_id
@@ -188,8 +186,8 @@ def analyze_post_comments(body: PostCommentsAnalysisRequest):
     comments_block = "\n".join(comments_block_lines) if comments_block_lines else "(暂无评论)"
 
     system_prompt = (
-        "你是一名严谨的舆论分析助手，专门分析某个帖子评论区的情绪氛围、观点极端程度，"
-        "并用自然语言总结多数观点与少数观点。回答尽量简洁、结构清晰。"
+        "你是一名严谨的舆论分析助手，专门分析某个帖子评论区的整体情绪氛围、观点极端程度，"
+        "并用自然语言总结多数观点与少数观点。你需要返回结构化 JSON，便于前端程序直接读取。"
     )
 
     user_prompt = f"""请基于下面的内容进行分析：
@@ -201,42 +199,83 @@ def analyze_post_comments(body: PostCommentsAnalysisRequest):
 [评论区]
 {comments_block}
 
-请完成以下任务：
-1. 针对评论区中的“每一条评论”逐条进行情绪与极端度评分：
-    - 对第 i 条评论给出 sentiment_score_i 和 extremeness_score_i，二者的取值都必须是以下五个离散值之一：0, 0.25, 0.5, 0.75, 1。
-      · 对于 sentiment_score_i：0 表示极度消极，1 表示极度积极，0.5 约为中性。
-      · 对于 extremeness_score_i：0 表示完全温和理性，1 表示极端、煽动性或仇恨情绪非常强。
-    - 对每条评论用一行类似格式输出，例如：
-      「评论 [编号]: sentiment_score=0.75, extremeness_score=0.25, 说明: ……」。
-2. 在完成单条评分后，再根据“全部评论的评分和内容”给出整体评估：
-    - 给出一个整体情绪度评分 sentiment_score_overall，取值也必须是 0, 0.25, 0.5, 0.75, 1 之一；
-    - 给出一个整体极端度评分 extremeness_score_overall，取值也必须是 0, 0.25, 0.5, 0.75, 1 之一；
-    - 简要说明整体评分是如何由各条评论的评分与内容综合得出的（例如大致的情绪分布、极端言论占比等）。
-3. 用一段话总结评论区的主要观点结构，形式类似：
-    「评论区中的大多数人认为……，少部分人认为……，还有个别观点认为……」。
+你的任务是：
+1. 基于“全部评论的内容”，给出一个整体情绪度评分 sentiment_score_overall：
+   - 取值必须是以下五个离散值之一：0, 0.25, 0.5, 0.75, 1。
+2. 基于“全部评论的内容”，给出一个整体极端度评分 extremeness_score_overall：
+   - 取值必须是以下五个离散值之一：0, 0.25, 0.5, 0.75, 1。
+3. 用一段中文总结评论区的主要观点结构。
 
-请用中文回答，并在文本中明确写出每条评论的 sentiment_score_i / extremeness_score_i，
-以及整体的 sentiment_score_overall 和 extremeness_score_overall 的数值。"""
+请严格按照下面的 JSON 格式直接作答：
 
-    # 3) 调用多模型选择器创建 LLM 客户端并生成分析
-    selector = MultiModelSelector()
+{{
+  "sentiment_score_overall": <0|0.25|0.5|0.75|1>,
+  "extremeness_score_overall": <0|0.25|0.5|0.75|1>,
+  "summary": "……"
+}}"""
+
+    # 3) 直接用 requests 调用 AIHUBMIX（与 curl 完全一致）
     try:
-        client, model_name = selector.create_openai_client(role="summary")
-
-        model_name = "gemini-3-flash-preview"
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            max_tokens=600,
-            temperature=0.5,
+        response = requests.post(
+            url="https://aihubmix.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENAI_API_KEY}",  # AIHUBMIX key
+                "Content-Type": "application/json",
+            },
+            data=json.dumps({
+                "model": "gpt-4o-mini",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "max_tokens": 600,
+                "temperature": 0.5,
+            }),
+            timeout=60,
         )
-        analysis_text = response.choices[0].message.content
+
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"LLM HTTP {response.status_code}: {response.text}"
+            )
+
+        resp_json = response.json()
+
+        raw_content = (
+            resp_json.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            .strip()
+        )
+
+        if not raw_content:
+            analysis_data = {
+                "sentiment_score_overall": None,
+                "extremeness_score_overall": None,
+                "summary": None,
+                "error": "LLM returned empty content",
+                "raw_text": resp_json,
+            }
+        else:
+            try:
+                analysis_data = json.loads(raw_content)
+            except Exception as e:
+                analysis_data = {
+                    "sentiment_score_overall": None,
+                    "extremeness_score_overall": None,
+                    "summary": None,
+                    "error": f"json_parse_failed: {e}",
+                    "raw_text": raw_content,
+                }
+
     except Exception as e:
         logging.error(f"Post comments analysis failed for {post_id}: {e}")
-        analysis_text = f"LLM analysis failed: {e}"
+        analysis_data = {
+            "sentiment_score_overall": None,
+            "extremeness_score_overall": None,
+            "summary": None,
+            "error": str(e),
+        }
 
     # 4) 关闭数据库连接
     try:
@@ -248,7 +287,11 @@ def analyze_post_comments(body: PostCommentsAnalysisRequest):
         "post_id": post_id,
         "post_content": post_content,
         "num_comments": len(comment_rows),
-        "analysis": analysis_text,
+        "sentiment_score_overall": analysis_data.get("sentiment_score_overall"),
+        "extremeness_score_overall": analysis_data.get("extremeness_score_overall"),
+        "summary": analysis_data.get("summary"),
+        "analysis_raw": analysis_data.get("raw_text"),
+        "error": analysis_data.get("error"),
     }
 
 
