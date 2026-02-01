@@ -7,6 +7,7 @@ datasets
 
 openai>=1.0.0
 pytest
+hypothesis
 protobuf
 
 jsonlines

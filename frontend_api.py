@@ -2991,6 +2991,650 @@ def get_dynamic_demo_status():
         }), 500
 
 
+
+
+
+# ============================================================================
+# 帖子热度榜功能
+# ============================================================================
+
+class HeatScoreCalculator:
+    """热度评分计算器 - 与 agent_user.py 的 get_feed() 评分算法完全一致
+    
+    该类负责计算帖子的热度评分，使用与 agent_user.py 中 get_feed() 函数
+    完全相同的算法和参数，确保前后端数据的一致性。
+    
+    评分公式：
+        score = (engagement + BETA_BIAS) × freshness
+        engagement = num_comments + num_shares + num_likes
+        freshness = max(MIN_FRESHNESS, 1.0 - LAMBDA_DECAY × age)
+        age = max(0, current_time_step - post_time_step)
+    """
+    
+    # 固定参数（与 agent_user.py 保持一致）
+    LAMBDA_DECAY = 0.1      # 时间衰减系数
+    BETA_BIAS = 180         # 基础偏置值
+    MIN_FRESHNESS = 0.1     # 最小新鲜度
+    
+    def __init__(self, db_path: str):
+        """初始化热度评分计算器
+        
+        Args:
+            db_path: 数据库文件路径
+        """
+        self.db_path = db_path
+    
+    def get_current_time_step(self) -> int:
+        """获取当前时间步
+        
+        从 post_timesteps 表获取最大 time_step 值作为当前时间步。
+        如果表为空或查询失败，返回 0。
+        
+        Returns:
+            int: 当前时间步，如果表为空则返回 0
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute('SELECT COALESCE(MAX(time_step), 0) FROM post_timesteps')
+            result = cursor.fetchone()
+            current_step = result[0] if result else 0
+            
+            conn.close()
+            return current_step
+        except Exception as e:
+            print(f'⚠️ 获取当前时间步失败: {e}')
+            return 0
+    
+    def get_post_time_step(self, post_id: str) -> Optional[int]:
+        """获取帖子的创建时间步
+        
+        Args:
+            post_id: 帖子ID
+            
+        Returns:
+            Optional[int]: 时间步，如果不存在则返回 None
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute('SELECT time_step FROM post_timesteps WHERE post_id = ?', (post_id,))
+            result = cursor.fetchone()
+            
+            conn.close()
+            return result[0] if result else None
+        except Exception as e:
+            print(f'⚠️ 获取帖子时间步失败 (post_id={post_id}): {e}')
+            return None
+    
+    def calculate_score(self, post: dict, current_time_step: int) -> float:
+        """计算单个帖子的热度评分
+        
+        使用与 agent_user.py 完全一致的评分公式：
+        1. 计算互动数：engagement = num_comments + num_shares + num_likes
+        2. 计算年龄：age = max(0, current_time_step - post_time_step)
+           如果 post_time_step 不存在，则 age = 0
+        3. 计算新鲜度：freshness = max(0.1, 1.0 - 0.1 × age)
+        4. 计算评分：score = (engagement + 180) × freshness
+        
+        Args:
+            post: 帖子数据字典，必须包含：
+                  - post_id: 帖子ID
+                  - num_comments: 评论数
+                  - num_shares: 分享数
+                  - num_likes: 点赞数
+            current_time_step: 当前时间步
+            
+        Returns:
+            float: 热度评分
+        """
+        # 计算互动数（与 agent_user.py 保持一致）
+        engagement = (
+            (post.get('num_comments') or 0) +
+            (post.get('num_shares') or 0) +
+            (post.get('num_likes') or 0)
+        )
+        
+        # 获取帖子的创建时间步
+        post_time_step = self.get_post_time_step(post['post_id'])
+        
+        # 计算年龄（如果 post_time_step 为 None，则 age = 0）
+        if post_time_step is not None:
+            age = max(0, current_time_step - post_time_step)
+        else:
+            age = 0
+        
+        # 计算新鲜度
+        freshness = max(self.MIN_FRESHNESS, 1.0 - self.LAMBDA_DECAY * age)
+        
+        # 计算最终评分
+        score = (engagement + self.BETA_BIAS) * freshness
+        
+        return score
+    
+    @staticmethod
+    def calculate_fingerprint(items: List[dict]) -> str:
+        """计算榜单指纹，用于去重
+        
+        基于榜单中所有帖子的关键字段（postId, score, createdAt）计算 MD5 哈希值，
+        用于判断榜单是否发生变化，避免无效的 SSE 推送。
+        
+        Args:
+            items: 榜单项列表，每项包含 postId, score, createdAt 字段
+            
+        Returns:
+            str: MD5 哈希值（32位十六进制字符串）
+        """
+        import hashlib
+        import json
+        
+        # 提取关键字段：postId, score, createdAt
+        key_data = [
+            (item['postId'], item['score'], item['createdAt'])
+            for item in items
+        ]
+        
+        # 序列化为 JSON 字符串（确保键排序以保证一致性）
+        json_str = json.dumps(key_data, sort_keys=True)
+        
+        # 计算 MD5 哈希
+        fingerprint = hashlib.md5(json_str.encode()).hexdigest()
+        
+        return fingerprint
+
+
+# ============================================================================
+# 帖子热度榜 API
+# ============================================================================
+
+@app.route('/api/leaderboard', methods=['GET'])
+def get_leaderboard():
+    """获取热度排行榜
+    
+    查询所有符合条件的帖子，计算热度评分，返回 Top N 个帖子。
+    
+    查询参数:
+        limit: 返回数量，默认 20，最大 100
+        
+    返回:
+        {
+            "items": [
+                {
+                    "postId": str,
+                    "excerpt": str,  # 优先使用 summary，否则截断 content 前 100 字符
+                    "score": float,
+                    "authorId": str,
+                    "createdAt": str,  # ISO 8601 格式
+                    "likeCount": int,
+                    "shareCount": int,
+                    "commentCount": int
+                },
+                ...
+            ],
+            "timeStep": int,
+            "fingerprint": str  # 用于去重的哈希值
+        }
+    """
+    try:
+        # 获取 limit 参数（默认 20，最大 100）
+        limit = request.args.get('limit', default=20, type=int)
+        limit = min(max(1, limit), 100)  # 限制在 1-100 范围内
+        
+        # 获取数据库路径（默认使用 simulation.db）
+        db_name = request.args.get('db', default='simulation.db', type=str)
+        db_path = os.path.join(DATABASE_DIR, db_name)
+        
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database not found'}), 404
+        
+        # 创建热度评分计算器
+        calculator = HeatScoreCalculator(db_path)
+        
+        # 获取当前时间步
+        current_time_step = calculator.get_current_time_step()
+        
+        # 查询所有符合条件的帖子
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # 只查询必需字段，过滤条件：status IS NULL OR status != 'taken_down'
+        cursor.execute("""
+            SELECT 
+                post_id,
+                summary,
+                content,
+                author_id,
+                created_at,
+                num_likes,
+                num_shares,
+                num_comments
+            FROM posts
+            WHERE status IS NULL OR status != 'taken_down'
+        """)
+        
+        # 计算每个帖子的热度评分
+        posts_with_scores = []
+        for row in cursor.fetchall():
+            post = {
+                'post_id': row[0],
+                'summary': row[1],
+                'content': row[2],
+                'author_id': row[3],
+                'created_at': row[4],
+                'num_likes': row[5] or 0,
+                'num_shares': row[6] or 0,
+                'num_comments': row[7] or 0
+            }
+            
+            # 计算热度评分
+            score = calculator.calculate_score(post, current_time_step)
+            
+            # 处理 excerpt 字段（优先使用 summary，否则截断 content）
+            if post['summary']:
+                excerpt = post['summary']
+            else:
+                content = post['content'] or ''
+                excerpt = content[:100] + ('...' if len(content) > 100 else '')
+            
+            posts_with_scores.append({
+                'postId': post['post_id'],
+                'excerpt': excerpt,
+                'score': score,
+                'authorId': post['author_id'],
+                'createdAt': post['created_at'],
+                'likeCount': post['num_likes'],
+                'shareCount': post['num_shares'],
+                'commentCount': post['num_comments']
+            })
+        
+        conn.close()
+        
+        # 排序：主排序 score 降序，次排序 createdAt 降序，三级排序 postId 升序
+        # 使用稳定排序的特性，从最低优先级到最高优先级依次排序
+        
+        # 第一步：按 postId 升序排序（最低优先级）
+        posts_with_scores.sort(key=lambda x: x['postId'])
+        
+        # 第二步：按 createdAt 降序排序（次优先级，稳定排序保持 postId 顺序）
+        posts_with_scores.sort(key=lambda x: x['createdAt'] or '', reverse=True)
+        
+        # 第三步：按 score 降序排序（最高优先级，稳定排序保持前两级顺序）
+        posts_with_scores.sort(key=lambda x: x['score'], reverse=True)
+        
+        # 返回前 N 个结果
+        top_posts = posts_with_scores[:limit]
+        
+        # 计算 fingerprint
+        fingerprint = HeatScoreCalculator.calculate_fingerprint(top_posts)
+        
+        return jsonify({
+            'items': top_posts,
+            'timeStep': current_time_step,
+            'fingerprint': fingerprint
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/leaderboard/posts/<post_id>', methods=['GET'])
+def get_post_detail_by_id(post_id: str):
+    """获取帖子详情（热度榜专用）
+    
+    查询指定 post_id 的帖子，返回完整的帖子信息。
+    
+    路径参数:
+        post_id: 帖子ID
+        
+    查询参数:
+        db: 数据库名称（默认 simulation.db）
+        
+    返回:
+        {
+            "postId": str,
+            "content": str,
+            "excerpt": str,  # summary 字段
+            "authorId": str,
+            "createdAt": str,  # ISO 8601 格式
+            "likeCount": int,
+            "shareCount": int,
+            "commentCount": int
+        }
+        
+    错误:
+        404: 帖子不存在或已删除（status = 'taken_down'）
+    """
+    try:
+        # 获取数据库路径（默认使用 simulation.db）
+        db_name = request.args.get('db', default='simulation.db', type=str)
+        db_path = os.path.join(DATABASE_DIR, db_name)
+        
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database not found'}), 404
+        
+        # 查询帖子
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # 过滤条件：status IS NULL OR status != 'taken_down'
+        cursor.execute("""
+            SELECT 
+                post_id,
+                content,
+                summary,
+                author_id,
+                created_at,
+                num_likes,
+                num_shares,
+                num_comments
+            FROM posts
+            WHERE post_id = ? AND (status IS NULL OR status != 'taken_down')
+        """, (post_id,))
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        # 如果帖子不存在或已删除，返回 404
+        if not row:
+            return jsonify({'error': 'Post not found'}), 404
+        
+        # 构造响应数据（转换为 camelCase）
+        response = {
+            'postId': row[0],
+            'content': row[1] or '',
+            'excerpt': row[2] or '',  # summary 字段
+            'authorId': row[3],
+            'createdAt': row[4],
+            'likeCount': row[5] or 0,
+            'shareCount': row[6] or 0,
+            'commentCount': row[7] or 0
+        }
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/leaderboard/posts/<post_id>/comments', methods=['GET'])
+def get_post_comments_by_id(post_id: str):
+    """获取帖子评论列表（热度榜专用）
+    
+    查询指定 post_id 的所有评论，支持按点赞数或时间排序。
+    
+    路径参数:
+        post_id: 帖子ID
+        
+    查询参数:
+        sort: 排序方式，'likes' 或 'time'，默认 'likes'
+        limit: 返回数量，默认 100
+        db: 数据库名称（默认 simulation.db）
+        
+    返回:
+        {
+            "comments": [
+                {
+                    "commentId": str,
+                    "content": str,
+                    "authorId": str,
+                    "createdAt": str,  # ISO 8601 格式
+                    "likeCount": int
+                },
+                ...
+            ]
+        }
+        
+    错误:
+        400: 无效的 sort 参数
+    """
+    try:
+        # 获取查询参数
+        sort_param = request.args.get('sort', default='likes', type=str).lower()
+        limit = request.args.get('limit', default=100, type=int)
+        db_name = request.args.get('db', default='simulation.db', type=str)
+        
+        # 验证 sort 参数
+        if sort_param not in ['likes', 'time']:
+            return jsonify({'error': 'Invalid sort parameter. Must be "likes" or "time"'}), 400
+        
+        # 限制 limit 范围
+        limit = min(max(1, limit), 100)
+        
+        # 获取数据库路径
+        db_path = os.path.join(DATABASE_DIR, db_name)
+        
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database not found'}), 404
+        
+        # 查询评论
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # 根据 sort 参数确定排序方式
+        if sort_param == 'likes':
+            order_by = 'num_likes DESC, created_at DESC'
+        else:  # sort_param == 'time'
+            order_by = 'created_at DESC'
+        
+        # 查询评论列表
+        query = f"""
+            SELECT 
+                comment_id,
+                content,
+                author_id,
+                created_at,
+                num_likes
+            FROM comments
+            WHERE post_id = ?
+            ORDER BY {order_by}
+            LIMIT ?
+        """
+        
+        cursor.execute(query, (post_id, limit))
+        
+        # 构造响应数据（转换为 camelCase）
+        comments = []
+        for row in cursor.fetchall():
+            comments.append({
+                'commentId': row[0],
+                'content': row[1] or '',
+                'authorId': row[2],
+                'createdAt': row[3],
+                'likeCount': row[4] or 0
+            })
+        
+        conn.close()
+        
+        return jsonify({'comments': comments})
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# SSE 事件流 - 实时热度榜更新
+# ============================================================================
+
+@app.route('/api/events', methods=['GET'])
+def event_stream():
+    """SSE 事件流，推送热度榜更新
+    
+    建立 Server-Sent Events 连接，每 1 秒推送一次热度榜更新。
+    使用 fingerprint 机制避免无效推送：只在榜单内容发生变化时才推送数据。
+    
+    事件格式:
+        event: leaderboard-update
+        data: {
+            "items": [...],  # 与 GET /api/leaderboard 返回格式一致
+            "timeStep": int,
+            "fingerprint": str,
+            "timestamp": str  # ISO 8601 格式
+        }
+        
+    推送间隔: 1 秒
+    推送策略: 仅当 fingerprint 变化时推送（避免无效更新）
+    """
+    # 在生成器外部获取请求参数（避免上下文问题）
+    db_name = request.args.get('db', default='simulation.db', type=str)
+    limit = request.args.get('limit', default=20, type=int)
+    limit = min(max(1, limit), 100)  # 限制在 1-100 范围内
+    
+    def generate():
+        """生成器函数，持续推送热度榜更新"""
+        last_fingerprint = None  # 记录上次的 fingerprint
+        
+        try:
+            while True:
+                try:
+                    # 获取数据库路径（使用外部变量）
+                    db_path = os.path.join(DATABASE_DIR, db_name)
+                    
+                    if not os.path.exists(db_path):
+                        # 数据库不存在，发送错误事件
+                        yield f'event: error\ndata: {{"error": "Database not found"}}\n\n'
+                        break
+                    
+                    # 创建热度评分计算器
+                    calculator = HeatScoreCalculator(db_path)
+                    
+                    # 获取当前时间步
+                    current_time_step = calculator.get_current_time_step()
+                    
+                    # 查询所有符合条件的帖子
+                    conn = sqlite3.connect(db_path)
+                    cursor = conn.cursor()
+                    
+                    # 只查询必需字段，过滤条件：status IS NULL OR status != 'taken_down'
+                    cursor.execute("""
+                        SELECT 
+                            post_id,
+                            summary,
+                            content,
+                            author_id,
+                            created_at,
+                            num_likes,
+                            num_shares,
+                            num_comments
+                        FROM posts
+                        WHERE status IS NULL OR status != 'taken_down'
+                    """)
+                    
+                    # 计算每个帖子的热度评分
+                    posts_with_scores = []
+                    for row in cursor.fetchall():
+                        post = {
+                            'post_id': row[0],
+                            'summary': row[1],
+                            'content': row[2],
+                            'author_id': row[3],
+                            'created_at': row[4],
+                            'num_likes': row[5] or 0,
+                            'num_shares': row[6] or 0,
+                            'num_comments': row[7] or 0
+                        }
+                        
+                        # 计算热度评分
+                        score = calculator.calculate_score(post, current_time_step)
+                        
+                        # 处理 excerpt 字段（优先使用 summary，否则截断 content）
+                        if post['summary']:
+                            excerpt = post['summary']
+                        else:
+                            content = post['content'] or ''
+                            excerpt = content[:100] + ('...' if len(content) > 100 else '')
+                        
+                        posts_with_scores.append({
+                            'postId': post['post_id'],
+                            'excerpt': excerpt,
+                            'score': score,
+                            'authorId': post['author_id'],
+                            'createdAt': post['created_at'],
+                            'likeCount': post['num_likes'],
+                            'shareCount': post['num_shares'],
+                            'commentCount': post['num_comments']
+                        })
+                    
+                    conn.close()
+                    
+                    # 排序：主排序 score 降序，次排序 createdAt 降序，三级排序 postId 升序
+                    # 使用稳定排序的特性，从最低优先级到最高优先级依次排序
+                    
+                    # 第一步：按 postId 升序排序（最低优先级）
+                    posts_with_scores.sort(key=lambda x: x['postId'])
+                    
+                    # 第二步：按 createdAt 降序排序（次优先级，稳定排序保持 postId 顺序）
+                    posts_with_scores.sort(key=lambda x: x['createdAt'] or '', reverse=True)
+                    
+                    # 第三步：按 score 降序排序（最高优先级，稳定排序保持前两级顺序）
+                    posts_with_scores.sort(key=lambda x: x['score'], reverse=True)
+                    
+                    # 返回前 N 个结果
+                    top_posts = posts_with_scores[:limit]
+                    
+                    # 计算 fingerprint
+                    current_fingerprint = HeatScoreCalculator.calculate_fingerprint(top_posts)
+                    
+                    # 只在 fingerprint 变化时推送
+                    if current_fingerprint != last_fingerprint:
+                        # 构造事件数据
+                        event_data = {
+                            'items': top_posts,
+                            'timeStep': current_time_step,
+                            'fingerprint': current_fingerprint,
+                            'timestamp': datetime.datetime.now().isoformat()
+                        }
+                        
+                        # 格式化为 SSE 格式
+                        import json
+                        data_json = json.dumps(event_data, ensure_ascii=False)
+                        yield f'event: leaderboard-update\ndata: {data_json}\n\n'
+                        
+                        # 更新 last_fingerprint
+                        last_fingerprint = current_fingerprint
+                    
+                    # 等待 1 秒
+                    time.sleep(1)
+                    
+                except GeneratorExit:
+                    # 客户端断开连接
+                    print('✅ SSE 客户端断开连接，清理资源')
+                    break
+                except Exception as e:
+                    # 发生错误，记录日志并发送错误事件
+                    import traceback
+                    traceback.print_exc()
+                    yield f'event: error\ndata: {{"error": "{str(e)}"}}\n\n'
+                    break
+                    
+        except GeneratorExit:
+            # 客户端断开连接
+            print('✅ SSE 客户端断开连接（外层），清理资源')
+        except Exception as e:
+            # 发生错误，记录日志
+            import traceback
+            traceback.print_exc()
+    
+    # 返回流式响应
+    from flask import Response
+    return Response(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',  # 禁用 nginx 缓冲
+            'Connection': 'keep-alive'
+        }
+    )
+
+
 if __name__ == '__main__':
     print("Starting EvoCorps Frontend API Server...")
     print("Database directory:", os.path.abspath(DATABASE_DIR))
