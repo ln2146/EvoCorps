@@ -276,9 +276,13 @@ export default function DynamicDemo() {
 
         setIsRunning(bothRunning)
 
-        // 同步 enableEvoCorps 状态
-        const obRunning = data.opinion_balance?.status === 'running'
-        setEnableEvoCorps(obRunning)
+        // Only sync opinion-balance toggle from backend when we actually manage the backend process.
+        // In workflow log replay mode, enableEvoCorps is a pure UI stream toggle and must not be
+        // overridden by status polling (otherwise it flips back off immediately).
+        if (shouldCallOpinionBalanceProcessApi(USE_WORKFLOW_LOG_REPLAY)) {
+          const obRunning = data.opinion_balance?.status === 'running'
+          setEnableEvoCorps(obRunning)
+        }
       } catch (error) {
         console.error('Failed to check status:', error)
       }
