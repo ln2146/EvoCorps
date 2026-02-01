@@ -1,7 +1,24 @@
 {
-  "simulation_timestamp": "20260201_014753",
-  "created_at": "2026-02-01T01:47:53.599232",
-  "last_update": "2026-02-01T01:47:53.599232",
-  "total_timesteps": 0,
-  "posts": {}
+  "simulation_timestamp": "20260201_214710",
+  "created_at": "2026-02-01T21:56:11.223580",
+  "last_update": "2026-02-01T21:56:11.223604",
+  "total_timesteps": 1,
+  "posts": {
+    "post-1f4e3e": {
+      "info": {
+        "extremism_level": 3,
+        "news_type": "fake",
+        "bucket": "extreme",
+        "injection_timestep": 1
+      },
+      "history": [
+        {
+          "timestep": 1,
+          "comments": 6,
+          "likes": 0,
+          "shares": 0
+        }
+      ]
+    }
+  }
 }

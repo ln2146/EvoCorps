@@ -3,9 +3,8 @@ import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContai
 import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { createInitialFlowState, routeLogLine, type FlowState, type Role } from '../lib/interventionFlow/logRouter'
-import { createEventSourceLogStream, createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
+import { createEventSourceLogStream, createFetchReplayLogStream, createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
 import { computeEffectiveRole, nextSelectedRoleOnTabClick } from '../lib/interventionFlow/selection'
-import { parsePostContent } from '../lib/interventionFlow/postContent'
 import { getEmptyCopy } from '../lib/interventionFlow/emptyCopy'
 import { isPreRunEmptyState } from '../lib/interventionFlow/emptyState'
 import { DEFAULT_WORKFLOW_REPLAY_DELAY_MS, getOpinionBalanceLogStreamUrl, shouldCallOpinionBalanceProcessApi } from '../lib/interventionFlow/replayConfig'
@@ -13,7 +12,7 @@ import { getRoleTabButtonClassName } from '../lib/interventionFlow/roleTabStyles
 import { getInterventionFlowPanelClassName, getLeaderCommentsContainerClassName } from '../lib/interventionFlow/panelLayout'
 import { buildRolePills } from '../lib/interventionFlow/rolePills'
 import { getHeatLeaderboardCardClassName, getHeatLeaderboardListClassName } from '../lib/interventionFlow/heatLeaderboardLayout'
-import { getAnalystCombinedCardClassName, getAnalystCombinedPostBodyClassName, getAnalystCombinedStreamClassName } from '../lib/interventionFlow/analystCombinedLayout'
+import { getAnalystCombinedCardClassName, getAnalystCombinedStreamClassName } from '../lib/interventionFlow/analystCombinedLayout'
 import { buildStageStepperModel } from '../lib/interventionFlow/stageStepper'
 import { getLiveBadgeClassName, getStageHeaderContainerClassName, getStageHeaderTextClassName, getStageSegmentClassName } from '../lib/interventionFlow/detailHeaderLayout'
 import { getDynamicDemoGridClassName } from '../lib/interventionFlow/pageGridLayout'
@@ -55,6 +54,8 @@ const USE_SIMULATED_LOG_STREAM = false
 const USE_WORKFLOW_LOG_REPLAY = true
 // One full round only (a single "action_..." cycle) so the demo doesn't endlessly chain.
 const WORKFLOW_REPLAY_BACKEND_FILE = 'replay_workflow_20260130_round1.log'
+// Frontend-only replay: served from `frontend/public/workflow/` (so it works even when the backend isn't running).
+const WORKFLOW_REPLAY_PUBLIC_FILE = 'replay_workflow_20260130_round1.txt'
 // Slower replay so the user can actually read the UI while it streams.
 const WORKFLOW_REPLAY_DELAY_MS = DEFAULT_WORKFLOW_REPLAY_DELAY_MS * 5
 
@@ -317,7 +318,9 @@ export default function DynamicDemo() {
 
     const stream = USE_SIMULATED_LOG_STREAM
       ? createSimulatedLogStream({ lines: DEMO_BACKEND_LOG_LINES, intervalMs: 320 })
-      : createEventSourceLogStream(OPINION_BALANCE_LOG_STREAM_URL)
+      : USE_WORKFLOW_LOG_REPLAY
+        ? createFetchReplayLogStream({ url: `/workflow/${WORKFLOW_REPLAY_PUBLIC_FILE}`, delayMs: WORKFLOW_REPLAY_DELAY_MS })
+        : createEventSourceLogStream(OPINION_BALANCE_LOG_STREAM_URL)
     const unsubscribe = stream.subscribe((line) => {
       setFlowState((prev) => routeLogLine(prev, line))
     })
@@ -526,21 +529,7 @@ export default function DynamicDemo() {
         </div>
 
         <div className="space-y-6">
-          {enableEvoCorps ? (
-            <InterventionFlowPanel state={flowState} enabled={enableEvoCorps} />
-          ) : (
-            <div className="glass-card p-6 min-h-[640px] flex items-center justify-center">
-              <div className="text-center space-y-3">
-                <div className="flex justify-center">
-                  <Shield className="text-slate-400" size={32} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-800">干预流程</h3>
-                  <p className="text-sm text-slate-600">启用舆论平衡系统后展示实时干预过程。</p>
-                </div>
-              </div>
-            </div>
-          )}
+          <InterventionFlowPanel state={flowState} enabled={enableEvoCorps} />
         </div>
       </div>
 
@@ -704,7 +693,7 @@ function HeatLeaderboardCard({
           </div>
         ) : posts.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-slate-500">暂无数据</p>
+            <p className="text-slate-500">暂无热度数据（请先点击“开启演示”启动模拟）</p>
           </div>
         ) : (
           posts.slice(0, 20).map((post, index) => {
@@ -1121,10 +1110,6 @@ function RoleDetailSection({
 }) {
   const displayLines = isLive ? during : (after ?? [])
   const emptyCopy = useMemo(() => getEmptyCopy({ enabled }), [enabled])
-  const parsedPost = useMemo(() => {
-    if (!context.postContent) return null
-    return parsePostContent(context.postContent, { previewChars: 160 })
-  }, [context.postContent])
 
   const pills = buildRolePills(role, {
     feedScore: context.feedScore,
@@ -1195,30 +1180,6 @@ function RoleDetailSection({
 
       {role === 'Analyst' ? (
         <div className={getAnalystCombinedCardClassName()}>
-          {parsedPost ? (
-            <div>
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="text-xs font-semibold text-slate-700 shrink-0">帖子与分析</div>
-                  {parsedPost.tag ? (
-                    <span className="text-[10px] font-semibold text-slate-700 px-2 py-1 rounded-full bg-white/70 border border-white/40 shrink-0">
-                      {parsedPost.tag}
-                    </span>
-                  ) : null}
-                </div>
-                {/* Always show full post content; no expand/collapse. */}
-              </div>
-
-              <div className="mt-2">
-                <div className={getAnalystCombinedPostBodyClassName()}>
-                  {parsedPost.full}
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="h-px bg-white/60" />
-
           <div className={getAnalystCombinedStreamClassName()}>
             {displayLines.length ? (
               displayLines.map((line, idx) => (
@@ -1248,7 +1209,7 @@ function RoleDetailSection({
 
       {role !== 'Analyst' ? (
         <div className="mt-4 bg-white/60 border border-white/40 rounded-2xl p-4 min-h-0 flex-1">
-          <div className="space-y-2 h-full overflow-y-auto overflow-x-hidden pr-1">
+          <div className="space-y-2 h-full overflow-y-scroll overflow-x-hidden pr-1">
             {displayLines.length ? (
               displayLines.map((line, idx) => (
                 <div key={`${role}_${idx}`} className="text-sm text-slate-700 leading-relaxed break-all">

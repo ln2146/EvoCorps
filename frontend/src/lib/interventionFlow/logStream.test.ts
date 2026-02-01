@@ -59,6 +59,9 @@ describe('createFetchReplayLogStream', () => {
     await Promise.resolve()
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
+    // UI should get an immediate status line so toggling "enable" feels responsive.
+    expect(handler).toHaveBeenCalledWith('INFO: 正在加载回放日志...')
+    expect(handler).toHaveBeenCalledWith('INFO: 回放开始')
     expect(handler).toHaveBeenCalledWith('l1')
 
     vi.advanceTimersByTime(1000)
@@ -89,8 +92,9 @@ describe('createFetchReplayLogStream', () => {
     await Promise.resolve()
     await Promise.resolve()
 
-    expect(handler.mock.calls.length).toBe(1)
-    expect(String(handler.mock.calls[0][0])).toContain('ERROR:')
+    // Should still emit a status line first.
+    expect(String(handler.mock.calls[0][0])).toContain('INFO:')
+    expect(handler.mock.calls.some((c) => String(c[0]).includes('ERROR:'))).toBe(true)
 
     vi.useRealTimers()
   })

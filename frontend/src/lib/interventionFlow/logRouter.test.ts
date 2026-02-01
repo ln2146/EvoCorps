@@ -25,19 +25,19 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:13:09,286 - INFO -   🔍 Analyst is analyzing content...')
     expect(state.activeRole).toBe('Analyst')
     expect(state.roles.Analyst.status).toBe('running')
-    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('分析师：开始分析')
+    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('开始分析')
 
     state = routeLogLine(state, '2026-01-28 21:13:42,092 - INFO -    📊 Analyst analysis completed:')
     expect(state.activeRole).toBe('Analyst')
     // "analysis completed" marker is suppressed to avoid duplicate analysis rows; core viewpoint line is rendered instead.
-    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('分析师：开始分析')
+    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('开始分析')
 
     state = routeLogLine(state, '2026-01-28 21:13:50,253 - INFO - ⚖️ Strategist is creating strategy...')
     expect(state.activeRole).toBe('Strategist')
     expect(state.roles.Analyst.status).toBe('done')
     expect(state.roles.Analyst.after?.length).toBeGreaterThan(0)
     expect(state.roles.Analyst.during).toEqual([])
-    expect(state.roles.Strategist.during[state.roles.Strategist.during.length - 1]).toBe('战略家：生成策略')
+    expect(state.roles.Strategist.during[state.roles.Strategist.during.length - 1]).toBe('生成策略')
   })
 
   it('keeps lines under Amplifier after activating echo cluster (sticky) even if they contain Leader keywords', () => {
@@ -52,7 +52,7 @@ describe('routeLogLine', () => {
 
     state = routeLogLine(state, '2026-01-28 21:18:33,637 - INFO - 💬 👑 Leader comment 1 on post post-18e9eb: ...')
     expect(state.activeRole).toBe('Amplifier')
-    expect(state.roles.Amplifier.during[state.roles.Amplifier.during.length - 1]).toBe('领袖：评论已发布（1）')
+    expect(state.roles.Amplifier.during[state.roles.Amplifier.during.length - 1]).toBe('评论已发布（1）')
   })
 
   it('releases amplifier sticky on monitoring and allows switching back to Analyst', () => {
@@ -84,7 +84,7 @@ describe('routeLogLine', () => {
 
     state = routeLogLine(state, '2026-01-30 23:22:11,000 - INFO - 🔄 Will continue monitoring and adjust dynamically')
     expect(state.activeRole).toBe('Analyst')
-    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1].toLowerCase()).toContain('monitoring')
+    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toContain('监测')
   })
 
   it('updates Analyst summary fields from key result lines', () => {
@@ -108,7 +108,7 @@ describe('routeLogLine', () => {
     let state = createInitialFlowState()
 
     state = routeLogLine(state, '2026-01-30 23:20:18,455 - INFO -   🔍 Analyst is analyzing content...')
-    expect(state.roles.Analyst.during).toEqual(['分析师：开始分析'])
+    expect(state.roles.Analyst.during).toEqual(['开始分析'])
 
     state = routeLogLine(state, '2026-01-30 23:20:29,476 - INFO -    📊 Analyst analysis completed:')
     expect(state.roles.Analyst.during.join('\n')).not.toMatch(/analysis completed/i)
@@ -162,9 +162,11 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:18:54,726 - INFO -   💖 Successfully added 240 likes to each of 2 leader comments (total: 480 likes)')
     state = routeLogLine(state, '2026-01-28 21:18:54,727 - INFO - 🎉 Workflow completed - effectiveness score: 10.0/10')
 
-    expect(state.roles.Amplifier.summary.join(' ')).toContain('12')
+    expect(state.roles.Amplifier.summary.join(' ')).toContain('Amplifiers: 12')
     expect(state.roles.Amplifier.summary.join(' ')).toContain('点赞：放大')
     expect(state.roles.Amplifier.summary.join(' ')).not.toContain('10.0/10')
+    // Strategist also receives the amplifier cluster size as a concise summary.
+    expect(state.roles.Strategist.summary.join(' ')).toContain('Amplifiers: 12')
   })
 
   it('stores full post content and feed score in context', () => {
@@ -304,5 +306,49 @@ describe('routeLogLine', () => {
       expect(state.roles[role].stage.max).toBe(-1)
       expect(state.roles[role].stage.order).toEqual([])
     }
+  })
+
+  it('formats Analyst decision stage lines compactly and avoids duplication', () => {
+    let state = createInitialFlowState()
+    state = routeLogLine(state, '2026-01-30 23:20:18,439 - INFO - 🚀 Start workflow execution - Action ID: action_x')
+
+    state = routeLogLine(state, '2026-01-30 23:20:18,439 - INFO -       Needs intervention: yes')
+    state = routeLogLine(state, '2026-01-30 23:20:18,439 - INFO -       Urgency level: 2')
+    state = routeLogLine(
+      state,
+      '2026-01-30 23:20:18,439 - INFO -       Trigger reasons: Viewpoint extremism too high (8.0/10.0 >= 4.5) & Sentiment too low (0.13/1.0 <= 0.4)',
+    )
+    state = routeLogLine(state, '2026-01-30 23:20:18,439 - INFO -    🚨 Analyst determined opinion balance intervention needed!')
+    state = routeLogLine(state, '2026-01-30 23:20:18,439 - INFO -   ⚠️  Alert generated - Urgency: 2')
+
+    expect(state.activeRole).toBe('Analyst')
+    expect(state.roles.Analyst.stage.current).toBe(4)
+
+    const text = state.roles.Analyst.during.join('\n')
+    expect(text).toContain('判定：需要干预')
+    expect(text).toContain('紧急度：U2')
+    expect(text).toContain('原因：')
+    expect(text).toContain('告警：已生成（U2）')
+
+    // Should not leak raw English key lines or duplicate reason tails.
+    expect(text).not.toContain('Urgency level:')
+    expect(text).not.toContain('Trigger reasons:')
+    expect(text).not.toContain('Analyst determined opinion balance intervention needed')
+    expect(text).not.toContain('）：Viewpoint')
+  })
+
+  it('suppresses workflow prelude meta lines (post id/author/etc.) from the dynamic panel', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-30 23:20:18,439 - INFO - 🚀 Start workflow execution - Action ID: action_x')
+    const beforeLen = state.roles.Analyst.during.length
+
+    state = routeLogLine(state, '2026-01-30 23:20:18,439 - INFO - 📋 Intervention ID: action_x')
+    state = routeLogLine(state, '2026-01-30 23:20:18,439 - INFO - 🎯 Target content: 【Trending Post Opinion Analysis】')
+    state = routeLogLine(state, '2026-01-30 23:20:18,439 - INFO - Post ID: post-123')
+    state = routeLogLine(state, '2026-01-30 23:20:18,439 - INFO - Author: agentverse_news')
+    state = routeLogLine(state, '2026-01-30 23:20:18,439 - INFO - Total engagement: 48')
+
+    expect(state.roles.Analyst.during.length).toBe(beforeLen)
   })
 })

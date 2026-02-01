@@ -7,8 +7,8 @@ describe('isPreRunEmptyState', () => {
     expect(isPreRunEmptyState({ enabled: true, status: 'idle', linesCount: 0 })).toBe(true)
   })
 
-  it('is false when disabled', () => {
-    expect(isPreRunEmptyState({ enabled: false, status: 'idle', linesCount: 0 })).toBe(false)
+  it('is true when disabled', () => {
+    expect(isPreRunEmptyState({ enabled: false, status: 'idle', linesCount: 0 })).toBe(true)
   })
 
   it('is false once role is running', () => {

@@ -7,5 +7,8 @@ export function isPreRunEmptyState({
   status: 'idle' | 'running' | 'done' | 'error'
   linesCount: number
 }) {
-  return enabled && status === 'idle' && linesCount <= 0
+  // When opinion-balance is disabled, keep the panel in a clean "pre-run" state
+  // (no metric pills; just a short prompt).
+  if (!enabled) return true
+  return status === 'idle' && linesCount <= 0
 }
