@@ -595,6 +595,7 @@ function DynamicDemoHeader({
   onToggleEvoCorps: () => void | Promise<void>
   sseStatus: 'connecting' | 'connected' | 'disconnected'
 }) {
+  const navigate = useNavigate()
   return (
     <div className="glass-card p-6 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
       <div className="flex items-center gap-4">
@@ -651,14 +652,23 @@ function DynamicDemoHeader({
             />
           </div>
         </div>
-        <button
-          className="btn-secondary aspect-square h-full min-h-[120px] w-[120px] flex flex-col items-center justify-center gap-2 px-4"
-          onClick={onBack}
-          title="返回首页"
-        >
-          <ArrowLeft size={20} />
-          <span className="text-lg font-semibold">返回首页</span>
-        </button>
+        <div className="flex flex-col gap-3 items-center">
+          <button
+            className="btn-secondary inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl"
+            onClick={() => navigate('/dashboard')}
+            title="进入静态演示"
+          >
+            <span>进入静态演示</span>
+          </button>
+          <button
+            className="btn-secondary inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl"
+            onClick={onBack}
+            title="返回首页"
+          >
+            <ArrowLeft size={18} />
+            <span>返回首页</span>
+          </button>
+        </div>
       </div>
     </div>
   )
