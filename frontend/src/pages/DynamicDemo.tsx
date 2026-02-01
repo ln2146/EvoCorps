@@ -520,7 +520,7 @@ export default function DynamicDemo() {
           )}
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-6 self-start">
           <MetricsBarsCard emotion={currentMetrics.emotion} extremity={currentMetrics.extremity} />
           <MetricsLineChartCard data={data.metricsSeries} />
         </div>
@@ -601,10 +601,10 @@ function DynamicDemoHeader({
       <div className="flex items-center gap-4">
         <img src="/logo.png" alt="EvoCorps Logo" className="w-[120px] h-auto max-w-full drop-shadow-xl" />
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
             欢迎使用 EvoCorps
           </h1>
-          <p className="text-slate-600">实时监控舆情变化，动态观察指标变化的舆情现状</p>
+          <p className="text-lg text-slate-600">实时监控舆情变化，动态观察指标变化的舆情现状</p>
           <div className="flex items-center gap-2 mt-2">
             <StatusBadge label={isRunning ? 'Running' : 'Stopped'} tone={isRunning ? 'success' : 'muted'} />
             <StatusBadge
@@ -626,7 +626,7 @@ function DynamicDemoHeader({
               <Play size={18} />
               {isStarting ? '启动中...' : isRunning ? '运行中' : '开启演示'}
             </button>
-            <button className="btn-secondary inline-flex items-center gap-2" onClick={onStop}>
+            <button className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 text-white font-medium hover:shadow-lg transition-all duration-200" onClick={onStop}>
               <Square size={18} />
               停止演示
             </button>
@@ -962,7 +962,7 @@ function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
           <p className="text-sm text-slate-600">情绪度 / 极端度趋势曲线</p>
         </div>
       </div>
-      <div className="h-64">
+      <div className="h-60">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -1281,15 +1281,17 @@ function RoleDetailSection({
 function CommentaryAnalysisPanel({ status, onOpenConfig, onRun }: { status: 'Idle' | 'Running' | 'Done' | 'Error'; onOpenConfig: () => void; onRun: () => void }) {
   return (
     <div className="glass-card p-6">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">评论区总体状态分析</h2>
-          <p className="text-sm text-slate-600">LLM 周期性分析评论情绪与极化趋势</p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <button className="btn-secondary" onClick={onOpenConfig}>分析配置</button>
-          <button className="btn-primary" onClick={onRun}>立即分析</button>
-          <StatusBadge label={status} tone={status === 'Running' ? 'warning' : status === 'Done' ? 'success' : status === 'Error' ? 'danger' : 'muted'} />
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">评论区总体状态分析</h2>
+            <p className="text-sm text-slate-600">LLM 周期性分析评论情绪与极化趋势</p>
+          </div>
+          <div className="flex items-center gap-3 bg-white/70 border border-white/40 rounded-2xl p-4 shrink-0 shadow-lg">
+            <button className="btn-secondary" onClick={onOpenConfig}>分析配置</button>
+            <button className="btn-primary" onClick={onRun}>立即分析</button>
+            <StatusBadge label={status} tone={status === 'Running' ? 'warning' : status === 'Done' ? 'success' : status === 'Error' ? 'danger' : 'muted'} />
+          </div>
         </div>
       </div>
       <AnalysisResultView status={status} />
@@ -1331,15 +1333,15 @@ function AnalysisConfigDialog({ open, onClose }: { open: boolean; onClose: () =>
 function AnalysisResultView({ status }: { status: 'Idle' | 'Running' | 'Done' | 'Error' }) {
   return (
     <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <div className="bg-white/70 rounded-2xl p-4 border border-white/40">
+      <div className="bg-white/70 rounded-2xl p-4 border border-white/40 shadow-lg">
         <h4 className="text-sm font-semibold text-slate-700 mb-2">分析摘要</h4>
         <p className="text-sm text-slate-600">当前分析状态：{status}。后续将展示总结性文本。</p>
       </div>
-      <div className="bg-white/70 rounded-2xl p-4 border border-white/40">
+      <div className="bg-white/70 rounded-2xl p-4 border border-white/40 shadow-lg">
         <h4 className="text-sm font-semibold text-slate-700 mb-2">情绪结构</h4>
         <p className="text-sm text-slate-600">结构化结果占位：正/负情绪比例，重点人群。</p>
       </div>
-      <div className="bg-white/70 rounded-2xl p-4 border border-white/40">
+      <div className="bg-white/70 rounded-2xl p-4 border border-white/40 shadow-lg">
         <h4 className="text-sm font-semibold text-slate-700 mb-2">系统建议</h4>
         <p className="text-sm text-slate-600">策略建议与风险提示占位。</p>
       </div>

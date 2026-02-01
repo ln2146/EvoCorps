@@ -128,7 +128,7 @@ export default function HomePage() {
       {/* 功能特性 */}
       <div>
         <h2 className="text-2xl font-bold text-slate-800 mb-6">核心功能</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {features.map((feature, index) => {
             const Icon = feature.icon
             return (
