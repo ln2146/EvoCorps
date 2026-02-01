@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Database, MessageSquare, Send, CheckCircle2, User, Loader2, Info, X, ThumbsUp, MessageCircle, TrendingUp, ChevronDown, ChevronUp, Users, ChevronLeft, ChevronRight } from 'lucide-react'
 import axios from 'axios'
 import DatabaseSelector from '../components/DatabaseSelector'
@@ -45,7 +45,16 @@ export default function InterviewPage() {
   const [question, setQuestion] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
-  const [interviewHistory, setInterviewHistory] = useState<InterviewHistory[]>([])
+  const [interviewHistory, setInterviewHistory] = useState<InterviewHistory[]>(() => {
+    // 从 localStorage 恢复采访记录
+    try {
+      const saved = localStorage.getItem('interviewHistory')
+      return saved ? JSON.parse(saved) : []
+    } catch (error) {
+      console.error('Failed to load interview history from localStorage:', error)
+      return []
+    }
+  })
   const [selectedHistory, setSelectedHistory] = useState<InterviewHistory | null>(null)
   const [selectedUserDetail, setSelectedUserDetail] = useState<UserInfo | null>(null)
   const [selectedPostDetail, setSelectedPostDetail] = useState<PostWithUsers | null>(null)
@@ -60,6 +69,28 @@ export default function InterviewPage() {
   // 用户列表分页（每个帖子内部）
   const [postUserPages, setPostUserPages] = useState<Record<string, number>>({})
   const usersPerPage = 16 // 4x4
+
+  // 使用 useRef 追踪最新的采访记录和流状态
+  const historyRef = useRef<InterviewHistory[]>(interviewHistory)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const streamStateRef = useRef<{
+    isStreaming: boolean
+    historyId: string
+  }>({ isStreaming: false, historyId: '' })
+
+  // 更新 ref 当 interviewHistory 改变时
+  useEffect(() => {
+    historyRef.current = interviewHistory
+  }, [interviewHistory])
+
+  // 保存采访记录到 localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('interviewHistory', JSON.stringify(interviewHistory))
+    } catch (error) {
+      console.error('Failed to save interview history to localStorage:', error)
+    }
+  }, [interviewHistory])
 
   // 加载数据库列表
   useEffect(() => {
@@ -735,10 +766,25 @@ export default function InterviewPage() {
 
             {/* 历史问答记录 */}
             <div className="glass-card p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <CheckCircle2 size={20} className="text-purple-600" />
-                <h2 className="text-xl font-bold text-slate-800">历史问答</h2>
-                <span className="text-sm text-slate-500">({interviewHistory.length})</span>
+              <div className="flex items-center justify-between gap-2 mb-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={20} className="text-purple-600" />
+                  <h2 className="text-xl font-bold text-slate-800">历史问答</h2>
+                  <span className="text-sm text-slate-500">({interviewHistory.length})</span>
+                </div>
+                {interviewHistory.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (confirm('确定要清除所有采访记录吗？')) {
+                        setInterviewHistory([])
+                        setSelectedHistory(null)
+                      }
+                    }}
+                    className="text-xs px-3 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                  >
+                    清除全部
+                  </button>
+                )}
               </div>
               
               {interviewHistory.length === 0 ? (
@@ -752,25 +798,42 @@ export default function InterviewPage() {
                   {interviewHistory.map((history) => (
                     <div
                       key={history.id}
-                      onClick={() => setSelectedHistory(history)}
-                      className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
+                      className={`p-3 rounded-xl border-2 transition-all duration-200 flex items-start justify-between gap-2 group ${
                         selectedHistory?.id === history.id
                           ? 'border-purple-500 bg-purple-50'
                           : 'border-slate-200 bg-white hover:border-purple-300 hover:bg-purple-50/50'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <p className="text-sm font-medium text-slate-800 line-clamp-2 flex-1">
+                      <div
+                        onClick={() => setSelectedHistory(history)}
+                        className="flex-1 cursor-pointer"
+                      >
+                        <p className="text-sm font-medium text-slate-800 line-clamp-2 mb-2">
                           {history.question}
                         </p>
+                        <div className="flex items-center justify-between text-xs text-slate-600">
+                          <span className="flex items-center gap-1">
+                            <User size={11} />
+                            {history.user_count} 人
+                          </span>
+                          <span className="text-slate-400">{history.timestamp}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between text-xs text-slate-600">
-                        <span className="flex items-center gap-1">
-                          <User size={11} />
-                          {history.user_count} 人
-                        </span>
-                        <span className="text-slate-400">{history.timestamp}</span>
-                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (confirm('确定要删除这条采访记录吗？')) {
+                            setInterviewHistory(prev => prev.filter(h => h.id !== history.id))
+                            if (selectedHistory?.id === history.id) {
+                              setSelectedHistory(null)
+                            }
+                          }
+                        }}
+                        className="flex-shrink-0 p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors opacity-0 group-hover:opacity-100"
+                        title="删除"
+                      >
+                        <X size={16} />
+                      </button>
                     </div>
                   ))}
                 </div>
