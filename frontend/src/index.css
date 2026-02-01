@@ -23,6 +23,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    font-weight: 600;
   }
 
   /* 标题使用科幻风格 */
@@ -32,7 +33,7 @@
       'Microsoft YaHei UI', 'PingFang SC',
       'Hiragino Sans GB', 'SimHei',
       sans-serif;
-    font-weight: 700;
+    font-weight: 800;
     letter-spacing: -0.5px;
     -webkit-font-smoothing: antialiased;
   }
@@ -40,18 +41,22 @@
   h1 {
     @apply text-4xl;
     letter-spacing: -1px;
-    font-weight: 800;
+    font-weight: 900;
   }
 
   h2 {
     @apply text-3xl;
     letter-spacing: -0.8px;
-    font-weight: 700;
+    font-weight: 800;
   }
 
   h3 {
     @apply text-2xl;
     letter-spacing: -0.6px;
+    font-weight: 800;
+  }
+
+  h4, h5, h6 {
     font-weight: 700;
   }
 
@@ -64,11 +69,22 @@
       sans-serif;
     letter-spacing: 0.2px;
     -webkit-font-smoothing: antialiased;
+    font-weight: 600;
   }
 
   /* 中文文本优化 */
   p, span, div, li, td, th, label, a {
     font-family: inherit;
+    font-weight: inherit;
+  }
+
+  /* 强制加粗所有文本 */
+  * {
+    font-weight: 600;
+  }
+
+  strong, b {
+    font-weight: 800;
   }
 }
 

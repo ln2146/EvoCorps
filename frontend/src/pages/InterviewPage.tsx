@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Database, MessageSquare, Send, CheckCircle2, User, Loader2, Info, X, ThumbsUp, MessageCircle, TrendingUp, ChevronDown, ChevronUp, Users, ChevronLeft, ChevronRight } from 'lucide-react'
 import axios from 'axios'
+import DatabaseSelector from '../components/DatabaseSelector'
 
 interface UserInfo {
   user_id: string
@@ -350,17 +351,12 @@ export default function InterviewPage() {
       {/* 数据库选择 */}
       <div className="glass-card p-6">
         <div className="flex items-center gap-4">
-          <Database size={20} className="text-slate-600" />
-          <label className="text-sm font-medium text-slate-700">选择数据库:</label>
-          <select
-            value={selectedDb}
-            onChange={(e) => setSelectedDb(e.target.value)}
-            className="px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
-          >
-            {databases.map((db) => (
-              <option key={db} value={db}>{db}</option>
-            ))}
-          </select>
+          <DatabaseSelector
+            databases={databases}
+            selectedDb={selectedDb}
+            onSelect={setSelectedDb}
+            label="选择数据库:"
+          />
           <div className="ml-auto text-sm text-slate-600">
             已选择 <span className="font-bold text-green-600">{selectedUsers.size}</span> / {totalUniqueUsers} 个用户
           </div>

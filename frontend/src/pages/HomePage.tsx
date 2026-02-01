@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Users, MessageSquare, ThumbsUp, FileText, Activity, TrendingUp, Zap } from 'lucide-react'
 import { getDatabases, getDatabaseStats, DatabaseStats } from '../services/api'
+import DatabaseSelector from '../components/DatabaseSelector'
 
 export default function HomePage() {
   const [databases, setDatabases] = useState<string[]>([])
@@ -96,17 +97,12 @@ export default function HomePage() {
       {/* 数据库选择 */}
       <div className="glass-card p-6">
         <div className="flex items-center gap-4">
-          <label className="text-sm font-medium text-slate-700">选择数据库：</label>
-          <select 
-            value={selectedDb}
-            onChange={(e) => setSelectedDb(e.target.value)}
-            className="px-4 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {databases.length === 0 && <option>暂无数据库</option>}
-            {databases.map((db) => (
-              <option key={db} value={db}>{db}</option>
-            ))}
-          </select>
+          <DatabaseSelector
+            databases={databases}
+            selectedDb={selectedDb}
+            onSelect={setSelectedDb}
+            label="选择数据库："
+          />
           {loading && <span className="text-sm text-slate-500">加载中...</span>}
         </div>
       </div>
