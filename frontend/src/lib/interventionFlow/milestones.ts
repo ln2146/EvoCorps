@@ -1,11 +1,3 @@
-const MAX_LEN = 72
-
-function truncate(s: string) {
-  const t = s.trim()
-  if (t.length <= MAX_LEN) return t
-  return `${t.slice(0, MAX_LEN - 1)}…`
-}
-
 export function toUserMilestone(cleanLine: string): string | null {
   const s = cleanLine.trim()
   if (!s) return null
@@ -25,7 +17,7 @@ export function toUserMilestone(cleanLine: string): string | null {
   // New round anchor (workflow starts a new "action_..." execution).
   {
     const m = s.match(/Start workflow execution\s*-\s*Action ID:\s*([A-Za-z0-9_:-]+)/i)
-    if (m) return truncate(`新回合：${m[1]}`)
+    if (m) return `新回合：${m[1]}`
   }
 
   // Analyst
@@ -33,7 +25,7 @@ export function toUserMilestone(cleanLine: string): string | null {
   // Prefer rendering the extracted core viewpoint line, so we don't show two "analysis done" lines.
   {
     const m = s.match(/^Core viewpoint:\s*(.+)$/i)
-    if (m) return truncate(`核心观点：${m[1].trim()}`)
+    if (m) return `核心观点：${m[1].trim()}`
   }
   if (/Total weight calculated:/i.test(s)) return '分析师：权重汇总'
   if (/Weighted per-comment sentiment:/i.test(s)) return '分析师：情绪汇总'
@@ -49,14 +41,14 @@ export function toUserMilestone(cleanLine: string): string | null {
   }
   {
     const m = s.match(/^Trigger reasons:\s*(.+)$/i)
-    if (m) return truncate(`分析师：触发原因 ${m[1].trim()}`)
+    if (m) return `分析师：触发原因 ${m[1].trim()}`
   }
 
   // Strategist
   if (/Strategist is creating strategy/i.test(s)) return '战略家：生成策略'
   {
     const m = s.match(/Selected optimal strategy:\s*([a-z0-9_ -]+)/i)
-    if (m) return truncate(`战略家：策略选定（${m[1].trim()}）`)
+    if (m) return `战略家：策略选定（${m[1].trim()}）`
   }
   // Strategist workflow steps: align stage text with log "Step 4: Format as agent instructions"
   if (/Step\s*4:\s*Format as agent instructions/i.test(s) || /Format as agent instructions/i.test(s)) {

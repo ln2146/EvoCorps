@@ -204,7 +204,7 @@ class EnhancedLeaderAgent:
             # Step 1: Parse strategist instructions
             workflow_logger.info("📋 Step 1: Parse strategist instructions")
             core_viewpoint = self._extract_core_viewpoint(strategist_instruction)
-            workflow_logger.info(f"   Core viewpoint: {core_viewpoint[:100]}...")
+            workflow_logger.info(f"   Core viewpoint: {core_viewpoint}")
             
             # Step 2: Search argument knowledge base
             workflow_logger.info("\n📚 Step 2: Search cognitive memory core-viewpoint argument base")
@@ -213,7 +213,7 @@ class EnhancedLeaderAgent:
             
             for i, arg in enumerate(relevant_arguments[:3], 1):
                 workflow_logger.info(
-                    f"   Argument {i}: {arg['content'][:50]}... (relevance: {arg['relevance_score']:.2f})"
+                    f"   Argument {i} (relevance: {arg['relevance_score']:.2f}): {arg['content']}"
                 )
             
             # Step 3: USC-Generate - generate multiple candidate comments
@@ -283,7 +283,8 @@ class EnhancedLeaderAgent:
         # Extract core_counter_argument directly
         if 'core_counter_argument' in instruction and instruction['core_counter_argument']:
             core_viewpoint = str(instruction['core_counter_argument'])
-            workflow_logger.info(f"   Extracted core viewpoint: {core_viewpoint[:100]}...")
+            # Do not truncate: the frontend panel is scrollable and should show full text.
+            workflow_logger.info(f"   Extracted core viewpoint: {core_viewpoint}")
             return core_viewpoint
         
         # If core_counter_argument is missing, extract from leader_instruction.core_message
@@ -291,7 +292,7 @@ class EnhancedLeaderAgent:
             leader_instruction = instruction['leader_instruction']
             if 'core_message' in leader_instruction and leader_instruction['core_message']:
                 core_viewpoint = str(leader_instruction['core_message'])
-                workflow_logger.info(f"   Extracted from leader_instruction: {core_viewpoint[:100]}...")
+                workflow_logger.info(f"   Extracted from leader_instruction: {core_viewpoint}")
                 return core_viewpoint
         
         # If neither is found, log and return empty string
@@ -388,7 +389,7 @@ class EnhancedLeaderAgent:
     def _get_backup_arguments(self, core_viewpoint: str) -> List[Dict]:
         """Backup argument generation - create related arguments with the LLM."""
         try:
-            workflow_logger.info(f"   Generating backup arguments for: {core_viewpoint[:50]}...")
+            workflow_logger.info("   Generating backup arguments (evidence system fallback)")
 
             # Use LLM to generate related arguments
             response = self.client.chat.completions.create(
@@ -548,9 +549,10 @@ Please create a high-quality response based on the above information, using the 
                 }
                 
                 candidates.append(candidate)
-                workflow_logger.info(
-                    f"   Candidate {i+1}: {content[:50]}... (angle: {current_angle})"
-                )
+                # Do not truncate candidate content; the UI scrolls and users want full context.
+                # Keep angle on the header line, then print the full body (may span multiple lines).
+                workflow_logger.info(f"   Candidate {i+1} (angle: {current_angle}):")
+                workflow_logger.info(content)
                 
             except Exception as e:
                 workflow_logger.warning(f"   ⚠️  Candidate {i+1} generation failed: {e}")

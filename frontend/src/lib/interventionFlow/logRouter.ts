@@ -214,12 +214,6 @@ function freezeAfter(card: RoleCardState): RoleCardState {
   return { ...card, status: 'done', after: snapshot, during: [] }
 }
 
-function truncateEnd(s: string, max: number) {
-  const t = s.trim()
-  if (t.length <= max) return t
-  return `${t.slice(0, Math.max(0, max - 1))}…`
-}
-
 function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): FlowState['roles'] {
   let roles = prevRoles
 
@@ -249,7 +243,7 @@ function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): 
       const zh = raw
         .replace(/Viewpoint extremism too high/gi, '极端度过高')
         .replace(/Sentiment too low/gi, '情绪过低')
-      update('Analyst', 3, `触发原因：${truncateEnd(zh, 80)}`)
+      update('Analyst', 3, `触发原因：${zh}`)
     }
 
     const needs = cleanLine.match(/Needs intervention:\s*(yes|no)\b/i)
@@ -289,7 +283,7 @@ function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): 
     }
 
     const arg = cleanLine.match(/Core argument:\s*(.+)$/i)?.[1]?.trim()
-    if (arg) update('Strategist', 3, `核心论点：${truncateEnd(arg, 220)}`)
+    if (arg) update('Strategist', 3, `核心论点：${arg}`)
   }
 
   // Leader: generation/vote outcomes.
@@ -347,11 +341,10 @@ function compressDisplayLine(cleanLine: string) {
     const mExt = cleanLine.match(/^Viewpoint extremism:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
     if (mExt) return `${milestone}（${mExt[1].replace(/\s+/g, '')}）`
     const mTrig = cleanLine.match(/^Trigger reasons:\s*(.+)$/i)
-    if (mTrig) return truncateEnd(`${milestone}：${mTrig[1].trim()}`, 120)
+    if (mTrig) return `${milestone}：${mTrig[1].trim()}`
     return milestone
   }
   // Fallback: short truncated line, but avoid dumping full bodies.
-  if (cleanLine.length > 96) return `${cleanLine.slice(0, 95)}…`
   return cleanLine.trim()
 }
 
@@ -375,6 +368,25 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
   const hasPrefix = LOG_PREFIX_RE.test(rawLine)
   const cleanLine = stripLogPrefix(rawLine)
   if (!cleanLine) return prev
+
+  // Surface stream status lines (produced by the backend SSE wrapper or our EventSource onopen/onerror)
+  // even before any role anchors appear. Without this, the UI can look "stuck" on connect failures.
+  if (/^(INFO|ERROR):/i.test(cleanLine) && !hasPrefix && !prev.context.pendingMultiline) {
+    const displayLine = compressDisplayLine(cleanLine)
+    const role: Role = prev.activeRole ?? 'Analyst'
+    const nextRoles = { ...prev.roles }
+    const cur = nextRoles[role]
+    nextRoles[role] = {
+      ...cur,
+      status: /^ERROR:/i.test(cleanLine) ? 'error' : (cur.status === 'idle' ? 'running' : cur.status),
+      during: pushAggregated(cur.during, displayLine, MAX_DURING_LINES),
+    }
+    return {
+      ...prev,
+      activeRole: prev.activeRole ?? role,
+      roles: nextRoles,
+    }
+  }
 
   // If logger emitted embedded newlines, continuation lines often come without a timestamp prefix.
   // In that case we append to the last captured field (post content / leader comment) and do not

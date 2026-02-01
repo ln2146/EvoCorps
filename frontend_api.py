@@ -2697,7 +2697,8 @@ def stream_opinion_balance_logs():
     replay = str(replay).lower() in ('1', 'true', 'yes', 'on')
     replay_file = request.args.get('file', default=None, type=str)
     delay_ms = request.args.get('delay_ms', default=40, type=int)
-    delay_sec = max(0.0, min(2000, int(delay_ms))) / 1000.0
+    # Keep in sync with frontend clamp in `frontend/src/lib/interventionFlow/replayConfig.ts`.
+    delay_sec = max(0.0, min(10000, int(delay_ms))) / 1000.0
 
     poll_interval_sec = 0.25
     heartbeat_sec = 15.0

@@ -24,6 +24,13 @@ describe('toUserMilestone', () => {
     expect(toUserMilestone('Needs intervention: yes')).toBe('分析师：判定需要干预')
   })
 
+  it('does not truncate long extracted text (no ellipsis)', () => {
+    const long = 'Core viewpoint: ' + 'A'.repeat(200)
+    const out = toUserMilestone(long)
+    expect(out).toBe('核心观点：' + 'A'.repeat(200))
+    expect(out).not.toContain('…')
+  })
+
   it('maps Strategist lines', () => {
     expect(toUserMilestone('⚖️ Strategist is creating strategy...')).toBe('战略家：生成策略')
     expect(toUserMilestone('🎯 Selected optimal strategy: balanced_response')).toBe('战略家：策略选定（balanced_response）')

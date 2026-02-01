@@ -4657,7 +4657,7 @@ class SimpleCoordinationSystem:
                 role_distribution = strategy_echo_plan.get('role_distribution', {})
 
             workflow_logger.info("  📋 Strategy details:")
-            workflow_logger.info(f"     🎯 Core argument: {strategy.get('core_counter_argument', 'balanced perspective')[:60]}...")
+            workflow_logger.info(f"     🎯 Core argument: {strategy.get('core_counter_argument', 'balanced perspective')}")
 
             # Display leader style details
             leader_style = leader_instructions.get('speaking_style', 'rational and neutral')
@@ -5769,7 +5769,7 @@ class SimpleCoordinationSystem:
                 role_distribution = strategy_echo_plan.get('role_distribution', {})
             
             workflow_logger.info("  📋 Strategy details:")
-            workflow_logger.info(f"     🎯 Core argument: {strategy.get('core_counter_argument', 'balanced perspective')[:60]}...")
+            workflow_logger.info(f"     🎯 Core argument: {strategy.get('core_counter_argument', 'balanced perspective')}")
             
             # Display leader style details
             leader_style = leader_instructions.get('speaking_style', 'rational and neutral')
@@ -9362,9 +9362,9 @@ Please return the evaluation result in JSON format:
                 
                 if result and len(result) > 0:
                     content = result[0][0]
-                    # Extract first 100 characters as core viewpoint
+                    # Do not truncate: the UI can scroll and needs full context.
                     if content and len(content) > 0:
-                        return content[:100] + "..." if len(content) > 100 else content
+                        return content
         except Exception as e:
             workflow_logger.warning(f"Failed to get fallback core viewpoint: {e}")
         
@@ -9779,7 +9779,7 @@ Please return the evaluation result in JSON format:
             # Display secondary intervention strategy details
             workflow_logger.info("    📋 Secondary intervention strategy details:")
             workflow_logger.info(f"       Strategy ID: {strategy.get('strategy_id', 'unknown')}")
-            workflow_logger.info(f"       Core argument: {strategy.get('core_counter_argument', 'balanced perspective')[:60]}...")
+            workflow_logger.info(f"       Core argument: {strategy.get('core_counter_argument', 'balanced perspective')}")
             
             # Generate secondary intervention content
             content_result = await self.leader.generate_strategic_content(

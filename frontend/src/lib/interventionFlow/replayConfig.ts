@@ -12,7 +12,8 @@ export function getOpinionBalanceLogStreamUrl(opts: {
   if (!opts.replay) return REAL_STREAM_URL
 
   const file = encodeURIComponent(opts.replayFile)
-  const delay = Math.max(0, Math.min(2000, Math.floor(opts.delayMs)))
+  // Keep in sync with backend clamp in `frontend_api.py`.
+  const delay = Math.max(0, Math.min(10000, Math.floor(opts.delayMs)))
   return `/api/opinion-balance/logs/stream?source=workflow&tail=0&follow_latest=false&replay=1&file=${file}&delay_ms=${delay}`
 }
 

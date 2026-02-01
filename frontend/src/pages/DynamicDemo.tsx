@@ -54,13 +54,13 @@ const USE_SIMULATED_LOG_STREAM = false
 // Flip this to false when switching back to true real-time backend streaming.
 const USE_WORKFLOW_LOG_REPLAY = true
 // One full round only (a single "action_..." cycle) so the demo doesn't endlessly chain.
-const WORKFLOW_REPLAY_FILE = 'replay_workflow_20260130_round1.log'
+const WORKFLOW_REPLAY_BACKEND_FILE = 'replay_workflow_20260130_round1.log'
 // Slower replay so the user can actually read the UI while it streams.
-const WORKFLOW_REPLAY_DELAY_MS = DEFAULT_WORKFLOW_REPLAY_DELAY_MS
+const WORKFLOW_REPLAY_DELAY_MS = DEFAULT_WORKFLOW_REPLAY_DELAY_MS * 5
 
 const OPINION_BALANCE_LOG_STREAM_URL = getOpinionBalanceLogStreamUrl({
   replay: USE_WORKFLOW_LOG_REPLAY,
-  replayFile: WORKFLOW_REPLAY_FILE,
+  replayFile: WORKFLOW_REPLAY_BACKEND_FILE,
   delayMs: WORKFLOW_REPLAY_DELAY_MS,
 })
 

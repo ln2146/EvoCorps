@@ -23,6 +23,11 @@ describe('replayConfig', () => {
     expect(url).toContain('follow_latest=false')
   })
 
+  it('clamps replay delay to the backend max', () => {
+    const url = getOpinionBalanceLogStreamUrl({ replay: true, replayFile: 'workflow_20260130.log', delayMs: 999999 })
+    expect(url).toContain('delay_ms=10000')
+  })
+
   it('skips process start/stop calls in replay mode', () => {
     expect(shouldCallOpinionBalanceProcessApi(false)).toBe(true)
     expect(shouldCallOpinionBalanceProcessApi(true)).toBe(false)
