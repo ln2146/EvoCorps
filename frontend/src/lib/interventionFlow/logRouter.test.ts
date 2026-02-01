@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { createInitialFlowState, routeLogLine, stripLogPrefix } from './logRouter'
+import { toUserMilestone } from './milestones'
 
 describe('stripLogPrefix', () => {
   it('strips timestamp + level prefix', () => {
@@ -67,6 +68,23 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:18:54,728 - INFO -   🔍 Analyst monitoring - establish baseline data')
     expect(state.activeRole).toBe('Analyst')
     expect(state.roles.Analyst.status).toBe('running')
+  })
+
+  it('attributes monitoring task lifecycle lines to Analyst (not Amplifier)', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-30 23:22:00,000 - INFO - ⚖️ Activating Echo Agent cluster...')
+    expect(state.activeRole).toBe('Amplifier')
+    expect(state.amplifierSticky).toBe(true)
+
+    // These lines are part of monitoring/iteration and should belong to Analyst.
+    state = routeLogLine(state, '2026-01-30 23:22:10,000 - INFO - 📊 Monitoring task started: monitor_action_20260130_232018_20260130_232253')
+    expect(state.amplifierSticky).toBe(false)
+    expect(state.activeRole).toBe('Analyst')
+
+    state = routeLogLine(state, '2026-01-30 23:22:11,000 - INFO - 🔄 Will continue monitoring and adjust dynamically')
+    expect(state.activeRole).toBe('Analyst')
+    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1].toLowerCase()).toContain('monitoring')
   })
 
   it('updates Analyst summary fields from key result lines', () => {
@@ -208,6 +226,21 @@ describe('routeLogLine', () => {
     expect(state.roles.Analyst.stage.current).toBe(5)
     expect(state.roles.Analyst.stage.max).toBe(5)
     expect(state.roles.Analyst.stage.order).toEqual([0, 1, 2, 3, 4, 5])
+  })
+
+  it('clears role stream buffer when stage changes to keep content aligned', () => {
+    let state = createInitialFlowState()
+
+    const analyzingMilestone = toUserMilestone('Analyst is analyzing content...')!
+    const weightMilestone = toUserMilestone('Total weight calculated: 34.0 (based on 4 comments)')!
+
+    state = routeLogLine(state, '2026-01-28 21:13:09,286 - INFO -   馃攳 Analyst is analyzing content...')
+    expect(state.roles.Analyst.during).toEqual([analyzingMilestone])
+
+    // Stage changes to 评论抽样/权重汇总; streaming buffer should reset to this stage's lines only.
+    state = routeLogLine(state, '2026-01-28 21:13:46,170 - INFO -     馃搳 Total weight calculated: 34.0 (based on 4 comments: 2 hot + 2 latest)')
+    expect(state.roles.Analyst.stage.current).toBe(1)
+    expect(state.roles.Analyst.during).toEqual([weightMilestone])
   })
 
   it('keeps stage current aligned with latest log line even if computation order interleaves', () => {

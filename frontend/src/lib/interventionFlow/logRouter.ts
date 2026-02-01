@@ -55,6 +55,11 @@ const analystAnchors = [
   /Analyst monitoring/i,
   /generate baseline effectiveness report/i,
   /Analyzing viewpoint extremism/i,
+  // Monitoring lifecycle lines (should return control to Analyst after Amplifier sticky).
+  /Monitoring task started/i,
+  /Will continue monitoring/i,
+  /Starting monitoring task/i,
+  /^📈\s*Phase 3:/i,
 ]
 
 const strategistAnchors = [
@@ -120,7 +125,13 @@ function mapLineToStageIndex(role: Role, cleanLine: string): number | null {
       if (/Weighted per-comment sentiment:/i.test(cleanLine) || /^Overall sentiment:/i.test(cleanLine)) return 2
       if (/^Viewpoint extremism:/i.test(cleanLine)) return 3
       if (/Needs intervention:/i.test(cleanLine) || /Urgency level:/i.test(cleanLine) || /Analyst determined opinion balance intervention needed/i.test(cleanLine)) return 4
-      if (/\[Monitoring round/i.test(cleanLine) || /^📈\s*Phase 3:/i.test(cleanLine) || /Starting monitoring task/i.test(cleanLine)) return 5
+      if (
+        /\[Monitoring round/i.test(cleanLine) ||
+        /^📈\s*Phase 3:/i.test(cleanLine) ||
+        /Starting monitoring task/i.test(cleanLine) ||
+        /Monitoring task started/i.test(cleanLine) ||
+        /Will continue monitoring/i.test(cleanLine)
+      ) return 5
       return null
     }
     case 'Strategist': {
@@ -169,9 +180,14 @@ function applyStageUpdateForRole(prevRoles: FlowState['roles'], role: Role, clea
     cur.stage.max === nextStage.max &&
     cur.stage.order.length === nextStage.order.length
   ) return prevRoles
+
+  // Keep stage and streamed lines aligned: when we enter a new stage, reset the
+  // per-role streaming buffer so the UI shows only the current stage's lines.
+  // (Persistent info is rendered via summary/context, not this buffer.)
+  const shouldResetDuring = cur.stage.current !== nextStage.current
   return {
     ...prevRoles,
-    [role]: { ...cur, stage: nextStage },
+    [role]: { ...cur, stage: nextStage, during: shouldResetDuring ? [] : cur.during },
   }
 }
 
