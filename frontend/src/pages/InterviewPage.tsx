@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Database, MessageSquare, Send, CheckCircle2, User, Loader2, Info, X, ThumbsUp, MessageCircle, TrendingUp, ChevronDown, ChevronUp, Users, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Database, MessageSquare, CheckCircle2, User, Loader2, Info, X, ThumbsUp, MessageCircle, TrendingUp, ChevronDown, ChevronUp, Users, ChevronLeft, ChevronRight, Check, Send } from 'lucide-react'
 import axios from 'axios'
 import DatabaseSelector from '../components/DatabaseSelector'
 
@@ -64,11 +64,15 @@ export default function InterviewPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalPosts, setTotalPosts] = useState(0)
   const [totalUniqueUsers, setTotalUniqueUsers] = useState(0)
-  const postsPerPage = 10
+  const postsPerPage = 6
   
   // 用户列表分页（每个帖子内部）
   const [postUserPages, setPostUserPages] = useState<Record<string, number>>({})
   const usersPerPage = 16 // 4x4
+  
+  // 回答分页
+  const [responsesPage, setResponsesPage] = useState(1)
+  const responsesPerPage = 10 // 双栏显示，每栏5个
 
   // 使用 useRef 追踪最新的采访记录和流状态
   const historyRef = useRef<InterviewHistory[]>(interviewHistory)
@@ -124,6 +128,11 @@ export default function InterviewPage() {
       }
     }
   }, [interviewHistory])
+
+  // 当选择新的历史记录时，重置分页
+  useEffect(() => {
+    setResponsesPage(1)
+  }, [selectedHistory?.id])
 
   const loadPostsWithUsers = async () => {
     if (!selectedDb) return
@@ -502,34 +511,38 @@ export default function InterviewPage() {
                                 return (
                                   <div
                                     key={user.user_id}
-                                    className={`relative p-2 rounded-lg border-2 bg-white cursor-pointer transition-all duration-200 group ${
+                                    className={`relative p-2 rounded-lg border-2 bg-white cursor-pointer transition-all duration-200 group h-16 flex flex-col items-center justify-center ${
                                       isSelected
-                                        ? 'border-green-500 shadow-md'
+                                        ? 'border-teal-500 shadow-md bg-teal-50'
                                         : 'border-slate-200 hover:border-slate-300'
                                     }`}
                                   >
                                     <div 
                                       onClick={() => toggleUser(user.user_id)}
-                                      className="flex flex-col items-center gap-1"
+                                      className="flex flex-col items-center gap-1 flex-1 justify-center relative"
                                     >
-                                      <User size={16} className={isSelected ? 'text-green-600' : 'text-slate-400'} />
-                                      <span className="font-mono text-xs text-slate-600 text-center truncate w-full">
+                                      <div className="relative">
+                                        <User size={18} className={isSelected ? 'text-teal-600' : 'text-slate-400'} />
+                                        {isSelected && (
+                                          <Check size={16} className="absolute -bottom-1 -right-1 text-teal-600 font-bold stroke-[3]" />
+                                        )}
+                                      </div>
+                                      <span className="font-mono text-xs text-slate-600 text-center truncate w-full px-1">
                                         {user.user_id}
                                       </span>
                                     </div>
-                                    {isSelected && (
-                                      <CheckCircle2 size={12} className="absolute top-1 right-1 text-green-600" />
-                                    )}
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setSelectedUserDetail(user)
-                                      }}
-                                      className="absolute top-0.5 right-0.5 p-0.5 rounded bg-green-500 text-white hover:bg-green-600 transition-all opacity-0 group-hover:opacity-100"
-                                      title="查看详情"
-                                    >
-                                      <Info size={10} />
-                                    </button>
+                                    <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-all">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setSelectedUserDetail(user)
+                                        }}
+                                        className="p-1 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-all shadow-md"
+                                        title="查看详情"
+                                      >
+                                        <Info size={12} />
+                                      </button>
+                                    </div>
                                   </div>
                                 )
                               })}
@@ -680,34 +693,38 @@ export default function InterviewPage() {
                           return (
                             <div
                               key={user.user_id}
-                              className={`relative p-3 rounded-xl border-2 bg-white cursor-pointer transition-all duration-200 group ${
+                              className={`relative p-2 rounded-xl border-2 bg-white cursor-pointer transition-all duration-200 group h-16 flex flex-col items-center justify-center ${
                                 isSelected
-                                  ? 'border-green-500 shadow-md'
+                                  ? 'border-teal-500 shadow-md bg-teal-50'
                                   : 'border-slate-200 hover:border-slate-300'
                               }`}
                             >
                               <div 
                                 onClick={() => toggleUser(user.user_id)}
-                                className="flex flex-col items-center gap-2"
+                                className="flex flex-col items-center gap-1 flex-1 justify-center relative"
                               >
-                                <User size={20} className={isSelected ? 'text-green-600' : 'text-slate-400'} />
+                                <div className="relative">
+                                  <User size={18} className={isSelected ? 'text-teal-600' : 'text-slate-400'} />
+                                  {isSelected && (
+                                    <Check size={16} className="absolute -bottom-1 -right-1 text-teal-600 font-bold stroke-[3]" />
+                                  )}
+                                </div>
                                 <span className="font-mono text-xs text-slate-600 text-center truncate w-full px-1">
                                   {user.user_id}
                                 </span>
                               </div>
-                              {isSelected && (
-                                <CheckCircle2 size={16} className="absolute top-2 right-2 text-green-600" />
-                              )}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setSelectedUserDetail(user)
-                                }}
-                                className="absolute top-1 right-1 p-1 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-all opacity-0 group-hover:opacity-100"
-                                title="查看详情"
-                              >
-                                <Info size={12} />
-                              </button>
+                              <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-all">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setSelectedUserDetail(user)
+                                  }}
+                                  className="p-1 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-all shadow-md"
+                                  title="查看详情"
+                                >
+                                  <Info size={12} />
+                                </button>
+                              </div>
                             </div>
                           )
                         })}
@@ -849,8 +866,8 @@ export default function InterviewPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-xl font-bold text-slate-800 mb-2">问答详情</h2>
-              <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-xl border border-purple-200">
-                <p className="text-xs text-purple-600 font-medium mb-1">问题</p>
+              <div className="bg-gradient-to-r from-blue-50 to-teal-50 p-4 rounded-xl border border-teal-200">
+                <p className="text-xs text-teal-600 font-medium mb-1">问题</p>
                 <p className="text-sm text-slate-800">{selectedHistory.question}</p>
               </div>
             </div>
@@ -862,50 +879,148 @@ export default function InterviewPage() {
             </button>
           </div>
           
-          <div className="space-y-3 max-h-[500px] overflow-y-auto">
-            <p className="text-sm text-slate-600 mb-3">
-              收到 <span className="font-bold text-purple-600">{selectedHistory.responses.length}</span> 个回答
+          {/* 分页信息和控制 */}
+          <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200">
+            <p className="text-sm text-slate-600">
+              共收到 <span className="font-bold text-teal-600">{selectedHistory.responses.length}</span> 个回答
             </p>
-            {selectedHistory.responses.map((response, index) => (
-              <div
-                key={index}
-                className="bg-gradient-to-br from-white to-slate-50 rounded-xl p-4 border border-slate-200 hover:border-purple-300 transition-all"
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setResponsesPage(p => Math.max(1, p - 1))}
+                disabled={responsesPage === 1}
+                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
-                    {index + 1}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <User size={14} className="text-purple-600" />
-                      <span className="font-mono text-sm text-slate-700">{response.user_id}</span>
-                    </div>
-                  </div>
-                  <span className="text-xs text-slate-400">{response.timestamp}</span>
-                </div>
-                <div className="bg-gradient-to-br from-green-50 to-teal-50 p-4 rounded-lg border border-green-200">
-                  <p className="text-xs text-green-700 font-medium mb-2">回答</p>
-                  <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
-                    {response.answer}
-                    {/* 如果回答为空或正在生成，显示光标动画 */}
-                    {sending && (!response.answer || response.answer.length < 10) && (
-                      <span className="inline-block w-2 h-4 bg-green-600 ml-1 animate-pulse"></span>
-                    )}
-                  </p>
-                  {/* 正在生成提示 */}
-                  {sending && response.answer && response.answer.length > 0 && (
-                    <div className="mt-2 flex items-center gap-2 text-xs text-green-600">
-                      <div className="flex gap-1">
-                        <div className="w-1.5 h-1.5 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-1.5 h-1.5 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-1.5 h-1.5 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                      </div>
-                      <span>正在生成中...</span>
-                    </div>
-                  )}
-                </div>
+                <ChevronLeft size={18} />
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.ceil(selectedHistory.responses.length / responsesPerPage) }, (_, i) => i + 1).map(pageNum => (
+                  <button
+                    key={pageNum}
+                    onClick={() => setResponsesPage(pageNum)}
+                    className={`w-8 h-8 rounded-lg font-medium transition-all text-sm ${
+                      responsesPage === pageNum
+                        ? 'bg-gradient-to-r from-blue-500 to-teal-500 text-white shadow-lg'
+                        : 'border border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
               </div>
-            ))}
+              <button
+                onClick={() => setResponsesPage(p => Math.min(Math.ceil(selectedHistory.responses.length / responsesPerPage), p + 1))}
+                disabled={responsesPage === Math.ceil(selectedHistory.responses.length / responsesPerPage)}
+                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          </div>
+          
+          {/* 双栏布局显示回答 */}
+          <div className="grid grid-cols-2 gap-4">
+            {(() => {
+              const startIndex = (responsesPage - 1) * responsesPerPage
+              const endIndex = startIndex + responsesPerPage
+              const paginatedResponses = selectedHistory.responses.slice(startIndex, endIndex)
+              
+              // 分成两列
+              const midPoint = Math.ceil(paginatedResponses.length / 2)
+              const leftColumn = paginatedResponses.slice(0, midPoint)
+              const rightColumn = paginatedResponses.slice(midPoint)
+              
+              return (
+                <>
+                  {/* 左列 */}
+                  <div className="space-y-3">
+                    {leftColumn.map((response, index) => (
+                      <div
+                        key={startIndex + index}
+                        className="bg-gradient-to-br from-white to-slate-50 rounded-xl p-4 border border-slate-200 hover:border-teal-300 transition-all"
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-blue-500 to-teal-500 flex items-center justify-center text-white font-bold text-sm">
+                            {startIndex + index + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <User size={14} className="text-teal-600 flex-shrink-0" />
+                              <span className="font-mono text-sm text-slate-700 truncate">{response.user_id}</span>
+                            </div>
+                          </div>
+                          <span className="text-xs text-slate-400 flex-shrink-0">{response.timestamp}</span>
+                        </div>
+                        <div className="bg-gradient-to-br from-green-50 to-teal-50 p-4 rounded-lg border border-green-200">
+                          <p className="text-xs text-green-700 font-medium mb-2">回答</p>
+                          <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap break-words">
+                            {response.answer}
+                            {/* 如果回答为空或正在生成，显示光标动画 */}
+                            {sending && (!response.answer || response.answer.length < 10) && (
+                              <span className="inline-block w-2 h-4 bg-green-600 ml-1 animate-pulse"></span>
+                            )}
+                          </p>
+                          {/* 正在生成提示 */}
+                          {sending && response.answer && response.answer.length > 0 && (
+                            <div className="mt-2 flex items-center gap-2 text-xs text-green-600">
+                              <div className="flex gap-1">
+                                <div className="w-1.5 h-1.5 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                <div className="w-1.5 h-1.5 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                <div className="w-1.5 h-1.5 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                              </div>
+                              <span>正在生成中...</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* 右列 */}
+                  <div className="space-y-3">
+                    {rightColumn.map((response, index) => (
+                      <div
+                        key={startIndex + midPoint + index}
+                        className="bg-gradient-to-br from-white to-slate-50 rounded-xl p-4 border border-slate-200 hover:border-teal-300 transition-all"
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-blue-500 to-teal-500 flex items-center justify-center text-white font-bold text-sm">
+                            {startIndex + midPoint + index + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <User size={14} className="text-teal-600 flex-shrink-0" />
+                              <span className="font-mono text-sm text-slate-700 truncate">{response.user_id}</span>
+                            </div>
+                          </div>
+                          <span className="text-xs text-slate-400 flex-shrink-0">{response.timestamp}</span>
+                        </div>
+                        <div className="bg-gradient-to-br from-green-50 to-teal-50 p-4 rounded-lg border border-green-200">
+                          <p className="text-xs text-green-700 font-medium mb-2">回答</p>
+                          <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap break-words">
+                            {response.answer}
+                            {/* 如果回答为空或正在生成，显示光标动画 */}
+                            {sending && (!response.answer || response.answer.length < 10) && (
+                              <span className="inline-block w-2 h-4 bg-green-600 ml-1 animate-pulse"></span>
+                            )}
+                          </p>
+                          {/* 正在生成提示 */}
+                          {sending && response.answer && response.answer.length > 0 && (
+                            <div className="mt-2 flex items-center gap-2 text-xs text-green-600">
+                              <div className="flex gap-1">
+                                <div className="w-1.5 h-1.5 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                <div className="w-1.5 h-1.5 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                <div className="w-1.5 h-1.5 bg-green-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                              </div>
+                              <span>正在生成中...</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )
+            })()}
           </div>
         </div>
       )}
@@ -1226,6 +1341,7 @@ export default function InterviewPage() {
           </div>
         </div>
       )}
+
     </div>
   )
 }
