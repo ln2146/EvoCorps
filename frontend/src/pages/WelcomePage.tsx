@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart3, Activity, ArrowRight } from 'lucide-react'
 
 export default function WelcomePage() {
   const navigate = useNavigate()
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; angle: number }>>([])
+  const logoRef = useRef<HTMLDivElement>(null)
+  const particleIdRef = useRef(0)
 
   const modes = [
     {
@@ -25,6 +29,11 @@ export default function WelcomePage() {
     },
   ]
 
+  // 页面加载动画
+  useEffect(() => {
+    setIsLoaded(true)
+  }, [])
+
   const handleWheel = (e: React.WheelEvent) => {
     if (e.deltaY > 0 && selectedIndex < modes.length - 1) {
       setSelectedIndex(selectedIndex + 1)
@@ -43,20 +52,67 @@ export default function WelcomePage() {
     }
   }
 
+  // Logo 点击特效
+  const handleLogoClick = () => {
+    if (!logoRef.current) return
+
+    const rect = logoRef.current.getBoundingClientRect()
+    const centerX = rect.left + rect.width / 2
+    const centerY = rect.top + rect.height / 2
+
+    // 生成粒子
+    const newParticles = Array.from({ length: 12 }, (_, i) => ({
+      id: particleIdRef.current++,
+      x: centerX,
+      y: centerY,
+      angle: (i / 12) * Math.PI * 2,
+    }))
+
+    setParticles(prev => [...prev, ...newParticles])
+
+    // 3 秒后移除粒子
+    setTimeout(() => {
+      setParticles(prev => prev.filter(p => !newParticles.find(np => np.id === p.id)))
+    }, 1000)
+  }
+
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedIndex])
 
   return (
-    <div className="min-h-screen flex items-center justify-between overflow-hidden">
+    <div className="min-h-screen flex items-center justify-between overflow-hidden bg-gradient-to-r from-blue-50 via-cyan-50 to-green-50">
+      {/* 粒子效果容器 */}
+      <div className="fixed inset-0 pointer-events-none">
+        {particles.map(particle => (
+          <Particle key={particle.id} particle={particle} />
+        ))}
+      </div>
+
       {/* 左侧 Logo */}
-      <div className="w-1/2 flex items-center justify-end pr-32">
-        <img 
-          src="/logo.png" 
-          alt="EvoCorps Logo" 
-          className="w-full max-w-md drop-shadow-2xl"
-        />
+      <div 
+        className="w-1/2 flex items-center justify-end pr-32"
+        ref={logoRef}
+      >
+        <div
+          className={`transition-all duration-1000 ease-out transform ${
+            isLoaded 
+              ? 'opacity-100 scale-100' 
+              : 'opacity-0 scale-75'
+          }`}
+          onClick={handleLogoClick}
+          style={{
+            cursor: 'pointer',
+            filter: isLoaded ? 'drop-shadow(0 20px 25px rgba(0, 0, 0, 0.1))' : 'drop-shadow(0 0 0 rgba(0, 0, 0, 0))',
+          }}
+        >
+          <img 
+            src="/logo.png" 
+            alt="EvoCorps Logo" 
+            className="w-full max-w-md hover:scale-105 transition-transform duration-300"
+          />
+        </div>
       </div>
 
       {/* 右侧选择区域 */}
@@ -89,6 +145,7 @@ export default function WelcomePage() {
               const scale = isSelected ? 1 : 0.85
               const opacity = isSelected ? 1 : 0.3
               const blur = isSelected ? 0 : 4
+              const cardDelay = index * 200
 
               return (
                 <div
@@ -96,9 +153,10 @@ export default function WelcomePage() {
                   className="absolute transition-all duration-500 ease-out cursor-pointer"
                   style={{
                     transform: `translateY(${offset}px) scale(${scale})`,
-                    opacity: opacity,
+                    opacity: isLoaded ? opacity : 0,
                     filter: `blur(${blur}px)`,
                     pointerEvents: isSelected ? 'auto' : 'none',
+                    transitionDelay: isLoaded ? '0ms' : `${cardDelay}ms`,
                   }}
                   onClick={() => isSelected && navigate(mode.path)}
                 >
@@ -128,5 +186,26 @@ export default function WelcomePage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// 粒子组件
+function Particle({ particle }: { particle: { id: number; x: number; y: number; angle: number } }) {
+  const distance = 150
+  const endX = particle.x + Math.cos(particle.angle) * distance
+  const endY = particle.y + Math.sin(particle.angle) * distance
+
+  return (
+    <div
+      className="fixed w-2 h-2 rounded-full pointer-events-none"
+      style={{
+        left: particle.x,
+        top: particle.y,
+        background: `hsl(${Math.random() * 60 + 180}, 100%, 50%)`,
+        animation: `particleExplode 1s ease-out forwards`,
+        '--end-x': `${endX - particle.x}px`,
+        '--end-y': `${endY - particle.y}px`,
+      } as React.CSSProperties & { '--end-x': string; '--end-y': string }}
+    />
   )
 }

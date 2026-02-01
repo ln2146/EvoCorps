@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { createInitialFlowState, routeLogLine, type FlowState, type Role } from '../lib/interventionFlow/logRouter'
 import { createEventSourceLogStream, createFetchReplayLogStream, createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
 import { computeEffectiveRole, nextSelectedRoleOnTabClick } from '../lib/interventionFlow/selection'
+import { parsePostContent } from '../lib/interventionFlow/postContent'
 import { getEmptyCopy } from '../lib/interventionFlow/emptyCopy'
 import { isPreRunEmptyState } from '../lib/interventionFlow/emptyState'
 import { DEFAULT_WORKFLOW_REPLAY_DELAY_MS, getOpinionBalanceLogStreamUrl, shouldCallOpinionBalanceProcessApi } from '../lib/interventionFlow/replayConfig'
@@ -12,7 +13,7 @@ import { getRoleTabButtonClassName } from '../lib/interventionFlow/roleTabStyles
 import { getInterventionFlowPanelClassName, getLeaderCommentsContainerClassName } from '../lib/interventionFlow/panelLayout'
 import { buildRolePills } from '../lib/interventionFlow/rolePills'
 import { getHeatLeaderboardCardClassName, getHeatLeaderboardListClassName } from '../lib/interventionFlow/heatLeaderboardLayout'
-import { getAnalystCombinedCardClassName, getAnalystCombinedStreamClassName } from '../lib/interventionFlow/analystCombinedLayout'
+import { getAnalystCombinedCardClassName, getAnalystCombinedPostBodyClassName, getAnalystCombinedStreamClassName } from '../lib/interventionFlow/analystCombinedLayout'
 import { buildStageStepperModel } from '../lib/interventionFlow/stageStepper'
 import { getLiveBadgeClassName, getStageHeaderContainerClassName, getStageHeaderTextClassName, getStageSegmentClassName } from '../lib/interventionFlow/detailHeaderLayout'
 import { getDynamicDemoGridClassName } from '../lib/interventionFlow/pageGridLayout'
@@ -55,6 +56,8 @@ const USE_WORKFLOW_LOG_REPLAY = true
 // One full round only (a single "action_..." cycle) so the demo doesn't endlessly chain.
 const WORKFLOW_REPLAY_BACKEND_FILE = 'replay_workflow_20260130_round1.log'
 // Frontend-only replay: served from `frontend/public/workflow/` (so it works even when the backend isn't running).
+// Note: default is false to keep upstream behavior (SSE via backend).
+const USE_FRONTEND_ONLY_WORKFLOW_REPLAY = false
 const WORKFLOW_REPLAY_PUBLIC_FILE = 'replay_workflow_20260130_round1.txt'
 // Slower replay so the user can actually read the UI while it streams.
 const WORKFLOW_REPLAY_DELAY_MS = DEFAULT_WORKFLOW_REPLAY_DELAY_MS * 5
@@ -318,7 +321,7 @@ export default function DynamicDemo() {
 
     const stream = USE_SIMULATED_LOG_STREAM
       ? createSimulatedLogStream({ lines: DEMO_BACKEND_LOG_LINES, intervalMs: 320 })
-      : USE_WORKFLOW_LOG_REPLAY
+      : USE_WORKFLOW_LOG_REPLAY && USE_FRONTEND_ONLY_WORKFLOW_REPLAY
         ? createFetchReplayLogStream({ url: `/workflow/${WORKFLOW_REPLAY_PUBLIC_FILE}`, delayMs: WORKFLOW_REPLAY_DELAY_MS })
         : createEventSourceLogStream(OPINION_BALANCE_LOG_STREAM_URL)
     const unsubscribe = stream.subscribe((line) => {
@@ -523,13 +526,27 @@ export default function DynamicDemo() {
           )}
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-6 self-start">
           <MetricsBarsCard emotion={currentMetrics.emotion} extremity={currentMetrics.extremity} />
           <MetricsLineChartCard data={data.metricsSeries} />
         </div>
 
         <div className="space-y-6">
-          <InterventionFlowPanel state={flowState} enabled={enableEvoCorps} />
+          {enableEvoCorps ? (
+            <InterventionFlowPanel state={flowState} enabled={enableEvoCorps} />
+          ) : (
+            <div className="glass-card p-6 min-h-[640px] flex items-center justify-center">
+              <div className="text-center space-y-3">
+                <div className="flex justify-center">
+                  <Shield className="text-slate-400" size={32} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-800">干预流程</h3>
+                  <p className="text-sm text-slate-600">启用舆论平衡系统后展示实时干预过程。</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -584,15 +601,16 @@ function DynamicDemoHeader({
   onToggleEvoCorps: () => void | Promise<void>
   sseStatus: 'connecting' | 'connected' | 'disconnected'
 }) {
+  const navigate = useNavigate()
   return (
     <div className="glass-card p-6 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
       <div className="flex items-center gap-4">
         <img src="/logo.png" alt="EvoCorps Logo" className="w-[120px] h-auto max-w-full drop-shadow-xl" />
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
             欢迎使用 EvoCorps
           </h1>
-          <p className="text-slate-600">实时监控舆情变化，动态观察指标变化的舆情现状</p>
+          <p className="text-lg text-slate-600">实时监控舆情变化，动态观察指标变化的舆情现状</p>
           <div className="flex items-center gap-2 mt-2">
             <StatusBadge label={isRunning ? 'Running' : 'Stopped'} tone={isRunning ? 'success' : 'muted'} />
             <StatusBadge
@@ -614,7 +632,7 @@ function DynamicDemoHeader({
               <Play size={18} />
               {isStarting ? '启动中...' : isRunning ? '运行中' : '开启演示'}
             </button>
-            <button className="btn-secondary inline-flex items-center gap-2" onClick={onStop}>
+            <button className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 text-white font-medium hover:shadow-lg transition-all duration-200" onClick={onStop}>
               <Square size={18} />
               停止演示
             </button>
@@ -640,14 +658,23 @@ function DynamicDemoHeader({
             />
           </div>
         </div>
-        <button
-          className="btn-secondary aspect-square h-full min-h-[120px] w-[120px] flex flex-col items-center justify-center gap-2 px-4"
-          onClick={onBack}
-          title="返回首页"
-        >
-          <ArrowLeft size={20} />
-          <span className="text-lg font-semibold">返回首页</span>
-        </button>
+        <div className="flex flex-col gap-3 items-center">
+          <button
+            className="btn-apple inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl"
+            onClick={() => navigate('/dashboard')}
+            title="进入静态演示"
+          >
+            <span>进入静态演示</span>
+          </button>
+          <button
+            className="btn-apple inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl"
+            onClick={onBack}
+            title="返回首页"
+          >
+            <ArrowLeft size={18} />
+            <span>返回首页</span>
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -693,7 +720,7 @@ function HeatLeaderboardCard({
           </div>
         ) : posts.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-slate-500">暂无热度数据（请先点击“开启演示”启动模拟）</p>
+            <p className="text-slate-500">暂无数据</p>
           </div>
         ) : (
           posts.slice(0, 20).map((post, index) => {
@@ -941,7 +968,7 @@ function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
           <p className="text-sm text-slate-600">情绪度 / 极端度趋势曲线</p>
         </div>
       </div>
-      <div className="h-64">
+      <div className="h-60">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -1110,6 +1137,10 @@ function RoleDetailSection({
 }) {
   const displayLines = isLive ? during : (after ?? [])
   const emptyCopy = useMemo(() => getEmptyCopy({ enabled }), [enabled])
+  const parsedPost = useMemo(() => {
+    if (!context.postContent) return null
+    return parsePostContent(context.postContent, { previewChars: 160 })
+  }, [context.postContent])
 
   const pills = buildRolePills(role, {
     feedScore: context.feedScore,
@@ -1180,6 +1211,30 @@ function RoleDetailSection({
 
       {role === 'Analyst' ? (
         <div className={getAnalystCombinedCardClassName()}>
+          {parsedPost ? (
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="text-xs font-semibold text-slate-700 shrink-0">帖子与分析</div>
+                  {parsedPost.tag ? (
+                    <span className="text-[10px] font-semibold text-slate-700 px-2 py-1 rounded-full bg-white/70 border border-white/40 shrink-0">
+                      {parsedPost.tag}
+                    </span>
+                  ) : null}
+                </div>
+                {/* Always show full post content; no expand/collapse. */}
+              </div>
+
+              <div className="mt-2">
+                <div className={getAnalystCombinedPostBodyClassName()}>
+                  {parsedPost.full}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="h-px bg-white/60" />
+
           <div className={getAnalystCombinedStreamClassName()}>
             {displayLines.length ? (
               displayLines.map((line, idx) => (
@@ -1209,7 +1264,7 @@ function RoleDetailSection({
 
       {role !== 'Analyst' ? (
         <div className="mt-4 bg-white/60 border border-white/40 rounded-2xl p-4 min-h-0 flex-1">
-          <div className="space-y-2 h-full overflow-y-scroll overflow-x-hidden pr-1">
+          <div className="space-y-2 h-full overflow-y-auto overflow-x-hidden pr-1">
             {displayLines.length ? (
               displayLines.map((line, idx) => (
                 <div key={`${role}_${idx}`} className="text-sm text-slate-700 leading-relaxed break-all">
@@ -1232,15 +1287,17 @@ function RoleDetailSection({
 function CommentaryAnalysisPanel({ status, onOpenConfig, onRun }: { status: 'Idle' | 'Running' | 'Done' | 'Error'; onOpenConfig: () => void; onRun: () => void }) {
   return (
     <div className="glass-card p-6">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">评论区总体状态分析</h2>
-          <p className="text-sm text-slate-600">LLM 周期性分析评论情绪与极化趋势</p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <button className="btn-secondary" onClick={onOpenConfig}>分析配置</button>
-          <button className="btn-primary" onClick={onRun}>立即分析</button>
-          <StatusBadge label={status} tone={status === 'Running' ? 'warning' : status === 'Done' ? 'success' : status === 'Error' ? 'danger' : 'muted'} />
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">评论区总体状态分析</h2>
+            <p className="text-sm text-slate-600">LLM 周期性分析评论情绪与极化趋势</p>
+          </div>
+          <div className="flex items-center gap-3 bg-white/70 border border-white/40 rounded-2xl p-4 shrink-0 shadow-lg">
+            <button className="btn-secondary" onClick={onOpenConfig}>分析配置</button>
+            <button className="btn-primary" onClick={onRun}>立即分析</button>
+            <StatusBadge label={status} tone={status === 'Running' ? 'warning' : status === 'Done' ? 'success' : status === 'Error' ? 'danger' : 'muted'} />
+          </div>
         </div>
       </div>
       <AnalysisResultView status={status} />
@@ -1282,15 +1339,15 @@ function AnalysisConfigDialog({ open, onClose }: { open: boolean; onClose: () =>
 function AnalysisResultView({ status }: { status: 'Idle' | 'Running' | 'Done' | 'Error' }) {
   return (
     <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <div className="bg-white/70 rounded-2xl p-4 border border-white/40">
+      <div className="bg-white/70 rounded-2xl p-4 border border-white/40 shadow-lg">
         <h4 className="text-sm font-semibold text-slate-700 mb-2">分析摘要</h4>
         <p className="text-sm text-slate-600">当前分析状态：{status}。后续将展示总结性文本。</p>
       </div>
-      <div className="bg-white/70 rounded-2xl p-4 border border-white/40">
+      <div className="bg-white/70 rounded-2xl p-4 border border-white/40 shadow-lg">
         <h4 className="text-sm font-semibold text-slate-700 mb-2">情绪结构</h4>
         <p className="text-sm text-slate-600">结构化结果占位：正/负情绪比例，重点人群。</p>
       </div>
-      <div className="bg-white/70 rounded-2xl p-4 border border-white/40">
+      <div className="bg-white/70 rounded-2xl p-4 border border-white/40 shadow-lg">
         <h4 className="text-sm font-semibold text-slate-700 mb-2">系统建议</h4>
         <p className="text-sm text-slate-600">策略建议与风险提示占位。</p>
       </div>

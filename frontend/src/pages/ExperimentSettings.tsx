@@ -465,7 +465,7 @@ export default function ExperimentSettings() {
               <p>3. <strong>舆论平衡系统</strong>仅在场景4中需要，且需要在社交平台启动前开启</p>
               <p>4. 舆论平衡系统需要配置梯子才能正常工作</p>
               <p>5. 不使用舆论平衡系统时请及时关闭以节省资源</p>
-              <p className="text-red-600 font-medium mt-3">⚠️ 如果服务无法启动或出现端口占用错误，请点击右上角�?清理所有服�?按钮</p>
+              <p className="text-red-600 font-medium mt-3">⚠️ 如果服务无法启动或出现端口占用错误，请点击右上角的清理所有服务按钮</p>
             </div>
           </div>
         </>

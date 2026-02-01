@@ -19,6 +19,9 @@ from pydantic import BaseModel
 import uvicorn
 import requests
 
+from openai import OpenAI
+from keys import OPENAI_API_KEY, OPENAI_BASE_URL
+
 import control_flags
 
 # Add src directory to path to import the config manager
@@ -50,6 +53,12 @@ class ToggleRequest(BaseModel):
     """Simple request body for enabling / disabling a flag."""
 
     enabled: bool
+
+
+class PostCommentsAnalysisRequest(BaseModel):
+    """Request body for analyzing a single post and its comments."""
+
+    post_id: str
 
 
 @control_app.get("/control/status")
@@ -119,6 +128,171 @@ def get_auto_status_flag():
     """Get current opinion-balance auto monitoring/intervention status."""
 
     return {"auto_status": control_flags.auto_status}
+
+
+@control_app.post("/analysis/post-comments")
+def analyze_post_comments(body: PostCommentsAnalysisRequest):
+    import os
+    import json
+    import logging
+    import sqlite3
+    import requests
+    from database_manager import DatabaseManager
+
+    post_id = body.post_id
+
+    # 1) 打开数据库并读取帖子与评论
+    project_root = os.path.dirname(os.path.dirname(__file__))
+    db_path = os.path.join(project_root, "database", "simulation.db")
+
+    db_manager = DatabaseManager(db_path, reset_db=False)
+    conn = db_manager.get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT post_id, content, author_id, created_at, num_comments
+        FROM posts
+        WHERE post_id = ?
+        """,
+        (post_id,),
+    )
+    post_row = cursor.fetchone()
+
+    if not post_row:
+        return {"error": f"Post {post_id} not found"}
+
+    cursor.execute(
+        """
+        SELECT comment_id, content, author_id, created_at, num_likes
+        FROM comments
+        WHERE post_id = ?
+        ORDER BY created_at ASC
+        """,
+        (post_id,),
+    )
+    comment_rows = cursor.fetchall()
+
+    # 2) 构造提示词
+    post_content = post_row["content"] or ""
+    post_author = post_row["author_id"]
+
+    comments_block_lines = []
+    for idx, c in enumerate(comment_rows, start=1):
+        comments_block_lines.append(
+            f"[{idx}] author={c['author_id']} likes={c['num_likes']}: {c['content']}"
+        )
+    comments_block = "\n".join(comments_block_lines) if comments_block_lines else "(暂无评论)"
+
+    system_prompt = (
+        "你是一名严谨的舆论分析助手，专门分析某个帖子评论区的整体情绪氛围、观点极端程度，"
+        "并用自然语言总结多数观点与少数观点。你需要返回结构化 JSON，便于前端程序直接读取。"
+    )
+
+    user_prompt = f"""请基于下面的内容进行分析：
+
+[主帖]
+作者: {post_author}
+内容: {post_content}
+
+[评论区]
+{comments_block}
+
+你的任务是：
+1. 基于“全部评论的内容”，给出一个整体情绪度评分 sentiment_score_overall：
+   - 取值必须是以下五个离散值之一：0, 0.25, 0.5, 0.75, 1。
+2. 基于“全部评论的内容”，给出一个整体极端度评分 extremeness_score_overall：
+   - 取值必须是以下五个离散值之一：0, 0.25, 0.5, 0.75, 1。
+3. 用一段中文总结评论区的主要观点结构。
+
+请严格按照下面的 JSON 格式直接作答：
+
+{{
+  "sentiment_score_overall": <0|0.25|0.5|0.75|1>,
+  "extremeness_score_overall": <0|0.25|0.5|0.75|1>,
+  "summary": "……"
+}}"""
+
+    # 3) 直接用 requests 调用 AIHUBMIX（与 curl 完全一致）
+    try:
+        response = requests.post(
+            url="https://aihubmix.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENAI_API_KEY}",  # AIHUBMIX key
+                "Content-Type": "application/json",
+            },
+            data=json.dumps({
+                "model": "gpt-4o-mini",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "max_tokens": 600,
+                "temperature": 0.5,
+            }),
+            timeout=60,
+        )
+
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"LLM HTTP {response.status_code}: {response.text}"
+            )
+
+        resp_json = response.json()
+
+        raw_content = (
+            resp_json.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            .strip()
+        )
+
+        if not raw_content:
+            analysis_data = {
+                "sentiment_score_overall": None,
+                "extremeness_score_overall": None,
+                "summary": None,
+                "error": "LLM returned empty content",
+                "raw_text": resp_json,
+            }
+        else:
+            try:
+                analysis_data = json.loads(raw_content)
+            except Exception as e:
+                analysis_data = {
+                    "sentiment_score_overall": None,
+                    "extremeness_score_overall": None,
+                    "summary": None,
+                    "error": f"json_parse_failed: {e}",
+                    "raw_text": raw_content,
+                }
+
+    except Exception as e:
+        logging.error(f"Post comments analysis failed for {post_id}: {e}")
+        analysis_data = {
+            "sentiment_score_overall": None,
+            "extremeness_score_overall": None,
+            "summary": None,
+            "error": str(e),
+        }
+
+    # 4) 关闭数据库连接
+    try:
+        db_manager.close()
+    except Exception:
+        pass
+
+    return {
+        "post_id": post_id,
+        "post_content": post_content,
+        "num_comments": len(comment_rows),
+        "sentiment_score_overall": analysis_data.get("sentiment_score_overall"),
+        "extremeness_score_overall": analysis_data.get("extremeness_score_overall"),
+        "summary": analysis_data.get("summary"),
+        "analysis_raw": analysis_data.get("raw_text"),
+        "error": analysis_data.get("error"),
+    }
 
 
 def start_control_api_server(host: str = "0.0.0.0", port: int = 8000) -> Optional[threading.Thread]:

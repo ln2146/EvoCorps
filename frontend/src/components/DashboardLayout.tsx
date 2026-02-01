@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Home, Activity, FlaskConical, BarChart3, Settings, ChevronLeft, ChevronRight, ArrowLeft, MessageSquare } from 'lucide-react'
+import { Home, Activity, FlaskConical, BarChart3, Settings, ChevronLeft, ChevronRight, ArrowLeft, MessageSquare, Zap } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 interface DashboardLayoutProps {
@@ -46,7 +46,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {!isCollapsed && (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-r from-blue-500 to-green-500 flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-xl">E</span>
+                <Zap size={24} className="text-white" />
               </div>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
@@ -58,7 +58,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           )}
           {isCollapsed && (
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-r from-blue-500 to-green-500 flex items-center justify-center shadow-lg mx-auto">
-              <span className="text-white font-bold text-xl">E</span>
+              <Zap size={24} className="text-white" />
             </div>
           )}
         </div>
@@ -84,26 +84,39 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           })}
         </nav>
 
-        {/* 底部返回首页按钮 */}
+        {/* 底部按钮区 */}
         {!isCollapsed && (
-          <div className="p-4 border-t border-white/20">
+          <div className="p-4 border-t border-white/20 space-y-2">
+            <button
+              onClick={() => navigate('/dynamic')}
+              className="btn-apple w-full flex items-center justify-center gap-2 text-slate-700 font-medium text-sm"
+            >
+              <span>进入动态演示</span>
+            </button>
             <button
               onClick={() => navigate('/')}
-              className="w-full glass-card p-4 hover:bg-white/80 transition-all flex items-center justify-center gap-2 text-slate-700 font-medium"
+              className="btn-apple w-full flex items-center justify-center gap-2 text-slate-700 font-medium text-sm"
             >
-              <ArrowLeft size={20} />
+              <ArrowLeft size={18} />
               <span>返回首页</span>
             </button>
           </div>
         )}
         {isCollapsed && (
-          <div className="p-4 border-t border-white/20">
+          <div className="p-4 border-t border-white/20 space-y-2">
+            <button
+              onClick={() => navigate('/dynamic')}
+              className="btn-apple w-full flex items-center justify-center text-slate-700"
+              title="进入动态演示"
+            >
+              <span className="text-xs">动态</span>
+            </button>
             <button
               onClick={() => navigate('/')}
-              className="w-full glass-card p-3 hover:bg-white/80 transition-all flex items-center justify-center text-slate-700"
+              className="btn-apple w-full flex items-center justify-center text-slate-700"
               title="返回首页"
             >
-              <ArrowLeft size={20} />
+              <ArrowLeft size={18} />
             </button>
           </div>
         )}
