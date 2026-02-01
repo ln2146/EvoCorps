@@ -17,6 +17,8 @@ from prompts import FactCheckerPrompts
 from opinion_balance_manager import OpinionBalanceManager
 # Remove the complex user selector
 import asyncio
+
+import control_flags
 from tracked_opinion_helper import (
     ensure_opinion_tracking_initialized,
     discover_first_malicious_news_if_needed,
@@ -123,11 +125,16 @@ class Simulation:
         else:
             self.opinion_balance_manager = None
 
-        # Initialize malicious bot manager
-        if config.get("malicious_bot_system", {}).get("enabled", False):
+        # Initialize malicious bot manager.
+        #
+        # Whether attacks actually run is now controlled *only* by
+        # control_flags.attack_enabled, so we always construct the
+        # manager when possible and let the global flag decide.
+        try:
             from malicious_bot_manager import MaliciousBotManager
             self.malicious_bot_manager = MaliciousBotManager(config, self.db_manager)
-        else:
+        except Exception as e:
+            logging.error(f"Failed to initialize MaliciousBotManager: {e}")
             self.malicious_bot_manager = None
 
 
@@ -416,13 +423,21 @@ class Simulation:
             # Update influence scores
             Utils.update_user_influence(self.conn, self.db_path)
 
-            # Execute malicious attacks concurrently
+            # Execute malicious attacks concurrently，完全依赖全局开关
+            # control_flags.attack_enabled（终端/端口统一控制）。
             tasks = []
+
+            # 只要存在 malicious_bot_manager，并且全局开关为 True，就执行攻击；
+            # 当 attack_enabled 为 False 时，完全关闭攻击。
+            if self.malicious_bot_manager:
+                malicious_effective = control_flags.attack_enabled
+            else:
+                malicious_effective = False
 
             # ========== Deprecated: threshold-based real-time attack mechanism removed ==========
 
             # Legacy news-based malicious post generation (retained for compatibility)
-            if self.malicious_bot_manager and self.malicious_bot_manager.enabled:
+            if malicious_effective:
                 tasks.append(self._news_based_malicious_posts(step))
 
             # Execute all tasks concurrently
@@ -431,12 +446,12 @@ class Simulation:
 
             # Run batch malicious attacks mid-timestep (no longer at the end)
             # Pass timestep to malicious manager for accurate comment timestamping
-            if self.malicious_bot_manager:
+            if malicious_effective:
                 try:
                     setattr(self.malicious_bot_manager, 'current_time_step', step)
                 except Exception:
                     pass
-            await self._run_malicious_batch_attack(step)
+                await self._run_malicious_batch_attack(step)
 
             # After malicious attacks and opinion balance system triggers, let regular users keep interacting
             # await self._continue_user_activities(step)
@@ -477,7 +492,9 @@ class Simulation:
 
     async def _run_malicious_batch_attack(self, step: int):
         """Run malicious bot batch attack around the middle of each timestep."""
-        if not hasattr(self, 'malicious_bot_manager') or not self.malicious_bot_manager or not self.malicious_bot_manager.enabled:
+        if (not hasattr(self, 'malicious_bot_manager') or
+                not self.malicious_bot_manager or
+                not control_flags.attack_enabled):
             return
 
         try:
@@ -670,8 +687,11 @@ class Simulation:
             # User reacts to their feed — even in fact-check mode, show the full feed (including user posts)
             feed = user.get_feed(experiment_config=self.config, time_step=step)
 
-            # After time step 5 (step >= 4 since we start at 0), keep appending truth notes to trending posts
-            if step >= 4 and self.news_manager:
+            # 事后干预完全由全局开关 control_flags.aftercare_enabled 控制：
+            # True 时启用，False/None 时关闭。
+            aftercare_effective = bool(control_flags.aftercare_enabled)
+
+            if aftercare_effective and step >= 4 and self.news_manager:
                 feed = self._append_truth_to_fake_news_posts_with_delay(feed, step)
 
             await user.react_to_feed(self.openai_client, self.engine, feed)
@@ -754,7 +774,8 @@ class Simulation:
         tasks.extend(normal_user_tasks)
 
         # 2. Malicious bot attack tasks (if enabled)
-        if self.malicious_bot_manager and self.malicious_bot_manager.enabled:
+        # 完全依赖全局恶意攻击开关 control_flags.attack_enabled
+        if self.malicious_bot_manager and bool(control_flags.attack_enabled):
             malicious_tasks = self._create_malicious_tasks(available_posts)
             tasks.extend(malicious_tasks)
 

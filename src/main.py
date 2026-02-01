@@ -9,6 +9,18 @@ import logging
 import time
 from datetime import datetime
 
+# Runtime control API
+import threading
+from typing import Optional
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import uvicorn
+import requests
+
+import control_flags
+
 # Add src directory to path to import the config manager
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 try:
@@ -17,6 +29,119 @@ try:
 except ImportError:
     CONFIG_MANAGER_AVAILABLE = False
     print("⚠️  Config manager unavailable, using basic configuration")
+
+
+# =============================
+# FastAPI control server setup
+# =============================
+
+control_app = FastAPI(title="Simulation Control API", version="1.0.0")
+
+control_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+class ToggleRequest(BaseModel):
+    """Simple request body for enabling / disabling a flag."""
+
+    enabled: bool
+
+
+@control_app.get("/control/status")
+def get_control_status():
+    """Return current values of all runtime control flags."""
+
+    return control_flags.as_dict()
+
+
+@control_app.post("/control/attack")
+def set_attack_flag(body: ToggleRequest):
+    """Enable or disable malicious bot attacks at runtime."""
+
+    control_flags.attack_enabled = bool(body.enabled)
+    return {"attack_enabled": control_flags.attack_enabled}
+
+
+@control_app.post("/control/aftercare")
+def set_aftercare_flag(body: ToggleRequest):
+    """Enable or disable post-hoc intervention at runtime."""
+
+    control_flags.aftercare_enabled = bool(body.enabled)
+    return {"aftercare_enabled": control_flags.aftercare_enabled}
+
+
+@control_app.post("/control/auto-status")
+def set_auto_status_flag(body: ToggleRequest):
+    """Enable or disable opinion-balance auto monitoring/intervention via port 8000.
+
+    语义：WSL 侧只需要调用 8000 端口，实际由 main.py 在
+
+        http://localhost:8100/launcher/auto-status
+
+    上转发同样的 enabled=true/false 给启动器，实现跨环境控制。
+    """
+
+    enabled = bool(body.enabled)
+
+    # 1) 更新当前进程的全局控制变量
+    control_flags.auto_status = enabled
+
+    # 2) 将 enabled 原样转发给启动器端口
+    #    等价于：
+    #    curl -X POST http://localhost:8100/launcher/auto-status \
+    #         -H "Content-Type: application/json" \
+    #         -d '{"enabled": true/false}'
+    resp_data = {}
+    try:
+        resp = requests.post(
+            "http://localhost:8100/launcher/auto-status",
+            json={"enabled": enabled},
+            timeout=5,
+        )
+        resp_data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+    except Exception as e:
+        # 启动器端口可能未开启，主流程仍然保持可用
+        resp_data = {"error": str(e)}
+
+    return {
+        "auto_status": control_flags.auto_status,
+        "launcher_call": resp_data,
+    }
+
+
+@control_app.get("/control/auto-status")
+def get_auto_status_flag():
+    """Get current opinion-balance auto monitoring/intervention status."""
+
+    return {"auto_status": control_flags.auto_status}
+
+
+def start_control_api_server(host: str = "0.0.0.0", port: int = 8000) -> Optional[threading.Thread]:
+    """Start the FastAPI control server in a background thread.
+
+    The server shares the same process and memory space as the
+    simulation, so updates to control_flags are visible immediately
+    inside simulation.py.
+    """
+
+    def _run() -> None:
+        config = uvicorn.Config(control_app, host=host, port=port, log_level="info")
+        server = uvicorn.Server(config)
+        server.run()
+
+    try:
+        thread = threading.Thread(target=_run, daemon=True, name="control-api-server")
+        thread.start()
+        print(f"📡 Control API server started at http://{host}:{port}")
+        return thread
+    except Exception as e:
+        print(f"⚠️  Failed to start control API server: {e}")
+        return None
 
 def setup_comprehensive_logging():
     """Set comprehensive logging configuration affecting all logging calls."""
@@ -383,6 +508,11 @@ if __name__ == "__main__":
     # Set comprehensive logging configuration affecting all logging calls
     log_file = setup_comprehensive_logging()
     
+    # Start the FastAPI control server in the background so that
+    # external tools / frontend can toggle runtime flags while the
+    # simulation is running.
+    start_control_api_server()
+    
     # Check database service
     print("🔍 Checking database service status...")
     if not check_database_service():
@@ -422,6 +552,9 @@ if __name__ == "__main__":
     # Get user selection - choose malicious bot system first
     enable_malicious_bots = get_user_choice_malicious_bots()
 
+    # CLI 选择直接写入全局恶意攻击开关，成为单一真值来源
+    control_flags.attack_enabled = enable_malicious_bots
+
     # Then choose the opinion balance system
     opinion_balance_choice = get_user_choice_opinion_balance()
     
@@ -458,7 +591,8 @@ if __name__ == "__main__":
     if 'malicious_bot_system' not in config:
         config['malicious_bot_system'] = {}
 
-    # CLI selection overrides config enabled setting
+    # 保留 enabled 字段供日志/其他组件参考，但实际是否攻击
+    # 已完全由 control_flags.attack_enabled 控制。
     config['malicious_bot_system']['enabled'] = enable_malicious_bots
     # Keep cluster_size from the config without forcing an override
     if enable_malicious_bots:

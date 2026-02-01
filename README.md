@@ -165,7 +165,41 @@ start
 auto-status
 ```
 
-### 5. 启动前端可视化界面
+### 5. 运行时控制端口（main.py）
+
+当你通过 `python src/main.py` 启动主程序后，`main.py` 会在 `8000` 端口启动一个 FastAPI 控制服务，用于在仿真运行中动态开关以下功能（默认监听 `http://localhost:8000`）：
+
+- 恶意水军攻击开关（`/control/attack`）
+- 事后干预开关（`/control/aftercare`）
+- 舆论平衡自动监控与干预开关（`/control/auto-status`）
+
+示例 curl 命令：
+
+```bash
+# 1）开启恶意水军攻击
+curl -X POST "http://localhost:8000/control/attack" \
+  -H "Content-Type: application/json" \
+  -d '{"enabled": true}'
+
+# 2）关闭事后干预
+curl -X POST "http://localhost:8000/control/aftercare" \
+  -H "Content-Type: application/json" \
+  -d '{"enabled": true}'
+
+# 3）开启舆论平衡自动监控与干预
+curl -X POST "http://localhost:8000/control/auto-status" \
+  -H "Content-Type: application/json" \
+  -d '{"enabled": true}'
+
+# 4）关闭舆论平衡自动监控与干预
+curl -X POST "http://localhost:8000/control/auto-status" \
+  -H "Content-Type: application/json" \
+  -d '{"enabled": false}'
+```
+
+其中 `/control/auto-status` 还会在内部封装调用 `opinion_balance_launcher` 暴露的 `http://localhost:8100/launcher/auto-status` 端口，实现对舆论平衡监控线程的启停控制。
+
+### 6. 启动前端可视化界面
 
 - 启动后端API服务
 ```bash
