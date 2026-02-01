@@ -157,7 +157,7 @@ export default function WelcomePage() {
           onWheel={handleWheel}
         >
           {/* 卡片容器 */}
-          <div className="relative h-[500px] flex items-center justify-center">
+          <div className="relative h-[650px] flex items-center justify-center">
           {modes.map((mode, index) => {
               const Icon = mode.icon
               const offset = (index - selectedIndex) * 120
@@ -172,7 +172,7 @@ export default function WelcomePage() {
                   key={mode.id}
                   className="absolute cursor-pointer"
                   animate={{
-                    y: offset,
+                    y: offset * 1.5,
                     scale: scale,
                     opacity: isLoaded ? opacity : 0,
                     filter: `blur(${blur}px)`,

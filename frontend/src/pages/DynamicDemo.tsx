@@ -607,10 +607,10 @@ function DynamicDemoHeader({
       <div className="flex items-center gap-4">
         <img src="/logo.png" alt="EvoCorps Logo" className="w-[120px] h-auto max-w-full drop-shadow-xl" />
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
+          <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
             欢迎使用 EvoCorps
           </h1>
-          <p className="text-lg text-slate-600">实时监控舆情变化，动态观察指标变化的舆情现状</p>
+          <p className="text-xl text-slate-600">实时监控舆情变化，动态观察指标变化的舆情现状</p>
           <div className="flex items-center gap-2 mt-2">
             <StatusBadge label={isRunning ? 'Running' : 'Stopped'} tone={isRunning ? 'success' : 'muted'} />
             <StatusBadge
@@ -625,14 +625,14 @@ function DynamicDemoHeader({
         <div className="flex flex-col gap-3 items-center">
           <div className="flex flex-wrap gap-3 justify-center">
             <button
-              className="btn-primary inline-flex items-center gap-2"
+              className="btn-primary inline-flex items-center gap-2 text-base"
               onClick={onStart}
               disabled={isRunning || isStarting}
             >
               <Play size={18} />
               {isStarting ? '启动中...' : isRunning ? '运行中' : '开启演示'}
             </button>
-            <button className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 text-white font-medium hover:shadow-lg transition-all duration-200" onClick={onStop}>
+            <button className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 text-white font-medium text-base hover:shadow-lg transition-all duration-200" onClick={onStop}>
               <Square size={18} />
               停止演示
             </button>
@@ -968,7 +968,7 @@ function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
           <p className="text-sm text-slate-600">情绪度 / 极端度趋势曲线</p>
         </div>
       </div>
-      <div className="h-60">
+      <div className="h-56">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
