@@ -362,7 +362,18 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
   if (!cleanLine) return prev
 
   if (isNewRoundAnchor(cleanLine)) {
-    return createInitialFlowState()
+    // Reset per-round state but immediately attach the new round to Analyst so the UI
+    // starts showing progress right away (replay logs often have many prelude lines
+    // before the first agent anchor appears).
+    const next = createInitialFlowState()
+    const displayLine = compressDisplayLine(cleanLine)
+    next.activeRole = 'Analyst'
+    next.roles.Analyst = {
+      ...next.roles.Analyst,
+      status: 'running',
+      during: displayLine ? [displayLine] : [],
+    }
+    return next
   }
 
   // Extract user-facing content that should be rendered in full (post body, leader comments, etc.)

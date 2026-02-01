@@ -22,6 +22,12 @@ export function toUserMilestone(cleanLine: string): string | null {
   if (s.startsWith('Post content:')) return null
   if (s.startsWith('Feed score:')) return null
 
+  // New round anchor (workflow starts a new "action_..." execution).
+  {
+    const m = s.match(/Start workflow execution\s*-\s*Action ID:\s*([A-Za-z0-9_:-]+)/i)
+    if (m) return truncate(`新回合：${m[1]}`)
+  }
+
   // Analyst
   if (/Analyst is analyzing/i.test(s)) return '分析师：开始分析'
   // Prefer rendering the extracted core viewpoint line, so we don't show two "analysis done" lines.

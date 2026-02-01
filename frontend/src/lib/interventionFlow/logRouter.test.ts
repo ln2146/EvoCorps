@@ -267,7 +267,9 @@ describe('routeLogLine', () => {
     expect(state.roles.Analyst.stage.max).toBeGreaterThanOrEqual(0)
 
     state = routeLogLine(state, '2026-01-28 21:24:38,434 - INFO - 🚀 Start workflow execution - Action ID: action_20260128_212438')
-    expect(state.activeRole).toBe(null)
+    // New round should reset progress but also bind to Analyst so early prelude lines are visible
+    // (avoids long silence before the first agent anchor arrives in replay logs).
+    expect(state.activeRole).toBe('Analyst')
     for (const role of ['Analyst', 'Strategist', 'Leader', 'Amplifier'] as const) {
       expect(state.roles[role].stage.current).toBe(-1)
       expect(state.roles[role].stage.max).toBe(-1)
