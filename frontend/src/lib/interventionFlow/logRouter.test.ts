@@ -305,4 +305,23 @@ describe('routeLogLine', () => {
       expect(state.roles[role].stage.order).toEqual([])
     }
   })
+
+  it('suppresses workflow config/meta lines from Analyst dynamic stream', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-28 21:24:38,434 - INFO - 🚀 Start workflow execution - Action ID: action_20260128_212438')
+    const before = [...state.roles.Analyst.during]
+
+    const metaLines = [
+      '2026-01-28 21:24:38,435 - INFO - ⚙️ Force intervention: no',
+      '2026-01-28 21:24:38,436 - INFO - 📊 Monitoring interval: 30 minutes',
+      '2026-01-28 21:24:38,437 - INFO - 🔄 Feedback iteration: enabled',
+      '2026-01-28 21:24:38,438 - INFO - ✅ Post exists: post-f053ef',
+      '2026-01-28 21:24:38,439 - INFO - 🚨⚖️ Start opinion balance intervention system',
+    ]
+
+    for (const line of metaLines) state = routeLogLine(state, line)
+
+    expect(state.roles.Analyst.during).toEqual(before)
+  })
 })

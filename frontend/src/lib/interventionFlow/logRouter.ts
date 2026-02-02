@@ -332,6 +332,14 @@ function compressDisplayLine(cleanLine: string) {
   // Suppress redundant "analysis completed" marker; we render the extracted core viewpoint instead.
   if (/Analyst analysis completed/i.test(cleanLine)) return ''
 
+  // Suppress workflow prelude/config lines that don't help the dynamic panel.
+  // (They are useful for logs, but in the UI they read as noise.)
+  if (/^⚙️\s*Force intervention:/i.test(cleanLine)) return ''
+  if (/^📊\s*Monitoring interval:/i.test(cleanLine)) return ''
+  if (/^🔄\s*Feedback iteration:/i.test(cleanLine)) return ''
+  if (/^✅\s*Post exists:/i.test(cleanLine)) return ''
+  if (/^🚨⚖️\s*Start opinion balance intervention system/i.test(cleanLine)) return ''
+
   const milestone = toUserMilestone(cleanLine)
   if (milestone) {
     // For Analyst, when a value line appears, include it in the dynamic stream line as well
