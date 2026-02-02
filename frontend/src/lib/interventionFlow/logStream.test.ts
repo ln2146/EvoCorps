@@ -22,7 +22,7 @@ describe('createEventSourceLogStream', () => {
     expect(created[0].url).toBe('/api/sse')
 
     created[0].es.onopen?.()
-    expect(handler).toHaveBeenCalledWith('INFO: 已连接流程日志流')
+    expect(handler).toHaveBeenCalledWith('提示：已连接流程日志流')
 
     created[0].es.onmessage({ data: 'line-1' })
     expect(handler).toHaveBeenCalledWith('line-1')
@@ -90,7 +90,7 @@ describe('createFetchReplayLogStream', () => {
     await Promise.resolve()
 
     expect(handler.mock.calls.length).toBe(1)
-    expect(String(handler.mock.calls[0][0])).toContain('ERROR:')
+    expect(String(handler.mock.calls[0][0])).toContain('错误：')
 
     vi.useRealTimers()
   })

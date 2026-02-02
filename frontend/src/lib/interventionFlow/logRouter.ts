@@ -373,14 +373,14 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
 
   // Surface stream status lines (produced by the backend SSE wrapper or our EventSource onopen/onerror)
   // even before any role anchors appear. Without this, the UI can look "stuck" on connect failures.
-  if (/^(INFO|ERROR):/i.test(cleanLine) && !hasPrefix && !prev.context.pendingMultiline) {
+  if (/^(INFO|ERROR|提示|错误)：/i.test(cleanLine) && !hasPrefix && !prev.context.pendingMultiline) {
     const displayLine = compressDisplayLine(cleanLine)
     const role: Role = prev.activeRole ?? 'Analyst'
     const nextRoles = { ...prev.roles }
     const cur = nextRoles[role]
     nextRoles[role] = {
       ...cur,
-      status: /^ERROR:/i.test(cleanLine) ? 'error' : (cur.status === 'idle' ? 'running' : cur.status),
+      status: /^ERROR:/i.test(cleanLine) || cleanLine.startsWith('错误：') ? 'error' : (cur.status === 'idle' ? 'running' : cur.status),
       during: pushAggregated(cur.during, displayLine, MAX_DURING_LINES),
     }
     return {

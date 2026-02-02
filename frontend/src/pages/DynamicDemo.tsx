@@ -14,6 +14,7 @@ import { getInterventionFlowPanelClassName, getLeaderCommentsContainerClassName 
 import { buildRolePills } from '../lib/interventionFlow/rolePills'
 import { getSummaryCardClassName } from '../lib/interventionFlow/summaryCardStyles'
 import { getSummaryGridClassName } from '../lib/interventionFlow/summaryGridLayout'
+import { formatAnalysisStatus, formatDemoRunStatus, formatSseStatus, formatTopCount } from '../lib/interventionFlow/uiLabels'
 import { getHeatLeaderboardCardClassName, getHeatLeaderboardListClassName } from '../lib/interventionFlow/heatLeaderboardLayout'
 import { getAnalystCombinedCardClassName, getAnalystCombinedPostBodyClassName, getAnalystCombinedStreamClassName } from '../lib/interventionFlow/analystCombinedLayout'
 import { buildStageStepperModel } from '../lib/interventionFlow/stageStepper'
@@ -605,16 +606,16 @@ function DynamicDemoHeader({
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
             欢迎使用 EvoCorps
           </h1>
-          <p className="text-slate-600">实时监控舆情变化，动态观察指标变化的舆情现状</p>
-          <div className="flex items-center gap-2 mt-2">
-            <StatusBadge label={isRunning ? 'Running' : 'Stopped'} tone={isRunning ? 'success' : 'muted'} />
-            <StatusBadge
-              label={sseStatus === 'connected' ? 'SSE Connected' : sseStatus === 'connecting' ? 'SSE Connecting' : 'SSE Disconnected'}
-              tone={sseStatus === 'connected' ? 'info' : sseStatus === 'connecting' ? 'warning' : 'muted'}
-            />
-          </div>
-        </div>
-      </div>
+           <p className="text-slate-600">实时监控舆情变化，动态观察指标变化的舆情现状</p>
+           <div className="flex items-center gap-2 mt-2">
+             <StatusBadge label={formatDemoRunStatus(isRunning)} tone={isRunning ? 'success' : 'muted'} />
+             <StatusBadge
+               label={formatSseStatus(sseStatus)}
+               tone={sseStatus === 'connected' ? 'info' : sseStatus === 'connecting' ? 'warning' : 'muted'}
+             />
+           </div>
+         </div>
+       </div>
 
       <div className="flex items-stretch gap-4 w-full xl:w-auto">
         <div className="flex flex-col gap-3 items-center">
@@ -688,7 +689,7 @@ function HeatLeaderboardCard({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <StatusBadge label={`Top ${posts.length}`} tone="info" />
+          <StatusBadge label={formatTopCount(posts.length)} tone="info" />
           {isLoading && <StatusBadge label="加载中" tone="warning" />}
         </div>
       </div>
@@ -1281,12 +1282,12 @@ function CommentaryAnalysisPanel({ status, onOpenConfig, onRun }: { status: 'Idl
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">评论区总体状态分析</h2>
-          <p className="text-sm text-slate-600">LLM 周期性分析评论情绪与极化趋势</p>
+          <p className="text-sm text-slate-600">大模型周期性分析评论情绪与极化趋势</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <button className="btn-secondary" onClick={onOpenConfig}>分析配置</button>
           <button className="btn-primary" onClick={onRun}>立即分析</button>
-          <StatusBadge label={status} tone={status === 'Running' ? 'warning' : status === 'Done' ? 'success' : status === 'Error' ? 'danger' : 'muted'} />
+          <StatusBadge label={formatAnalysisStatus(status)} tone={status === 'Running' ? 'warning' : status === 'Done' ? 'success' : status === 'Error' ? 'danger' : 'muted'} />
         </div>
       </div>
       <AnalysisResultView status={status} />
@@ -1304,7 +1305,7 @@ function AnalysisConfigDialog({ open, onClose }: { open: boolean; onClose: () =>
         <h3 className="text-xl font-bold text-slate-800 mb-4">分析配置</h3>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">分析时间间隔 t（分钟）</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">分析间隔（分钟）</label>
             <input
               type="number"
               defaultValue={10}
@@ -1330,7 +1331,7 @@ function AnalysisResultView({ status }: { status: 'Idle' | 'Running' | 'Done' | 
     <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div className="bg-white/70 rounded-2xl p-4 border border-white/40">
         <h4 className="text-sm font-semibold text-slate-700 mb-2">分析摘要</h4>
-        <p className="text-sm text-slate-600">当前分析状态：{status}。后续将展示总结性文本。</p>
+        <p className="text-sm text-slate-600">当前分析状态：{formatAnalysisStatus(status)}。后续将展示总结性文本。</p>
       </div>
       <div className="bg-white/70 rounded-2xl p-4 border border-white/40">
         <h4 className="text-sm font-semibold text-slate-700 mb-2">情绪结构</h4>

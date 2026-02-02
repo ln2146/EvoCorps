@@ -59,7 +59,7 @@ export function createFetchReplayLogStream(opts: {
 
         lines = text.split(/\r?\n/).filter((l) => l.length > 0)
         if (!lines.length) {
-          emit('ERROR: 回放日志为空或无法解析。')
+          emit('错误：回放日志为空或无法解析。')
           stop()
           return
         }
@@ -95,7 +95,7 @@ export function createFetchReplayLogStream(opts: {
       } catch (e) {
         if (stopped) return
         const msg = e instanceof Error ? e.message : String(e)
-        emit(`ERROR: 无法加载回放日志：${msg}`)
+        emit(`错误：无法加载回放日志：${msg}`)
         stop()
       }
     })()
@@ -176,12 +176,12 @@ export function createEventSourceLogStream(
     ;(es as any).onopen = () => {
       if (emittedOpen) return
       emittedOpen = true
-      emit('INFO: 已连接流程日志流')
+      emit('提示：已连接流程日志流')
     }
     ;(es as any).onerror = () => {
       if (emittedError) return
       emittedError = true
-      emit('ERROR: 流程日志流连接失败或已断开')
+      emit('错误：流程日志流连接失败或已断开')
       // Close so a future `start()` call can create a fresh connection.
       try {
         es?.close()
