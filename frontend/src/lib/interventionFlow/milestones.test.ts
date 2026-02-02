@@ -24,6 +24,16 @@ describe('toUserMilestone', () => {
     expect(toUserMilestone('Needs intervention: yes')).toBe('分析师：判定需要干预')
   })
 
+  it('maps per-comment scoring lines (keep raw content, translate labels)', () => {
+    expect(toUserMilestone('🔍 Comment 1 LLM result: (8.0, 0.1)')).toBe('🔍 评论1 模型结果： (8.0, 0.1)')
+    expect(toUserMilestone('📊 Comment 1: sentiment=0.10, likes=12, weight=0.325, contribution=0.033')).toBe(
+      '📊 评论1：情绪=0.10，点赞=12，权重=0.325，贡献=0.033',
+    )
+    expect(toUserMilestone('Comment 2 content: This is the original comment body.')).toBe(
+      '评论2 内容：This is the original comment body.',
+    )
+  })
+
   it('does not truncate long extracted text (no ellipsis)', () => {
     const long = 'Core viewpoint: ' + 'A'.repeat(200)
     const out = toUserMilestone(long)

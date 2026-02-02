@@ -29,6 +29,28 @@ export function toUserMilestone(cleanLine: string): string | null {
   }
   if (/Total weight calculated:/i.test(s)) return '分析师：权重汇总'
   if (/Weighted per-comment sentiment:/i.test(s)) return '分析师：情绪汇总'
+  {
+    const m = s.match(/^🔍\s*Comment\s+(\d+)\s+LLM result:\s*(.+)$/i)
+    if (m) return `🔍 评论${m[1]} 模型结果： ${m[2].trim()}`
+  }
+  {
+    const m = s.match(/^📊\s*Comment\s+(\d+):\s*(.+)$/i)
+    if (m) {
+      const idx = m[1]
+      const raw = m[2]
+      const zh = raw
+        .replace(/\bsentiment\s*=/gi, '情绪=')
+        .replace(/\blikes\s*=/gi, '点赞=')
+        .replace(/\bweight\s*=/gi, '权重=')
+        .replace(/\bcontribution\s*=/gi, '贡献=')
+        .replace(/\s*,\s*/g, '，')
+      return `📊 评论${idx}：${zh.trim()}`
+    }
+  }
+  {
+    const m = s.match(/^Comment\s+(\d+)\s+content:\s*(.+)$/i)
+    if (m) return `评论${m[1]} 内容：${m[2].trim()}`
+  }
   if (/generate baseline effectiveness report/i.test(s)) return '分析师：生成基线报告'
   if (/Analyst monitoring\s*-\s*establish baseline data/i.test(s)) return '分析师：建立基线数据'
   if (/Monitoring task started/i.test(s)) return '分析师：启动监测任务'
