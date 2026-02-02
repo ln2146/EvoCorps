@@ -13,6 +13,7 @@ import { getRoleTabButtonClassName } from '../lib/interventionFlow/roleTabStyles
 import { getInterventionFlowPanelClassName, getLeaderCommentsContainerClassName } from '../lib/interventionFlow/panelLayout'
 import { buildRolePills } from '../lib/interventionFlow/rolePills'
 import { getSummaryCardClassName } from '../lib/interventionFlow/summaryCardStyles'
+import { getSummaryGridClassName } from '../lib/interventionFlow/summaryGridLayout'
 import { getHeatLeaderboardCardClassName, getHeatLeaderboardListClassName } from '../lib/interventionFlow/heatLeaderboardLayout'
 import { getAnalystCombinedCardClassName, getAnalystCombinedPostBodyClassName, getAnalystCombinedStreamClassName } from '../lib/interventionFlow/analystCombinedLayout'
 import { buildStageStepperModel } from '../lib/interventionFlow/stageStepper'
@@ -1186,7 +1187,7 @@ function RoleDetailSection({
       </div>
 
       {!preRunEmpty && pills.length ? (
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className={getSummaryGridClassName(role)}>
           {pills.slice(0, 4).map((line, idx) => (
             <div
               key={`${role}_summary_${idx}`}
