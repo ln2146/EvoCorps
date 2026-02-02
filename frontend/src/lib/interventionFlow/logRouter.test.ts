@@ -102,6 +102,8 @@ describe('routeLogLine', () => {
     expect(state.roles.Analyst.summary[1]).toContain('8.6/10.0')
     expect(state.roles.Analyst.summary[2]).toContain('0.10/1.0')
     expect(state.roles.Analyst.summary[3]).toContain('触发原因：')
+    expect(state.roles.Analyst.summary[3]).toContain('观点极端度太高')
+    expect(state.roles.Analyst.summary[3]).toContain('情绪度太低')
   })
 
   it('suppresses Analyst "analysis completed" line to avoid duplicate analysis rows', () => {

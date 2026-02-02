@@ -19,7 +19,7 @@ describe('toUserMilestone', () => {
     expect(toUserMilestone('Viewpoint extremism: 8.6/10.0')).toBe('分析师：极端度 8.6/10.0')
     expect(toUserMilestone('Overall sentiment: 0.10/1.0')).toBe('分析师：情绪度 0.10/1.0')
     expect(toUserMilestone('Trigger reasons: Viewpoint extremism too high & Sentiment too low')).toBe(
-      '分析师：触发原因 Viewpoint extremism too high & Sentiment too low',
+      '触发原因： 观点极端度太高 & 情绪度太低',
     )
     expect(toUserMilestone('Needs intervention: yes')).toBe('分析师：判定需要干预')
   })

@@ -41,7 +41,13 @@ export function toUserMilestone(cleanLine: string): string | null {
   }
   {
     const m = s.match(/^Trigger reasons:\s*(.+)$/i)
-    if (m) return `分析师：触发原因 ${m[1].trim()}`
+    if (m) {
+      const zh = m[1]
+        .trim()
+        .replace(/Viewpoint extremism too high/gi, '观点极端度太高')
+        .replace(/Sentiment too low/gi, '情绪度太低')
+      return `触发原因： ${zh}`
+    }
   }
 
   // Strategist

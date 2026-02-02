@@ -241,8 +241,8 @@ function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): 
     if (mReasons) {
       const raw = mReasons[1]
       const zh = raw
-        .replace(/Viewpoint extremism too high/gi, '极端度过高')
-        .replace(/Sentiment too low/gi, '情绪过低')
+        .replace(/Viewpoint extremism too high/gi, '观点极端度太高')
+        .replace(/Sentiment too low/gi, '情绪度太低')
       update('Analyst', 3, `触发原因：${zh}`)
     }
 
