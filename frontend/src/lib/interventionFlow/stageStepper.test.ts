@@ -5,7 +5,7 @@ import { buildStageStepperModel } from './stageStepper'
 describe('stageStepper', () => {
   it('maps current/max to labels and totals', () => {
     const model = buildStageStepperModel('Analyst', { current: 2, max: 2, order: [0, 1, 2] })
-    expect(model.currentLabel).toBe('情绪度')
+    expect(model.currentLabel).toBe('极端度')
     expect(model.total).toBe(6)
     expect(model.seenCount).toBe(3)
     expect(model.currentPos).toBe(2)

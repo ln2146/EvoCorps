@@ -4,7 +4,7 @@ import { formatRoleStagesTooltip, getRoleStages } from './roleStages'
 
 describe('roleStages', () => {
   it('defines Analyst stages', () => {
-    expect(getRoleStages('Analyst')).toEqual(['内容识别', '评论抽样', '情绪度', '极端度', '干预判定', '监测评估'])
+    expect(getRoleStages('Analyst')).toEqual(['内容识别', '评论抽样', '极端度', '情绪度', '干预判定', '监测评估'])
   })
 
   it('defines Strategist stages', () => {
@@ -23,4 +23,3 @@ describe('roleStages', () => {
     expect(formatRoleStagesTooltip('Analyst')).toMatch(/内容识别.*->.*监测评估/)
   })
 })
-

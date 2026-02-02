@@ -231,12 +231,12 @@ describe('routeLogLine', () => {
     expect(state.roles.Analyst.stage.max).toBe(1)
     expect(state.roles.Analyst.stage.order).toEqual([0, 1])
 
-    state = routeLogLine(state, '2026-01-28 21:13:50,217 - INFO -       Overall sentiment: 0.10/1.0')
+    state = routeLogLine(state, '2026-01-28 21:13:50,217 - INFO -       Viewpoint extremism: 8.6/10.0')
     expect(state.roles.Analyst.stage.current).toBe(2)
     expect(state.roles.Analyst.stage.max).toBe(2)
     expect(state.roles.Analyst.stage.order).toEqual([0, 1, 2])
 
-    state = routeLogLine(state, '2026-01-28 21:13:50,217 - INFO -       Viewpoint extremism: 8.6/10.0')
+    state = routeLogLine(state, '2026-01-28 21:13:50,217 - INFO -       Overall sentiment: 0.10/1.0')
     expect(state.roles.Analyst.stage.current).toBe(3)
     expect(state.roles.Analyst.stage.max).toBe(3)
     expect(state.roles.Analyst.stage.order).toEqual([0, 1, 2, 3])
@@ -272,15 +272,15 @@ describe('routeLogLine', () => {
 
     state = routeLogLine(state, '2026-01-30 23:20:18,455 - INFO -   🔍 Analyst is analyzing content...')
     state = routeLogLine(state, '2026-01-30 23:20:39,304 - INFO -       Viewpoint extremism: 8.0/10.0')
-    expect(state.roles.Analyst.stage.current).toBe(3) // 极端度
-    expect(state.roles.Analyst.stage.max).toBe(3)
-    expect(state.roles.Analyst.stage.order).toEqual([0, 3])
+    expect(state.roles.Analyst.stage.current).toBe(2) // 极端度
+    expect(state.roles.Analyst.stage.max).toBe(2)
+    expect(state.roles.Analyst.stage.order).toEqual([0, 2])
 
-    // If sentiment arrives after extremism, current should switch to 情绪度 without losing the max stage reached.
+    // If sentiment arrives after extremism, current should advance to 情绪度.
     state = routeLogLine(state, '2026-01-30 23:20:39,304 - INFO -       Overall sentiment: 0.13/1.0')
-    expect(state.roles.Analyst.stage.current).toBe(2) // 情绪度
+    expect(state.roles.Analyst.stage.current).toBe(3) // 情绪度
     expect(state.roles.Analyst.stage.max).toBe(3)
-    expect(state.roles.Analyst.stage.order).toEqual([0, 3, 2])
+    expect(state.roles.Analyst.stage.order).toEqual([0, 2, 3])
   })
 
   it('resets stage progress on a new workflow round anchor (option A)', () => {

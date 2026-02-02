@@ -123,11 +123,13 @@ function isNewRoundAnchor(cleanLine: string) {
 function mapLineToStageIndex(role: Role, cleanLine: string): number | null {
   switch (role) {
     case 'Analyst': {
-      // 内容识别 -> 评论抽样 -> 情绪度 -> 极端度 -> 干预判定 -> 监测评估
+      // 内容识别 -> 评论抽样 -> 极端度 -> 情绪度 -> 干预判定 -> 监测评估
       if (/Analyst is analyzing/i.test(cleanLine) || /^📊\s*Phase 1:/i.test(cleanLine) || /^Core viewpoint:/i.test(cleanLine)) return 0
       if (/Total weight calculated:/i.test(cleanLine) || /Comment\s+\d+\s+content:/i.test(cleanLine)) return 1
-      if (/Weighted per-comment sentiment:/i.test(cleanLine) || /^Overall sentiment:/i.test(cleanLine)) return 2
-      if (/^Viewpoint extremism:/i.test(cleanLine)) return 3
+      // Sentiment summary is part of sampling; keep it in stage 1 so later stages stay aligned.
+      if (/Weighted per-comment sentiment:/i.test(cleanLine)) return 1
+      if (/^Viewpoint extremism:/i.test(cleanLine)) return 2
+      if (/^Overall sentiment:/i.test(cleanLine)) return 3
       if (/Needs intervention:/i.test(cleanLine) || /Urgency level:/i.test(cleanLine) || /Analyst determined opinion balance intervention needed/i.test(cleanLine)) return 4
       if (
         /\[Monitoring round/i.test(cleanLine) ||
