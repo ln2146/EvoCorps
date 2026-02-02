@@ -342,14 +342,6 @@ function compressDisplayLine(cleanLine: string) {
 
   const milestone = toUserMilestone(cleanLine)
   if (milestone) {
-    // For Analyst, when a value line appears, include it in the dynamic stream line as well
-    // so users can see the number inside the running panel (not only the summary cards).
-    const mSent = cleanLine.match(/^Overall sentiment:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
-    if (mSent) return `${milestone}（${mSent[1].replace(/\s+/g, '')}）`
-    const mExt = cleanLine.match(/^Viewpoint extremism:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
-    if (mExt) return `${milestone}（${mExt[1].replace(/\s+/g, '')}）`
-    const mTrig = cleanLine.match(/^Trigger reasons:\s*(.+)$/i)
-    if (mTrig) return `${milestone}：${mTrig[1].trim()}`
     return milestone
   }
   // Fallback: short truncated line, but avoid dumping full bodies.

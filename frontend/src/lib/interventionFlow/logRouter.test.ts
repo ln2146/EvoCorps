@@ -324,4 +324,16 @@ describe('routeLogLine', () => {
 
     expect(state.roles.Analyst.during).toEqual(before)
   })
+
+  it('does not duplicate sentiment/extremity values in Analyst milestone lines', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-30 23:20:18,455 - INFO -   🔍 Analyst is analyzing content...')
+    state = routeLogLine(state, '2026-01-30 23:20:39,304 - INFO -       Overall sentiment: 0.13/1.0')
+
+    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('分析师：情绪度 0.13/1.0')
+
+    state = routeLogLine(state, '2026-01-30 23:20:39,305 - INFO -       Viewpoint extremism: 8.0/10.0')
+    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('分析师：极端度 8.0/10.0')
+  })
 })
