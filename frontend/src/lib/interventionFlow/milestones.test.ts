@@ -38,17 +38,27 @@ describe('toUserMilestone', () => {
   })
 
   it('maps Leader lines', () => {
+    expect(toUserMilestone('🎯 Leader Agent starts USC process and generates candidate comments...')).toBe('领袖：启动生成流程')
     expect(toUserMilestone('✍️  Step 3: USC-Generate - generate 6 candidate comments')).toBe('领袖：生成候选（6）')
+    expect(toUserMilestone('Retrieved 5 relevant arguments')).toBe('领袖：检索论据（5）')
     expect(toUserMilestone('🏆 Best selection: candidate_4 (total: 4.80)')).toBe('领袖：选定版本（candidate_4）')
     expect(toUserMilestone('💬 👑 Leader comment 1 on post post-18e9eb: ...')).toBe('领袖：评论已发布（1）')
+    expect(toUserMilestone('✅ USC workflow completed')).toBe('领袖：生成完成')
   })
 
   it('maps Amplifier lines', () => {
     expect(toUserMilestone('⚖️ Activating Echo Agent cluster...')).toBe('扩音器：启动回声集群')
+    expect(toUserMilestone('🚀 Start parallel execution of 12 agent tasks...')).toBe('扩音器：并行执行（12）')
+    expect(toUserMilestone('📊 Echo Agent results: 12 succeeded, 0 failed')).toBe('扩音器：执行结果（成功 12 / 失败 0）')
     expect(toUserMilestone('📋 Echo plan: total=12, role distribution={...}')).toBe('扩音器：集群规模（12）')
     expect(toUserMilestone('✅ 12 echo responses generated')).toBe('扩音器：生成回应（12）')
     expect(toUserMilestone('💖 Successfully added 240 likes to each of 2 leader comments (total: 480 likes)')).toBe('扩音器：点赞放大')
     expect(toUserMilestone('🎉 Workflow completed - effectiveness score: 10.0/10')).toBe('扩音器：扩散完成')
+  })
+
+  it('maps monitoring/baseline lines', () => {
+    expect(toUserMilestone('📊 Analyst Agent - generate baseline effectiveness report')).toBe('分析师：生成基线报告')
+    expect(toUserMilestone('🔍 Analyst monitoring - establish baseline data')).toBe('分析师：建立基线数据')
   })
 
   it('returns null for infra noise', () => {

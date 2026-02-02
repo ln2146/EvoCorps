@@ -84,7 +84,7 @@ describe('routeLogLine', () => {
 
     state = routeLogLine(state, '2026-01-30 23:22:11,000 - INFO - 🔄 Will continue monitoring and adjust dynamically')
     expect(state.activeRole).toBe('Analyst')
-    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1].toLowerCase()).toContain('monitoring')
+    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toContain('监测')
   })
 
   it('updates Analyst summary fields from key result lines', () => {
@@ -325,6 +325,18 @@ describe('routeLogLine', () => {
     for (const line of metaLines) state = routeLogLine(state, line)
 
     expect(state.roles.Analyst.during).toEqual(before)
+  })
+
+  it('suppresses leader candidate draft lines from the dynamic panel', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-30 23:21:07,935 - INFO - 🎯 Leader Agent starts USC process and generates candidate comments...')
+    const beforeLen = state.roles.Leader.during.length
+
+    state = routeLogLine(state, '2026-01-30 23:21:38,535 - INFO -    Candidate 1: I understand the concern, but...')
+    state = routeLogLine(state, "2026-01-30 23:21:40,928 - INFO -    Candidate 2: It's easy to feel scared...")
+
+    expect(state.roles.Leader.during.length).toBe(beforeLen)
   })
 
   it('does not duplicate sentiment/extremity values in Analyst milestone lines', () => {

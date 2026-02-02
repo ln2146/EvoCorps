@@ -29,6 +29,10 @@ export function toUserMilestone(cleanLine: string): string | null {
   }
   if (/Total weight calculated:/i.test(s)) return '分析师：权重汇总'
   if (/Weighted per-comment sentiment:/i.test(s)) return '分析师：情绪汇总'
+  if (/generate baseline effectiveness report/i.test(s)) return '分析师：生成基线报告'
+  if (/Analyst monitoring\s*-\s*establish baseline data/i.test(s)) return '分析师：建立基线数据'
+  if (/Monitoring task started/i.test(s)) return '分析师：启动监测任务'
+  if (/Will continue monitoring/i.test(s)) return '分析师：持续监测与动态调整'
   if (/Needs intervention:\s*yes\b/i.test(s)) return '分析师：判定需要干预'
   if (/Needs intervention:\s*no\b/i.test(s)) return '分析师：判定无需干预'
   {
@@ -52,6 +56,23 @@ export function toUserMilestone(cleanLine: string): string | null {
 
   // Strategist
   if (/Strategist is creating strategy/i.test(s)) return '战略家：生成策略'
+  if (/Query historical successful strategies/i.test(s)) return '战略家：检索历史策略'
+  {
+    const m = s.match(/Found\s+(\d+)\s+related historical strategies/i)
+    if (m) return `战略家：找到相关历史（${m[1]}）`
+  }
+  if (/Intelligent learning system initialized successfully/i.test(s)) return '战略家：智能学习系统已就绪'
+  {
+    const m = s.match(/Intelligent learning system recommended strategy:\s*(.+)$/i)
+    if (m) return `战略家：智能学习推荐：${m[1].trim()}`
+  }
+  if (/Intelligent learning system found no matching strategy/i.test(s)) return '战略家：未匹配到历史策略'
+  if (/Use Tree-of-Thought/i.test(s)) return '战略家：推理规划'
+  if (/Start Tree-of-Thought reasoning/i.test(s)) return '战略家：开始推理'
+  {
+    const m = s.match(/Strategy creation completed\s*-\s*Strategy ID:\s*(\S+)/i)
+    if (m) return `战略家：策略生成完成（${m[1]}）`
+  }
   {
     const m = s.match(/Selected optimal strategy:\s*([a-z0-9_ -]+)/i)
     if (m) return `战略家：策略选定：${m[1].trim()}`
@@ -62,6 +83,12 @@ export function toUserMilestone(cleanLine: string): string | null {
   }
 
   // Leader
+  if (/Leader Agent starts USC/i.test(s)) return '领袖：启动生成流程'
+  {
+    const m = s.match(/Retrieved\s+(\d+)\s+relevant arguments/i)
+    if (m) return `领袖：检索论据（${m[1]}）`
+  }
+  if (/^✅\s*USC workflow completed/i.test(s)) return '领袖：生成完成'
   {
     const m = s.match(/USC-Generate\s*-\s*generate\s+(\d+)\s+candidate comments/i)
     if (m) return `领袖：生成候选（${m[1]}）`
@@ -77,6 +104,14 @@ export function toUserMilestone(cleanLine: string): string | null {
 
   // Amplifier
   if (/Activating Echo Agent cluster/i.test(s)) return '扩音器：启动回声集群'
+  {
+    const m = s.match(/Start parallel execution of\s+(\d+)\s+agent tasks/i)
+    if (m) return `扩音器：并行执行（${m[1]}）`
+  }
+  {
+    const m = s.match(/Echo Agent results:\s*(\d+)\s+succeeded,\s*(\d+)\s+failed/i)
+    if (m) return `扩音器：执行结果（成功 ${m[1]} / 失败 ${m[2]}）`
+  }
   {
     const m = s.match(/Echo plan:\s*total=(\d+)/i)
     if (m) return `扩音器：集群规模（${m[1]}）`

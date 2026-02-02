@@ -341,6 +341,8 @@ function compressDisplayLine(cleanLine: string) {
   if (/^🔄\s*Feedback iteration:/i.test(cleanLine)) return ''
   if (/^✅\s*Post exists:/i.test(cleanLine)) return ''
   if (/^🚨⚖️\s*Start opinion balance intervention system/i.test(cleanLine)) return ''
+  // Suppress long candidate drafts (they are not posts/comments; they clutter the panel).
+  if (/^Candidate\s+\d+:/i.test(cleanLine)) return ''
 
   const milestone = toUserMilestone(cleanLine)
   if (milestone) {
