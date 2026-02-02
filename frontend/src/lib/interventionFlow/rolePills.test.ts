@@ -18,8 +18,11 @@ describe('buildRolePills', () => {
     const strategist = buildRolePills('Strategist', {
       feedScore: 999.9,
       summary: ['策略：balanced_response', '置信度：0.43', '风格：diplomatic / empathetic', '核心论点：...'],
+      related: {
+        amplifierSummary: ['Echo: 12'],
+      },
     })
-    expect(strategist[0]).toBe('策略：balanced_response')
+    expect(strategist).toEqual(['策略：balanced_response', '风格：diplomatic', '语气：empathetic', '扩音器：12'])
     expect(strategist.join(' ')).not.toContain('热度')
     // Strategist core argument should be shown in the dynamic panel, not duplicated in the summary pills.
     expect(strategist.join(' ')).not.toContain('核心论点：')
@@ -35,6 +38,9 @@ describe('buildRolePills', () => {
   it('filters placeholder confidence line', () => {
     const strategist = buildRolePills('Strategist', {
       summary: ['策略：x', '置信度：—', '风格：y', '核心论点：z'],
+      related: {
+        amplifierSummary: ['Echo: 3'],
+      },
     })
     expect(strategist.join(' ')).not.toContain('置信度：—')
     expect(strategist.join(' ')).not.toContain('核心论点：')

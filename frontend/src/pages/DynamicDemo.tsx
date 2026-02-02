@@ -1024,6 +1024,7 @@ function InterventionFlowPanel({ state, enabled }: { state: FlowState; enabled: 
         during={roleState.during}
         after={roleState.after}
         context={state.context}
+        amplifierSummary={state.roles.Amplifier.summary}
       />
     </div>
   )
@@ -1106,6 +1107,7 @@ function RoleDetailSection({
   during,
   after,
   context,
+  amplifierSummary,
 }: {
   role: Role
   label: string
@@ -1118,6 +1120,7 @@ function RoleDetailSection({
   during: string[]
   after?: string[]
   context: FlowState['context']
+  amplifierSummary: string[]
 }) {
   const displayLines = isLive ? during : (after ?? [])
   const emptyCopy = useMemo(() => getEmptyCopy({ enabled }), [enabled])
@@ -1129,6 +1132,7 @@ function RoleDetailSection({
   const pills = buildRolePills(role, {
     feedScore: context.feedScore,
     summary,
+    related: role === 'Strategist' ? { amplifierSummary } : undefined,
   })
   const preRunEmpty = isPreRunEmptyState({ enabled, status, linesCount: displayLines.length })
   const stageModel = useMemo(() => buildStageStepperModel(role, stage), [role, stage.current, stage.max, stage.order])

@@ -27,6 +27,9 @@ export function buildRolePills(
   input: {
     feedScore?: number
     summary: string[]
+    related?: {
+      amplifierSummary?: string[]
+    }
   },
 ) {
   const summary = normalizeSummary(input.summary)
@@ -57,13 +60,35 @@ export function buildRolePills(
   if (role === 'Strategist') {
     const strategy = summary.find((s) => s.startsWith('策略：')) ?? ''
     const style = summary.find((s) => s.startsWith('风格：')) ?? ''
-    const amplifiers = summary.find((s) => s.startsWith('Amplifiers:')) ?? ''
 
     const pills: string[] = []
     if (strategy) pills.push(strategy)
 
-    const merged = [style, amplifiers].map((s) => s.trim()).filter(Boolean).join(' · ')
-    if (merged) pills.push(merged)
+    const rawStyle = stripPrefix(style, '风格：').replace(/\\/g, '/').trim()
+    const styleParts = rawStyle
+      ? rawStyle
+          .split('/')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : []
+    const styleAdj = styleParts[0] ?? ''
+    const toneAdj = styleParts[1] ?? ''
+
+    if (styleAdj) pills.push(`风格：${styleAdj}`)
+    if (toneAdj) pills.push(`语气：${toneAdj}`)
+
+    const amplifierSummary = normalizeSummary(input.related?.amplifierSummary ?? [])
+    const rawAmplifierLine =
+      amplifierSummary.find((s) => /^Echo:\s*\d+/i.test(s)) ??
+      amplifierSummary.find((s) => /^Amplifiers:\s*\d+/i.test(s)) ??
+      amplifierSummary.find((s) => /^扩音器：\s*\d+/.test(s)) ??
+      ''
+    const amplifierCount =
+      rawAmplifierLine.match(/^Echo:\s*(\d+)/i)?.[1] ??
+      rawAmplifierLine.match(/^Amplifiers:\s*(\d+)/i)?.[1] ??
+      rawAmplifierLine.match(/^扩音器：\s*(\d+)/)?.[1] ??
+      ''
+    if (amplifierCount) pills.push(`扩音器：${amplifierCount}`)
 
     // Strategist core argument is displayed in the dynamic panel (it can be long), so don't duplicate it here.
     return pills.slice(0, 4)
