@@ -12,6 +12,7 @@ import { DEFAULT_WORKFLOW_REPLAY_DELAY_MS, getOpinionBalanceLogStreamUrl, should
 import { getRoleTabButtonClassName } from '../lib/interventionFlow/roleTabStyles'
 import { getInterventionFlowPanelClassName, getLeaderCommentsContainerClassName } from '../lib/interventionFlow/panelLayout'
 import { buildRolePills } from '../lib/interventionFlow/rolePills'
+import { getSummaryCardClassName } from '../lib/interventionFlow/summaryCardStyles'
 import { getHeatLeaderboardCardClassName, getHeatLeaderboardListClassName } from '../lib/interventionFlow/heatLeaderboardLayout'
 import { getAnalystCombinedCardClassName, getAnalystCombinedPostBodyClassName, getAnalystCombinedStreamClassName } from '../lib/interventionFlow/analystCombinedLayout'
 import { buildStageStepperModel } from '../lib/interventionFlow/stageStepper'
@@ -1189,7 +1190,8 @@ function RoleDetailSection({
           {pills.slice(0, 4).map((line, idx) => (
             <div
               key={`${role}_summary_${idx}`}
-              className="text-xs text-slate-700 px-3 py-2 rounded-xl bg-white/60 border border-white/40 whitespace-pre-wrap break-words leading-snug max-h-16 overflow-y-auto"
+              className={getSummaryCardClassName(role, idx)}
+              title={line}
             >
               {line}
             </div>

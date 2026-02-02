@@ -48,7 +48,7 @@ export function toUserMilestone(cleanLine: string): string | null {
   if (/Strategist is creating strategy/i.test(s)) return '战略家：生成策略'
   {
     const m = s.match(/Selected optimal strategy:\s*([a-z0-9_ -]+)/i)
-    if (m) return `战略家：策略选定（${m[1].trim()}）`
+    if (m) return `战略家：策略选定：${m[1].trim()}`
   }
   // Strategist workflow steps: align stage text with log "Step 4: Format as agent instructions"
   if (/Step\s*4:\s*Format as agent instructions/i.test(s) || /Format as agent instructions/i.test(s)) {
