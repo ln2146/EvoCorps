@@ -3658,7 +3658,7 @@ class SimpleCoordinationSystem:
         # Use first N fixed IDs to ensure the same IDs each run
         selected_ids = self._echo_agent_id_pool[:count]
         
-        workflow_logger.info(f"  🔒 Allocated {len(selected_ids)} fixed Echo Agent IDs: {selected_ids[:5]}{'...' if len(selected_ids) > 5 else ''}")
+        workflow_logger.info(f"  🔒 Allocated {len(selected_ids)} fixed Amplifier Agent IDs: {selected_ids[:5]}{'...' if len(selected_ids) > 5 else ''}")
         return selected_ids
 
     def _load_few_shot_examples(self) -> Dict[str, Any]:
@@ -4371,7 +4371,7 @@ class SimpleCoordinationSystem:
                 failed_count += 1
 
         # Simplify logs: record overall result only, not per-item
-        workflow_logger.info(f"📊 Echo Agent results: {len(successful_responses)} succeeded, {failed_count} failed")
+        workflow_logger.info(f"📊 Amplifier Agent results: {len(successful_responses)} succeeded, {failed_count} failed")
         return successful_responses
 
     def _generate_fallback_instruction(self, role_type: str, index: int, target_content: str) -> Dict[str, Any]:
@@ -4749,7 +4749,7 @@ class SimpleCoordinationSystem:
             # 4. Echo Agent responses
             # Activate Echo Agent cluster
             # Log to workflow
-            workflow_logger.info("⚖️ Activating Echo Agent cluster...")
+            workflow_logger.info("⚖️ Activating Amplifier Agent cluster...")
 
             # Ensure echo_plan contains required fields
             if not isinstance(echo_plan, dict):
@@ -4759,7 +4759,7 @@ class SimpleCoordinationSystem:
             if not echo_plan.get("role_distribution"):
                 echo_plan["role_distribution"] = {}
 
-            workflow_logger.info(f"  📋 Echo plan: total={echo_plan.get('total_agents', 5)}, role distribution={echo_plan.get('role_distribution', {})}")
+            workflow_logger.info(f"  📋 Amplifier plan: total={echo_plan.get('total_agents', 5)}, role distribution={echo_plan.get('role_distribution', {})}")
 
             # Enhance echo_plan with concrete instructions
             enhanced_echo_plan = echo_plan.copy()
@@ -4786,7 +4786,7 @@ class SimpleCoordinationSystem:
                 workflow_logger.warning(f"  ⚠️ Echo coordination failed: {e}")
                 echo_responses = []
             
-            workflow_logger.info(f"  ✅ {len(echo_responses)} echo responses generated")
+            workflow_logger.info(f"  ✅ {len(echo_responses)} amplifier responses generated")
 
             # Highlighted echo agent content display
             for i, response in enumerate(echo_responses):
@@ -5840,7 +5840,7 @@ class SimpleCoordinationSystem:
                 workflow_logger.warning("⚠️ Second leader comment save failed")
             
             # 3. Echo Agent responses - reuse execute_workflow logic
-            workflow_logger.info("⚖️ Activating Echo Agent cluster...")
+            workflow_logger.info("⚖️ Activating Amplifier Agent cluster...")
             
             # Ensure echo_plan contains required fields
             if not isinstance(echo_plan, dict):
@@ -5850,7 +5850,7 @@ class SimpleCoordinationSystem:
             if not echo_plan.get("role_distribution"):
                 echo_plan["role_distribution"] = {}
             
-            workflow_logger.info(f"  📋 Echo plan: total={echo_plan.get('total_agents', 5)}, role distribution={echo_plan.get('role_distribution', {})}")
+            workflow_logger.info(f"  📋 Amplifier plan: total={echo_plan.get('total_agents', 5)}, role distribution={echo_plan.get('role_distribution', {})}")
             
             # Enhance echo_plan with concrete instructions
             enhanced_echo_plan = echo_plan.copy()
@@ -5878,7 +5878,7 @@ class SimpleCoordinationSystem:
                 workflow_logger.warning(f"  ⚠️ Echo coordination failed: {e}")
                 echo_responses = []
             
-            workflow_logger.info(f"  ✅ {len(echo_responses)} echo responses generated")
+            workflow_logger.info(f"  ✅ {len(echo_responses)} amplifier responses generated")
             
             # Highlighted echo agent content display
             for i, response in enumerate(echo_responses):

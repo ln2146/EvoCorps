@@ -20,9 +20,9 @@ export function compressLogLine(line: string) {
     return `💬 👑 Leader comment posted (${leaderComment[1]})`
   }
 
-  // Echo per-agent comment: collapse.
-  if (/^💬\s*🤖\s*Echo-\d+\b/i.test(s) && /\bcommented:/i.test(s)) {
-    return '💬 🤖 Echo commented'
+  // Amplifier per-agent comment: collapse.
+  if (/^💬\s*🤖\s*(?:Echo|Amplifier)-\d+\b/i.test(s) && /\bcommented:/i.test(s)) {
+    return '💬 🤖 Amplifier commented'
   }
 
   // Drop long trailing bodies after ":" for certain patterns; keep prefix.
@@ -37,12 +37,6 @@ export function compressLogLine(line: string) {
   return s
 }
 
-function parseAggSuffix(line: string): { base: string; count: number } {
-  const m = line.match(/^(.*?)(?:\s*×\s*(\d+))$/)
-  if (!m) return { base: line, count: 1 }
-  return { base: m[1].trimEnd(), count: Number(m[2] || 1) }
-}
-
 export function pushCompressedLine(
   prev: string[],
   nextLine: string,
@@ -54,13 +48,11 @@ export function pushCompressedLine(
   if (prev.length) {
     const last = prev[prev.length - 1]
     if (last.startsWith(nextLine)) {
-      const parsed = parseAggSuffix(last)
-      const updated = `${parsed.base} × ${parsed.count + 1}`
-      return [...prev.slice(0, -1), updated]
+      // Do not show repetition counters (×N); keep only one copy.
+      return prev
     }
   }
 
   const appended = [...prev, nextLine]
   return appended.slice(Math.max(0, appended.length - maxLines))
 }
-

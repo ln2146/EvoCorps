@@ -318,6 +318,8 @@ class EnhancedLeaderAgent:
             # Extract evidence info
             evidence_list = result.get('evidence', [])
             relevant_arguments = []
+            keyword_value = (result.get('keyword') or result.get('keywords') or '').strip()
+            theme_value = (result.get('theme') or '').strip()
 
             for i, evidence in enumerate(evidence_list):
                 argument = {
@@ -326,15 +328,16 @@ class EnhancedLeaderAgent:
                     'source_claim': core_viewpoint,
                     'db_id': f"evidence_{i}",
                     'relevance_score': evidence.get('acceptance_rate', 0.5),
-                    'keyword_matched': result.get('keyword', ''),
-                    'theme': result.get('theme', ''),
+                    'keyword_matched': keyword_value,
+                    'theme': theme_value,
                     'source': evidence.get('source', 'Wikipedia')
                 }
                 relevant_arguments.append(argument)
 
             workflow_logger.info(f"   Argument system status: {result.get('status', 'unknown')}")
-            workflow_logger.info(f"   Theme: {result.get('theme', 'unknown')}")
-            workflow_logger.info(f"   Keyword: {result.get('keyword', 'unknown')}")
+            workflow_logger.info(f"   Theme: {theme_value or 'unknown'}")
+            # EnhancedOpinionSystem uses 'keywords' in its result payload; keep compatibility with both keys.
+            workflow_logger.info(f"   Keyword: {keyword_value or 'unknown'}")
 
             # If no relevant arguments found, use backup
             if not relevant_arguments:

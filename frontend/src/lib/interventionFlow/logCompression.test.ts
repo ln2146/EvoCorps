@@ -19,7 +19,7 @@ describe('compressLogLine', () => {
 
   it('shortens echo per-agent comments into a single category line', () => {
     const raw = "💬 🤖 Echo-12 (positive_david_180) (deepseek-chat) commented: That's a thoughtful analysis..."
-    expect(compressLogLine(raw)).toBe('💬 🤖 Echo commented')
+    expect(compressLogLine(raw)).toBe('💬 🤖 Amplifier commented')
   })
 })
 
@@ -28,11 +28,11 @@ describe('pushCompressedLine', () => {
     const lines: string[] = []
     let next = lines
     for (let i = 0; i < 12; i++) {
-      next = pushCompressedLine(next, '💬 🤖 Echo commented', { maxLines: 10 })
+      next = pushCompressedLine(next, '💬 🤖 Amplifier commented', { maxLines: 10 })
     }
-    // Should be aggregated rather than 12 separate lines.
+    // Should be deduplicated rather than 12 separate lines.
     expect(next.length).toBeLessThanOrEqual(10)
-    expect(next[0].startsWith('💬 🤖 Echo commented')).toBe(true)
-    expect(next[0]).toContain('×')
+    expect(next[0].startsWith('💬 🤖 Amplifier commented')).toBe(true)
+    expect(next[0]).not.toContain('×')
   })
 })

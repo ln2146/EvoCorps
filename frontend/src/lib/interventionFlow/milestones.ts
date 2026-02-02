@@ -33,7 +33,7 @@ export function toUserMilestone(cleanLine: string): string | null {
   }
   {
     const m = s.match(/^Feed score:\s*([0-9.]+)\b/i)
-    if (m) return `信息流得分：${m[1]}`
+    if (m) return `热度值：${m[1]}`
   }
   {
     const m = s.match(/^Post content:\s*(.+)$/i)
@@ -103,7 +103,17 @@ export function toUserMilestone(cleanLine: string): string | null {
   if (/Weighted per-comment sentiment:/i.test(s)) return '分析师：情绪汇总'
   {
     const m = s.match(/^🔍\s*Comment\s+(\d+)\s+LLM result:\s*(.+)$/i)
-    if (m) return `🔍 评论${m[1]} 模型结果： ${m[2].trim()}`
+    if (m) {
+      const raw = m[2].trim()
+      const cleaned = raw.replace(/^\(\s*/, '').replace(/\s*\)$/, '')
+      const parts = cleaned.split(',').map((p) => p.trim()).filter(Boolean)
+      const extremity = parts[0] ?? ''
+      const sentiment = parts[1] ?? ''
+      if (extremity && sentiment && !Number.isNaN(Number(extremity)) && !Number.isNaN(Number(sentiment))) {
+        return `🔍 评论${m[1]} 计算结果：极端度 ${extremity}/10.0，情绪度 ${sentiment}/1.0`
+      }
+      return `🔍 评论${m[1]} 计算结果：${raw}`
+    }
   }
   {
     const m = s.match(/^📊\s*Comment\s+(\d+):\s*(.+)$/i)
@@ -236,21 +246,21 @@ export function toUserMilestone(cleanLine: string): string | null {
   }
 
   // Amplifier
-  if (/Activating Echo Agent cluster/i.test(s)) return '扩音器：启动回声集群'
+  if (/Activating (?:Echo|Amplifier) Agent cluster/i.test(s)) return '扩音器：启动回声集群'
   {
     const m = s.match(/Start parallel execution of\s+(\d+)\s+agent tasks/i)
     if (m) return `扩音器：并行执行（${m[1]}）`
   }
   {
-    const m = s.match(/Echo Agent results:\s*(\d+)\s+succeeded,\s*(\d+)\s+failed/i)
+    const m = s.match(/(?:Echo|Amplifier) Agent results:\s*(\d+)\s+succeeded,\s*(\d+)\s+failed/i)
     if (m) return `扩音器：执行结果（成功 ${m[1]} / 失败 ${m[2]}）`
   }
   {
-    const m = s.match(/Echo plan:\s*total=(\d+)/i)
+    const m = s.match(/(?:Echo|Amplifier) plan:\s*total=(\d+)/i)
     if (m) return `扩音器：集群规模（${m[1]}）`
   }
   {
-    const m = s.match(/(\d+)\s+echo responses generated/i)
+    const m = s.match(/(\d+)\s+(?:echo|amplifier) responses generated/i)
     if (m) return `扩音器：生成回应（${m[1]}）`
   }
   {

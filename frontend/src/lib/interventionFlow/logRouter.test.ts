@@ -165,6 +165,8 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-28 21:18:54,727 - INFO - 🎉 Workflow completed - effectiveness score: 10.0/10')
 
     expect(state.roles.Amplifier.summary.join(' ')).toContain('12')
+    expect(state.roles.Amplifier.summary.join(' ')).toContain('Amplifier:')
+    expect(state.roles.Amplifier.summary.join(' ')).not.toContain('Echo:')
     expect(state.roles.Amplifier.summary.join(' ')).toContain('点赞：放大')
     expect(state.roles.Amplifier.summary.join(' ')).not.toContain('10.0/10')
   })
@@ -267,6 +269,22 @@ describe('routeLogLine', () => {
     expect(state.roles.Analyst.during).toEqual([weightMilestone])
   })
 
+  it('keeps Strategist candidate strategy lines across stage changes', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-28 21:14:02,000 - INFO - ⚖️ Strategist is creating strategy...')
+    state = routeLogLine(state, '2026-01-28 21:14:10,000 - INFO - 🔄 Generated 3 strategy options')
+    state = routeLogLine(state, '2026-01-28 21:14:11,000 - INFO -    Option 1: Community Partnership - build trust with local orgs')
+    state = routeLogLine(state, '2026-01-28 21:14:12,000 - INFO -    Option 2: Transparent Fact Check - cite verified sources')
+
+    const before = [...state.roles.Strategist.during]
+
+    // Stage change to "选择策略" should not clear previously shown options.
+    state = routeLogLine(state, '2026-01-28 21:14:20,000 - INFO - 🎯 Selected optimal strategy: Community Partnership')
+
+    for (const line of before) expect(state.roles.Strategist.during).toContain(line)
+  })
+
   it('keeps stage current aligned with latest log line even if computation order interleaves', () => {
     let state = createInitialFlowState()
 
@@ -327,7 +345,34 @@ describe('routeLogLine', () => {
     expect(state.roles.Analyst.during).toEqual(before)
   })
 
-  it('suppresses leader candidate draft lines from the dynamic panel', () => {
+  it('suppresses leader separators and model(unknown) lines from the dynamic panel', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-30 23:21:07,935 - INFO - 🎯 Leader Agent starts USC process and generates candidate comments...')
+    const before = [...state.roles.Leader.during]
+
+    state = routeLogLine(state, '2026-01-30 23:21:07,936 - INFO - ============================================================')
+    state = routeLogLine(state, '2026-01-30 23:21:07,937 - INFO - model(unknown)')
+
+    expect(state.roles.Leader.during).toEqual(before)
+  })
+
+  it('keeps Leader evidence/candidate context across stage changes', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-30 23:21:07,935 - INFO - 🎯 Leader Agent starting USC workflow')
+    state = routeLogLine(state, '2026-01-30 23:21:09,000 - INFO - 📋 Step 1: Parse strategist instructions')
+    state = routeLogLine(state, '2026-01-30 23:21:10,000 - INFO - Argument 1 (relevance: 0.60): Some long evidence line...')
+    const evidenceLine = state.roles.Leader.during[state.roles.Leader.during.length - 1]
+
+    // Stage jumps to "生成候选" and "投票选优"
+    state = routeLogLine(state, '2026-01-30 23:21:20,000 - INFO - ✍️  Step 3: USC-Generate - generate 6 candidate comments')
+    state = routeLogLine(state, '2026-01-30 23:21:30,000 - INFO - 🔍 Step 4: USC-Vote - score and select the best version')
+
+    expect(state.roles.Leader.during).toContain(evidenceLine)
+  })
+
+  it('shows leader candidate draft lines in the dynamic panel', () => {
     let state = createInitialFlowState()
 
     state = routeLogLine(state, '2026-01-30 23:21:07,935 - INFO - 🎯 Leader Agent starts USC process and generates candidate comments...')
@@ -336,7 +381,34 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, '2026-01-30 23:21:38,535 - INFO -    Candidate 1: I understand the concern, but...')
     state = routeLogLine(state, "2026-01-30 23:21:40,928 - INFO -    Candidate 2: It's easy to feel scared...")
 
-    expect(state.roles.Leader.during.length).toBe(beforeLen)
+    expect(state.roles.Leader.during.length).toBe(beforeLen + 2)
+    expect(state.roles.Leader.during[state.roles.Leader.during.length - 2]).toContain('Candidate 1:')
+    expect(state.roles.Leader.during[state.roles.Leader.during.length - 1]).toContain('Candidate 2:')
+  })
+
+  it('suppresses allocated echo agent id lines from the dynamic panel', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-30 23:22:29,931 - INFO -   🔊 Activating Echo Agent cluster...')
+    const before = [...state.roles.Amplifier.during]
+
+    state = routeLogLine(
+      state,
+      "2026-01-30 23:22:30,931 - INFO -   🔒 Allocated 12 fixed Echo Agent IDs: ['echo_000', 'echo_001', 'echo_002', 'echo_003', 'echo_004']...",
+    )
+
+    expect(state.roles.Amplifier.during).toEqual(before)
+  })
+
+  it('deduplicates consecutive Amplifier execution result lines', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-30 23:22:29,931 - INFO - ⚖️ Activating Echo Agent cluster...')
+    state = routeLogLine(state, '2026-01-30 23:22:40,000 - INFO - 📊 Echo Agent results: 12 succeeded, 0 failed')
+    const once = [...state.roles.Amplifier.during]
+
+    state = routeLogLine(state, '2026-01-30 23:22:40,001 - INFO - 📊 Echo Agent results: 12 succeeded, 0 failed')
+    expect(state.roles.Amplifier.during).toEqual(once)
   })
 
   it('does not duplicate sentiment/extremity values in Analyst milestone lines', () => {
@@ -349,5 +421,32 @@ describe('routeLogLine', () => {
 
     state = routeLogLine(state, '2026-01-30 23:20:39,305 - INFO -       Viewpoint extremism: 8.0/10.0')
     expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('分析师：极端度 8.0/10.0')
+  })
+
+  it('does not append ×N suffix for repeated lines', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-02-02 10:00:00,000 - INFO - 🔍 Analyst is analyzing content...')
+    state = routeLogLine(state, '2026-02-02 10:00:01,000 - INFO - Core viewpoint: Hello')
+    state = routeLogLine(state, '2026-02-02 10:00:02,000 - INFO - Core viewpoint: Hello')
+
+    const last = state.roles.Analyst.during[state.roles.Analyst.during.length - 1]
+    expect(last).not.toContain('×')
+  })
+
+  it('rewrites Amplifier per-agent comment lines (Echo→Amplifier) and removes model parentheses', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-02-02 10:00:00,000 - INFO - ⚖️ Activating Echo Agent cluster...')
+    state = routeLogLine(
+      state,
+      '2026-02-02 10:00:01,000 - INFO - 💬 🤖 Echo-3 (positive_john_133) (gemini-2.0-flash) commented: hello world',
+    )
+
+    const last = state.roles.Amplifier.during[state.roles.Amplifier.during.length - 1]
+    expect(last).toContain('Amplifier-3')
+    expect(last).not.toContain('Echo-3')
+    expect(last).toContain('(positive_john_133)')
+    expect(last).not.toContain('(gemini-2.0-flash)')
   })
 })

@@ -81,7 +81,7 @@ const leaderAnchors = [
 ]
 
 const amplifierAnchors = [
-  /Activating Echo Agent cluster/i,
+  /Activating (?:Echo|Amplifier) Agent cluster/i,
   /Start parallel execution/i,
   /Bulk like/i,
 ]
@@ -160,8 +160,8 @@ function mapLineToStageIndex(role: Role, cleanLine: string): number | null {
     }
     case 'Amplifier': {
       // 启动集群 -> 生成回应 -> 点赞放大 -> 扩散完成
-      if (/Activating Echo Agent cluster/i.test(cleanLine) || /Echo plan:\s*total=/i.test(cleanLine)) return 0
-      if (/Start parallel execution/i.test(cleanLine) || /\d+\s+echo responses generated/i.test(cleanLine) || /Echo Agent results:/i.test(cleanLine)) return 1
+      if (/Activating (?:Echo|Amplifier) Agent cluster/i.test(cleanLine) || /(?:Echo|Amplifier) plan:\s*total=/i.test(cleanLine)) return 0
+      if (/Start parallel execution/i.test(cleanLine) || /\d+\s+(?:echo|amplifier) responses generated/i.test(cleanLine) || /(?:Echo|Amplifier) Agent results:/i.test(cleanLine)) return 1
       if (/start liking leader comments/i.test(cleanLine) || /Bulk like/i.test(cleanLine) || /\(total:\s*\d+\s+likes\)/i.test(cleanLine)) return 2
       if (/Workflow completed\s*-\s*effectiveness score:/i.test(cleanLine) || /Base effectiveness score:/i.test(cleanLine)) return 3
       return null
@@ -190,7 +190,10 @@ function applyStageUpdateForRole(prevRoles: FlowState['roles'], role: Role, clea
   // Keep stage and streamed lines aligned: when we enter a new stage, reset the
   // per-role streaming buffer so the UI shows only the current stage's lines.
   // (Persistent info is rendered via summary/context, not this buffer.)
-  const shouldResetDuring = cur.stage.current !== nextStage.current
+  // Strategist/Leader panels benefit from keeping earlier context (candidate strategies / evidence / candidates)
+  // across stage transitions; other roles keep stage-only stream for readability.
+  const shouldResetDuring =
+    cur.stage.current !== nextStage.current && role !== 'Strategist' && role !== 'Leader'
   return {
     ...prevRoles,
     [role]: { ...cur, stage: nextStage, during: shouldResetDuring ? [] : cur.during },
@@ -206,6 +209,8 @@ function detectRoleByAnchor(cleanLine: string): Role | null {
 }
 
 function appendDuringWithCap(card: RoleCardState, line: string, maxLines: number): RoleCardState {
+  if (!line) return card
+  if (card.during.length && card.during[card.during.length - 1] === line) return card
   const appended = [...card.during, line]
   const bounded = appended.slice(Math.max(0, appended.length - maxLines))
   return { ...card, during: bounded }
@@ -312,10 +317,10 @@ function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): 
 
   // Amplifier: echo size + likes + effectiveness.
   {
-    const mTotal = cleanLine.match(/Echo plan:\s*total=(\d+)/i)
-    if (mTotal) update('Amplifier', 0, `Echo: ${mTotal[1]}`)
+    const mTotal = cleanLine.match(/(?:Echo|Amplifier) plan:\s*total=(\d+)/i)
+    if (mTotal) update('Amplifier', 0, `Amplifier: ${mTotal[1]}`)
 
-    const mResp = cleanLine.match(/(\d+)\s+echo responses generated/i)
+    const mResp = cleanLine.match(/(\d+)\s+(?:echo|amplifier) responses generated/i)
     if (mResp) update('Amplifier', 1, `回应：${mResp[1]}`)
 
     const mLikes = cleanLine.match(/\(total:\s*(\d+)\s+likes\)/i)
@@ -331,6 +336,25 @@ function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): 
 }
 
 function compressDisplayLine(cleanLine: string) {
+  const trimmed = cleanLine.trim()
+  // Suppress visual separators emitted by some backends (they don't carry meaning in the UI).
+  if (/^=+$/.test(trimmed)) return ''
+  // Suppress placeholder model identifiers (they are internal and confusing in the UI).
+  if (/model\s*\(unknown\)/i.test(trimmed)) return ''
+
+  // Amplifier per-agent comment: keep the body, but normalize the label and hide model name.
+  // Example:
+  //   "💬 🤖 Echo-3 (positive_john_133) (gemini-2.0-flash) commented: ..."
+  // ->"💬 🤖 Amplifier-3 (positive_john_133) commented: ..."
+  if (/^💬\s*🤖\s*(?:Echo|Amplifier)-\d+\b/i.test(trimmed) && /\bcommented:/i.test(trimmed)) {
+    const normalized = trimmed.replace(/^💬\s*🤖\s*(?:Echo|Amplifier)-(\d+)\b/i, '💬 🤖 Amplifier-$1')
+    const withoutModel = normalized.replace(
+      /^(💬\s*🤖\s*Amplifier-\d+\s+\([^)]*\))\s+\([^)]*\)\s+commented:/i,
+      '$1 commented:',
+    )
+    return withoutModel
+  }
+
   // Suppress redundant "analysis completed" marker; we render the extracted core viewpoint instead.
   if (/Analyst analysis completed/i.test(cleanLine)) return ''
 
@@ -341,8 +365,8 @@ function compressDisplayLine(cleanLine: string) {
   if (/^🔄\s*Feedback iteration:/i.test(cleanLine)) return ''
   if (/^✅\s*Post exists:/i.test(cleanLine)) return ''
   if (/^🚨⚖️\s*Start opinion balance intervention system/i.test(cleanLine)) return ''
-  // Suppress long candidate drafts (they are not posts/comments; they clutter the panel).
-  if (/^Candidate\s+\d+:/i.test(cleanLine)) return ''
+  // Suppress fixed echo agent id allocation details (they are internal plumbing; the UI shows count instead).
+  if (/^(?:🔒\s*)?Allocated\s+\d+\s+fixed\s+(?:Echo|Amplifier)\s+Agent\s+IDs:/i.test(cleanLine)) return ''
 
   const milestone = toUserMilestone(cleanLine)
   if (milestone) {
@@ -357,11 +381,8 @@ function pushAggregated(prev: string[], nextLine: string, maxLines: number) {
   if (prev.length) {
     const last = prev[prev.length - 1]
     if (last.startsWith(nextLine)) {
-      const m = last.match(/^(.*?)(?:\s*×\s*(\d+))$/)
-      const base = (m ? m[1] : last).trimEnd()
-      const count = m ? Number(m[2] || 1) : 1
-      const updated = `${base} × ${count + 1}`
-      return [...prev.slice(0, -1), updated]
+      // Do not show repetition counters (×N) in the UI; keep the latest line as-is.
+      return prev
     }
   }
   const appended = [...prev, nextLine]
@@ -553,7 +574,7 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
     }
     return {
       ...stateAfterStage,
-      amplifierSticky: amplifierSticky || matchesAny(cleanLine, [/Activating Echo Agent cluster/i]),
+      amplifierSticky: amplifierSticky || matchesAny(cleanLine, [/Activating (?:Echo|Amplifier) Agent cluster/i]),
       activeRole: nextRole,
       roles: nextRoles,
     }
@@ -574,7 +595,7 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
   if (nextRole === activeRole) {
     const nextRoles = { ...stateAfterStage.roles }
     nextRoles[activeRole] = appendDuringWithCap(nextRoles[activeRole], displayLine, MAX_DURING_LINES)
-    const nextSticky = amplifierSticky || matchesAny(cleanLine, [/Activating Echo Agent cluster/i])
+    const nextSticky = amplifierSticky || matchesAny(cleanLine, [/Activating (?:Echo|Amplifier) Agent cluster/i])
     return { ...stateAfterStage, amplifierSticky: nextSticky, roles: nextRoles }
   }
 
@@ -583,7 +604,7 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
   nextRoles[activeRole] = freezeAfter(nextRoles[activeRole])
   nextRoles[nextRole] = appendDuringWithCap({ ...nextRoles[nextRole], status: 'running' }, displayLine, MAX_DURING_LINES)
 
-  const nextSticky = amplifierSticky || matchesAny(cleanLine, [/Activating Echo Agent cluster/i])
+  const nextSticky = amplifierSticky || matchesAny(cleanLine, [/Activating (?:Echo|Amplifier) Agent cluster/i])
   return {
     ...stateAfterStage,
     activeRole: nextRole,

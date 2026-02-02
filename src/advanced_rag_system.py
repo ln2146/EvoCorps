@@ -913,7 +913,7 @@ class AdvancedRAGSystem:
                         echo_parts.append(f"Decision factors: {', '.join(factor_parts)}")
                     
                     if echo_parts:
-                        parsed_parts.append(f"Echo plan: {'; '.join(echo_parts)}")
+                        parsed_parts.append(f"Amplifier plan: {'; '.join(echo_parts)}")
                 
                 # 4. expected_outcome
                 if "expected_outcome" in decision_data:

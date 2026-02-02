@@ -79,11 +79,13 @@ export function buildRolePills(
 
     const amplifierSummary = normalizeSummary(input.related?.amplifierSummary ?? [])
     const rawAmplifierLine =
+      amplifierSummary.find((s) => /^Amplifier:\s*\d+/i.test(s)) ??
       amplifierSummary.find((s) => /^Echo:\s*\d+/i.test(s)) ??
       amplifierSummary.find((s) => /^Amplifiers:\s*\d+/i.test(s)) ??
       amplifierSummary.find((s) => /^扩音器：\s*\d+/.test(s)) ??
       ''
     const amplifierCount =
+      rawAmplifierLine.match(/^Amplifier:\s*(\d+)/i)?.[1] ??
       rawAmplifierLine.match(/^Echo:\s*(\d+)/i)?.[1] ??
       rawAmplifierLine.match(/^Amplifiers:\s*(\d+)/i)?.[1] ??
       rawAmplifierLine.match(/^扩音器：\s*(\d+)/)?.[1] ??
@@ -97,6 +99,10 @@ export function buildRolePills(
   if (role === 'Amplifier') {
     const amplifiers = summary.find((s) => s.startsWith('Amplifiers:')) ?? ''
     return amplifiers ? [amplifiers] : []
+  }
+
+  if (role === 'Leader') {
+    return summary.filter((s) => !s.startsWith('发布：')).slice(0, 4)
   }
 
   return summary.slice(0, 4)

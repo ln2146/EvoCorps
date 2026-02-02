@@ -3,10 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { getSummaryGridClassName } from './summaryGridLayout'
 
 describe('getSummaryGridClassName', () => {
-  it('widens Strategist first column while keeping 2 columns', () => {
+  it('gives Strategist first column more room for long strategy names', () => {
     const cls = getSummaryGridClassName('Strategist')
-    expect(cls).toContain('grid')
-    expect(cls).toContain('grid-cols-[')
+    expect(cls).toBe('mt-3 grid gap-2 grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]')
   })
 
   it('uses 2 equal columns for other roles', () => {
@@ -14,4 +13,3 @@ describe('getSummaryGridClassName', () => {
     expect(getSummaryGridClassName('Leader')).toContain('grid-cols-2')
   })
 })
-

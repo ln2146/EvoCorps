@@ -33,7 +33,7 @@ describe('toUserMilestone', () => {
     expect(toUserMilestone('Post ID: post-f053ef')).toBe('帖子ID：post-f053ef')
     expect(toUserMilestone('Author: agentverse_news')).toBe('作者：agentverse_news')
     expect(toUserMilestone('Total engagement: 48')).toBe('总互动量：48')
-    expect(toUserMilestone('Feed score: 205.20')).toBe('信息流得分：205.20')
+    expect(toUserMilestone('Feed score: 205.20')).toBe('热度值：205.20')
     expect(toUserMilestone("Post content: [NEWS] Purdue's 'Robust Testing' is Actually Mass Surveillance!")).toBe(
       "帖子内容：[NEWS] Purdue's 'Robust Testing' is Actually Mass Surveillance!",
     )
@@ -57,8 +57,8 @@ describe('toUserMilestone', () => {
   })
 
   it('maps per-comment scoring lines (keep raw content, translate labels)', () => {
-    expect(toUserMilestone('🔍 Comment 1 LLM result: (8.0, 0.1)')).toBe('🔍 评论1 模型结果： (8.0, 0.1)')
-    expect(toUserMilestone('INFO: 🔍 Comment 1 LLM result: (8.0, 0.1)')).toBe('🔍 评论1 模型结果： (8.0, 0.1)')
+    expect(toUserMilestone('🔍 Comment 1 LLM result: (8.0, 0.1)')).toBe('🔍 评论1 计算结果：极端度 8.0/10.0，情绪度 0.1/1.0')
+    expect(toUserMilestone('INFO: 🔍 Comment 1 LLM result: (8.0, 0.1)')).toBe('🔍 评论1 计算结果：极端度 8.0/10.0，情绪度 0.1/1.0')
     expect(toUserMilestone('📝 Comment 1 content: This is the original comment body.')).toBe(
       '评论1 内容：This is the original comment body.',
     )
@@ -111,10 +111,14 @@ describe('toUserMilestone', () => {
 
   it('maps Amplifier lines', () => {
     expect(toUserMilestone('⚖️ Activating Echo Agent cluster...')).toBe('扩音器：启动回声集群')
+    expect(toUserMilestone('⚖️ Activating Amplifier Agent cluster...')).toBe('扩音器：启动回声集群')
     expect(toUserMilestone('🚀 Start parallel execution of 12 agent tasks...')).toBe('扩音器：并行执行（12）')
     expect(toUserMilestone('📊 Echo Agent results: 12 succeeded, 0 failed')).toBe('扩音器：执行结果（成功 12 / 失败 0）')
+    expect(toUserMilestone('📊 Amplifier Agent results: 12 succeeded, 0 failed')).toBe('扩音器：执行结果（成功 12 / 失败 0）')
     expect(toUserMilestone('📋 Echo plan: total=12, role distribution={...}')).toBe('扩音器：集群规模（12）')
+    expect(toUserMilestone('📋 Amplifier plan: total=12, role distribution={...}')).toBe('扩音器：集群规模（12）')
     expect(toUserMilestone('✅ 12 echo responses generated')).toBe('扩音器：生成回应（12）')
+    expect(toUserMilestone('✅ 12 amplifier responses generated')).toBe('扩音器：生成回应（12）')
     expect(toUserMilestone('💖 Successfully added 240 likes to each of 2 leader comments (total: 480 likes)')).toBe('扩音器：点赞放大')
     expect(toUserMilestone('🎉 Workflow completed - effectiveness score: 10.0/10')).toBe('扩音器：扩散完成')
   })
@@ -133,6 +137,6 @@ describe('toUserMilestone', () => {
 
   it('maps post content + feed score labels (keep body original)', () => {
     expect(toUserMilestone('Post content: hello world')).toBe('帖子内容：hello world')
-    expect(toUserMilestone('Feed score: 27.10')).toBe('信息流得分：27.10')
+    expect(toUserMilestone('Feed score: 27.10')).toBe('热度值：27.10')
   })
 })
