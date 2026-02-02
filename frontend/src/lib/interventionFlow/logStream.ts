@@ -47,9 +47,6 @@ export function createFetchReplayLogStream(opts: {
     const delay = Math.max(0, Number.isFinite(opts.delayMs) ? opts.delayMs : 0)
     abort = typeof AbortController !== 'undefined' ? new AbortController() : null
 
-    // Immediate, user-visible feedback so "enable" doesn't feel like it did nothing.
-    emit('INFO: 正在加载回放日志...')
-
     // Load the whole replay file once, then emit it gradually to mimic streaming.
     void (async () => {
       try {
@@ -66,8 +63,6 @@ export function createFetchReplayLogStream(opts: {
           stop()
           return
         }
-
-        emit('INFO: 回放开始')
 
         // Emit the first line immediately for responsiveness.
         emit(lines[0])
