@@ -22,11 +22,50 @@ describe('toUserMilestone', () => {
       '触发原因： 观点极端度太高 & 情绪度太低',
     )
     expect(toUserMilestone('Needs intervention: yes')).toBe('分析师：判定需要干预')
+    expect(toUserMilestone('Urgency level: 2')).toBe('分析师：紧急程度 2')
+    expect(toUserMilestone('🚨 Analyst determined opinion balance intervention needed!')).toBe('🚨 分析师判定需要舆论平衡干预！')
+    expect(toUserMilestone('⚠️  Alert generated - Urgency: 2')).toBe('⚠️ 已生成告警：紧急程度 2')
+  })
+
+  it('maps intervention header/meta lines (keep post content original)', () => {
+    expect(toUserMilestone('📋 Intervention ID: action_20260130_232018')).toBe('📋 干预ID：action_20260130_232018')
+    expect(toUserMilestone('🎯 Target content: 【Trending Post Opinion Analysis】')).toBe('🎯 目标内容：【Trending Post Opinion Analysis】')
+    expect(toUserMilestone('Post ID: post-f053ef')).toBe('帖子ID：post-f053ef')
+    expect(toUserMilestone('Author: agentverse_news')).toBe('作者：agentverse_news')
+    expect(toUserMilestone('Total engagement: 48')).toBe('总互动量：48')
+    expect(toUserMilestone('Feed score: 205.20')).toBe('信息流得分：205.20')
+    expect(toUserMilestone("Post content: [NEWS] Purdue's 'Robust Testing' is Actually Mass Surveillance!")).toBe(
+      "帖子内容：[NEWS] Purdue's 'Robust Testing' is Actually Mass Surveillance!",
+    )
+  })
+
+  it('maps leader memory + voting detail labels', () => {
+    expect(toUserMilestone('Argument system status: completely_new')).toBe('论据系统状态：completely_new')
+    expect(toUserMilestone('Theme: Science & Health')).toBe('主题：Science & Health')
+    expect(toUserMilestone('Keyword: unknown')).toBe('关键词：unknown')
+    expect(toUserMilestone('Argument 1: Legal right to privacy ... (relevance: 0.60)')).toBe(
+      '论据1：Legal right to privacy ... (relevance: 0.60)',
+    )
+
+    expect(toUserMilestone('candidate_1: total 4.80/5.0')).toBe('候选1：总分 4.80/5.0')
+    expect(toUserMilestone('Best candidate score: 4.80/5.0')).toBe('最佳得分：4.80/5.0')
+    expect(toUserMilestone('Best comment length: 650 characters')).toBe('最佳长度：650 字符')
+
+    expect(toUserMilestone('💬 First leader comment ID: comment-606ac9')).toBe('第一条领袖评论ID：comment-606ac9')
+    expect(toUserMilestone('🎯 Target post: post-f053ef')).toBe('目标帖子：post-f053ef')
+    expect(toUserMilestone('💬 Second leader comment ID: comment-0cd2c7')).toBe('第二条领袖评论ID：comment-0cd2c7')
   })
 
   it('maps per-comment scoring lines (keep raw content, translate labels)', () => {
     expect(toUserMilestone('🔍 Comment 1 LLM result: (8.0, 0.1)')).toBe('🔍 评论1 模型结果： (8.0, 0.1)')
+    expect(toUserMilestone('INFO: 🔍 Comment 1 LLM result: (8.0, 0.1)')).toBe('🔍 评论1 模型结果： (8.0, 0.1)')
+    expect(toUserMilestone('📝 Comment 1 content: This is the original comment body.')).toBe(
+      '评论1 内容：This is the original comment body.',
+    )
     expect(toUserMilestone('📊 Comment 1: sentiment=0.10, likes=12, weight=0.325, contribution=0.033')).toBe(
+      '📊 评论1：情绪=0.10，点赞=12，权重=0.325，贡献=0.033',
+    )
+    expect(toUserMilestone('INFO: 📊 Comment 1: sentiment=0.10, likes=12, weight=0.325, contribution=0.033')).toBe(
       '📊 评论1：情绪=0.10，点赞=12，权重=0.325，贡献=0.033',
     )
     expect(toUserMilestone('Comment 2 content: This is the original comment body.')).toBe(
@@ -43,13 +82,27 @@ describe('toUserMilestone', () => {
 
   it('maps Strategist lines', () => {
     expect(toUserMilestone('⚖️ Strategist is creating strategy...')).toBe('战略家：生成策略')
+    expect(toUserMilestone('📋 Strategist Agent - start intelligent strategy creation workflow')).toBe('战略家：启动智能策略生成')
+    expect(toUserMilestone('✅ Step 1: Confirm alert information')).toBe('战略家：确认告警信息')
+    expect(toUserMilestone('📊 Alert ID: post-f053ef')).toBe('告警ID：post-f053ef')
+    expect(toUserMilestone('🚨 Urgency: 2/4')).toBe('紧急程度：2/4')
+    expect(toUserMilestone('📝 Recommended action: Do X then Y.')).toBe('建议动作：Do X then Y.')
     expect(toUserMilestone('🎯 Selected optimal strategy: balanced_response')).toBe('战略家：策略选定：balanced_response')
+    expect(toUserMilestone('🔄 Generated 5 strategy options')).toBe('战略家：生成策略选项（5）')
+    expect(toUserMilestone('📝 Decision rationale: Select Community Partnership based on Low risk')).toBe(
+      '战略家：决策依据：Select Community Partnership based on Low risk',
+    )
+    expect(toUserMilestone('🎯 Selected optimal option: Community Partnership')).toBe('战略家：选定最优方案：Community Partnership')
     expect(toUserMilestone('📋 Step 4: Format as agent instructions')).toBe('战略家：输出指令')
   })
 
   it('maps Leader lines', () => {
     expect(toUserMilestone('🎯 Leader Agent starts USC process and generates candidate comments...')).toBe('领袖：启动生成流程')
+    expect(toUserMilestone('📋 Step 1: Parse strategist instructions')).toBe('领袖：解析战略家指令')
+    expect(toUserMilestone('📚 Step 2: Search cognitive memory core-viewpoint argument base')).toBe('领袖：检索记忆论据库')
     expect(toUserMilestone('✍️  Step 3: USC-Generate - generate 6 candidate comments')).toBe('领袖：生成候选（6）')
+    expect(toUserMilestone('🔍 Step 4: USC-Vote - score and select the best version')).toBe('领袖：评分投票')
+    expect(toUserMilestone('📤 Step 5: Output final copy')).toBe('领袖：输出最终文案')
     expect(toUserMilestone('Retrieved 5 relevant arguments')).toBe('领袖：检索论据（5）')
     expect(toUserMilestone('🏆 Best selection: candidate_4 (total: 4.80)')).toBe('领袖：选定版本（candidate_4）')
     expect(toUserMilestone('💬 👑 Leader comment 1 on post post-18e9eb: ...')).toBe('领袖：评论已发布（1）')
@@ -78,8 +131,8 @@ describe('toUserMilestone', () => {
     expect(toUserMilestone('📊 Cache status: embedding=1')).toBeNull()
   })
 
-  it('returns null for full-rendered content lines', () => {
-    expect(toUserMilestone('Post content: hello world')).toBeNull()
-    expect(toUserMilestone('Feed score: 27.10')).toBeNull()
+  it('maps post content + feed score labels (keep body original)', () => {
+    expect(toUserMilestone('Post content: hello world')).toBe('帖子内容：hello world')
+    expect(toUserMilestone('Feed score: 27.10')).toBe('信息流得分：27.10')
   })
 })

@@ -1,5 +1,5 @@
 export function toUserMilestone(cleanLine: string): string | null {
-  const s = cleanLine.trim()
+  const s = cleanLine.trim().replace(/^(?:INFO|ERROR|提示|错误)[:：]\s*/i, '')
   if (!s) return null
 
   // Infra noise
@@ -10,9 +10,77 @@ export function toUserMilestone(cleanLine: string): string | null {
   // Phase headers are redundant in the UI (they often duplicate the role-level milestones).
   if (/^📊\s*Phase\s+\d+:/i.test(s)) return null
   if (/^📈\s*Phase\s+\d+:/i.test(s)) return null
-  // Content that we render separately in full.
-  if (s.startsWith('Post content:')) return null
-  if (s.startsWith('Feed score:')) return null
+  // Intervention meta header (keep content original; translate only fixed labels).
+  {
+    const m = s.match(/^📋\s*Intervention ID:\s*(.+)$/i)
+    if (m) return `📋 干预ID：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^🎯\s*Target content:\s*(.+)$/i)
+    if (m) return `🎯 目标内容：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^Post ID:\s*(.+)$/i)
+    if (m) return `帖子ID：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^Author:\s*(.+)$/i)
+    if (m) return `作者：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^Total engagement:\s*(\d+)\b/i)
+    if (m) return `总互动量：${m[1]}`
+  }
+  {
+    const m = s.match(/^Feed score:\s*([0-9.]+)\b/i)
+    if (m) return `信息流得分：${m[1]}`
+  }
+  {
+    const m = s.match(/^Post content:\s*(.+)$/i)
+    if (m) return `帖子内容：${m[1].trim()}`
+  }
+
+  // Leader memory + voting detail (fixed labels; values stay original)
+  {
+    const m = s.match(/^Argument system status:\s*(.+)$/i)
+    if (m) return `论据系统状态：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^Theme:\s*(.+)$/i)
+    if (m) return `主题：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^Keyword:\s*(.+)$/i)
+    if (m) return `关键词：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^Argument\s+(\d+):\s*(.+)$/i)
+    if (m) return `论据${m[1]}：${m[2].trim()}`
+  }
+  {
+    const m = s.match(/^candidate_(\d+):\s*total\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
+    if (m) return `候选${m[1]}：总分 ${m[2].replace(/\s+/g, '')}`
+  }
+  {
+    const m = s.match(/^Best candidate score:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
+    if (m) return `最佳得分：${m[1].replace(/\s+/g, '')}`
+  }
+  {
+    const m = s.match(/^Best comment length:\s*(\d+)\s*characters/i)
+    if (m) return `最佳长度：${m[1]} 字符`
+  }
+  {
+    const m = s.match(/^💬\s*First leader comment ID:\s*(\S+)/i)
+    if (m) return `第一条领袖评论ID：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^💬\s*Second leader comment ID:\s*(\S+)/i)
+    if (m) return `第二条领袖评论ID：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^🎯\s*Target post:\s*(\S+)/i)
+    if (m) return `目标帖子：${m[1].trim()}`
+  }
 
   // New round anchor (workflow starts a new "action_..." execution).
   {
@@ -23,6 +91,10 @@ export function toUserMilestone(cleanLine: string): string | null {
   // Analyst
   if (/Analyst is analyzing/i.test(s)) return '分析师：开始分析'
   // Prefer rendering the extracted core viewpoint line, so we don't show two "analysis done" lines.
+  {
+    const m = s.match(/^Extracted core viewpoint:\s*(.+)$/i)
+    if (m) return `核心观点：${m[1].trim()}`
+  }
   {
     const m = s.match(/^Core viewpoint:\s*(.+)$/i)
     if (m) return `核心观点：${m[1].trim()}`
@@ -48,8 +120,17 @@ export function toUserMilestone(cleanLine: string): string | null {
     }
   }
   {
-    const m = s.match(/^Comment\s+(\d+)\s+content:\s*(.+)$/i)
+    const m = s.match(/^(?:📝\s*)?Comment\s+(\d+)\s+content:\s*(.+)$/i)
     if (m) return `评论${m[1]} 内容：${m[2].trim()}`
+  }
+  {
+    const m = s.match(/^Urgency level:\s*(\d+)\b/i)
+    if (m) return `分析师：紧急程度 ${m[1]}`
+  }
+  if (/Analyst determined opinion balance intervention needed/i.test(s)) return '🚨 分析师判定需要舆论平衡干预！'
+  {
+    const m = s.match(/Alert generated\s*-\s*Urgency:\s*(\d+)\b/i)
+    if (m) return `⚠️ 已生成告警：紧急程度 ${m[1]}`
   }
   if (/generate baseline effectiveness report/i.test(s)) return '分析师：生成基线报告'
   if (/Analyst monitoring\s*-\s*establish baseline data/i.test(s)) return '分析师：建立基线数据'
@@ -78,6 +159,20 @@ export function toUserMilestone(cleanLine: string): string | null {
 
   // Strategist
   if (/Strategist is creating strategy/i.test(s)) return '战略家：生成策略'
+  if (/Strategist Agent\s*-\s*start intelligent strategy creation workflow/i.test(s)) return '战略家：启动智能策略生成'
+  if (/Step\s*1:\s*Confirm alert information/i.test(s)) return '战略家：确认告警信息'
+  {
+    const m = s.match(/^📊\s*Alert ID:\s*(.+)$/i)
+    if (m) return `告警ID：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^🚨\s*Urgency:\s*(.+)$/i)
+    if (m) return `紧急程度：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^📝\s*Recommended action:\s*(.+)$/i)
+    if (m) return `建议动作：${m[1].trim()}`
+  }
   if (/Query historical successful strategies/i.test(s)) return '战略家：检索历史策略'
   {
     const m = s.match(/Found\s+(\d+)\s+related historical strategies/i)
@@ -91,6 +186,18 @@ export function toUserMilestone(cleanLine: string): string | null {
   if (/Intelligent learning system found no matching strategy/i.test(s)) return '战略家：未匹配到历史策略'
   if (/Use Tree-of-Thought/i.test(s)) return '战略家：推理规划'
   if (/Start Tree-of-Thought reasoning/i.test(s)) return '战略家：开始推理'
+  {
+    const m = s.match(/(?:🔄|✅)\s*Generated\s+(\d+)\s+strategy options/i)
+    if (m) return `战略家：生成策略选项（${m[1]}）`
+  }
+  {
+    const m = s.match(/^📝\s*Decision rationale:\s*(.+)$/i)
+    if (m) return `战略家：决策依据：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^🎯\s*Selected optimal option:\s*(.+)$/i)
+    if (m) return `战略家：选定最优方案：${m[1].trim()}`
+  }
   {
     const m = s.match(/Strategy creation completed\s*-\s*Strategy ID:\s*(\S+)/i)
     if (m) return `战略家：策略生成完成（${m[1]}）`
@@ -106,6 +213,10 @@ export function toUserMilestone(cleanLine: string): string | null {
 
   // Leader
   if (/Leader Agent starts USC/i.test(s)) return '领袖：启动生成流程'
+  if (/Step\s*1:\s*Parse strategist instructions/i.test(s)) return '领袖：解析战略家指令'
+  if (/Step\s*2:\s*Search cognitive memory/i.test(s)) return '领袖：检索记忆论据库'
+  if (/Step\s*4:\s*USC-Vote/i.test(s)) return '领袖：评分投票'
+  if (/Step\s*5:\s*Output final copy/i.test(s)) return '领袖：输出最终文案'
   {
     const m = s.match(/Retrieved\s+(\d+)\s+relevant arguments/i)
     if (m) return `领袖：检索论据（${m[1]}）`
