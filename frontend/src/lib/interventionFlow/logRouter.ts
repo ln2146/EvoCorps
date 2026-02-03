@@ -33,8 +33,33 @@ export interface FlowState {
 
 const LOG_PREFIX_RE = /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d+\s+-\s+\w+\s+-\s+/
 
-const MAX_DURING_LINES = 10
-const MAX_AFTER_LINES = 6
+const MAX_DURING_LINES_DEFAULT = 10
+const MAX_AFTER_LINES_DEFAULT = 6
+
+function maxDuringLines(role: Role) {
+  switch (role) {
+    case 'Strategist':
+      // Strategist often emits multiple candidate strategies; keep more for readability.
+      return 20
+    case 'Leader':
+      // Leader needs to show full evidence + candidate blocks (can be >10 lines).
+      return 40
+    default:
+      return MAX_DURING_LINES_DEFAULT
+  }
+}
+
+function maxAfterLines(role: Role) {
+  switch (role) {
+    case 'Strategist':
+      return 12
+    case 'Leader':
+      // Preserve the full evidence + candidate set for review after switching tabs.
+      return 40
+    default:
+      return MAX_AFTER_LINES_DEFAULT
+  }
+}
 
 const ROLE_BEFORE_COPY: Record<Role, string> = {
   Analyst: '监测舆情信号，判断是否触发干预',
@@ -216,8 +241,8 @@ function appendDuringWithCap(card: RoleCardState, line: string, maxLines: number
   return { ...card, during: bounded }
 }
 
-function freezeAfter(card: RoleCardState): RoleCardState {
-  const snapshot = card.during.slice(Math.max(0, card.during.length - MAX_AFTER_LINES))
+function freezeAfter(card: RoleCardState, maxLines: number): RoleCardState {
+  const snapshot = card.during.slice(Math.max(0, card.during.length - maxLines))
   return { ...card, status: 'done', after: snapshot, during: [] }
 }
 
@@ -341,6 +366,30 @@ function compressDisplayLine(cleanLine: string) {
   if (/^=+$/.test(trimmed)) return ''
   // Suppress placeholder model identifiers (they are internal and confusing in the UI).
   if (/model\s*\(unknown\)/i.test(trimmed)) return ''
+  // Suppress placeholder Leader keyword lines; they are misleading and we hide the keyword pill when unknown.
+  if (/^Keyword:\s*unknown\s*$/i.test(trimmed)) return ''
+
+  // Map Phase headers to Chinese for readability in the dynamic panel.
+  // Examples:
+  //   "📊 Phase 1: perception and decision" -> "📊 阶段 1：感知与决策"
+  //   "📈 Phase 3: feedback and iteration" -> "📈 阶段 3：反馈与迭代"
+  {
+    const m = trimmed.match(/^([^\p{L}\p{N}]*)Phase\s*(\d+)\s*:\s*(.+)$/iu)
+    if (m) {
+      const prefixRaw = m[1].trimEnd()
+      const phaseNum = m[2]
+      const desc = m[3].trim()
+      const descKey = desc.toLowerCase()
+      const descZh =
+        descKey === 'perception and decision'
+          ? '感知与决策'
+          : descKey === 'feedback and iteration'
+            ? '反馈与迭代'
+            : desc
+      const prefix = prefixRaw ? `${prefixRaw} ` : ''
+      return `${prefix}阶段 ${phaseNum}：${descZh}`
+    }
+  }
 
   // Amplifier per-agent comment: keep the body, but normalize the label and hide model name.
   // Example:
@@ -379,6 +428,11 @@ function compressDisplayLine(cleanLine: string) {
 function pushAggregated(prev: string[], nextLine: string, maxLines: number) {
   if (!nextLine) return prev
   if (prev.length) {
+    if (prev.includes(nextLine)) {
+      // Avoid showing duplicate milestone lines when backends emit both "in-progress" and "completed" variants.
+      // (e.g. "🔄 Generated N ..." then later "✅ Generated N ..." -> same milestone string in the UI)
+      return prev
+    }
     const last = prev[prev.length - 1]
     if (last.startsWith(nextLine)) {
       // Do not show repetition counters (×N) in the UI; keep the latest line as-is.
@@ -404,7 +458,7 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
     nextRoles[role] = {
       ...cur,
       status: /^ERROR:/i.test(cleanLine) || cleanLine.startsWith('错误：') ? 'error' : (cur.status === 'idle' ? 'running' : cur.status),
-      during: pushAggregated(cur.during, displayLine, MAX_DURING_LINES),
+      during: pushAggregated(cur.during, displayLine, maxDuringLines(role)),
     }
     return {
       ...prev,
@@ -570,7 +624,7 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
     nextRoles[nextRole] = {
       ...nextRoles[nextRole],
       status: 'running',
-      during: pushAggregated(nextRoles[nextRole].during, displayLine, MAX_DURING_LINES),
+      during: pushAggregated(nextRoles[nextRole].during, displayLine, maxDuringLines(nextRole)),
     }
     return {
       ...stateAfterStage,
@@ -586,7 +640,7 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
     const cur = nextRoles[activeRole]
     nextRoles[activeRole] = {
       ...cur,
-      during: pushAggregated(cur.during, displayLine, MAX_DURING_LINES),
+      during: pushAggregated(cur.during, displayLine, maxDuringLines(activeRole)),
     }
     return { ...stateAfterStage, amplifierSticky, roles: nextRoles }
   }
@@ -594,15 +648,19 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
   // Anchor resolves to the same active role: keep streaming.
   if (nextRole === activeRole) {
     const nextRoles = { ...stateAfterStage.roles }
-    nextRoles[activeRole] = appendDuringWithCap(nextRoles[activeRole], displayLine, MAX_DURING_LINES)
+    nextRoles[activeRole] = appendDuringWithCap(nextRoles[activeRole], displayLine, maxDuringLines(activeRole))
     const nextSticky = amplifierSticky || matchesAny(cleanLine, [/Activating (?:Echo|Amplifier) Agent cluster/i])
     return { ...stateAfterStage, amplifierSticky: nextSticky, roles: nextRoles }
   }
 
   // Role switch: freeze previous role and start streaming to the new role.
   const nextRoles = { ...stateAfterStage.roles }
-  nextRoles[activeRole] = freezeAfter(nextRoles[activeRole])
-  nextRoles[nextRole] = appendDuringWithCap({ ...nextRoles[nextRole], status: 'running' }, displayLine, MAX_DURING_LINES)
+  nextRoles[activeRole] = freezeAfter(nextRoles[activeRole], maxAfterLines(activeRole))
+  nextRoles[nextRole] = appendDuringWithCap(
+    { ...nextRoles[nextRole], status: 'running' },
+    displayLine,
+    maxDuringLines(nextRole),
+  )
 
   const nextSticky = amplifierSticky || matchesAny(cleanLine, [/Activating (?:Echo|Amplifier) Agent cluster/i])
   return {

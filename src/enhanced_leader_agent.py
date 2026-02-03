@@ -337,7 +337,9 @@ class EnhancedLeaderAgent:
             workflow_logger.info(f"   Argument system status: {result.get('status', 'unknown')}")
             workflow_logger.info(f"   Theme: {theme_value or 'unknown'}")
             # EnhancedOpinionSystem uses 'keywords' in its result payload; keep compatibility with both keys.
-            workflow_logger.info(f"   Keyword: {keyword_value or 'unknown'}")
+            if not keyword_value:
+                workflow_logger.warning("   ⚠️ Keyword missing in evidence system result; defaulting to 'general'")
+            workflow_logger.info(f"   Keyword: {keyword_value or 'general'}")
 
             # If no relevant arguments found, use backup
             if not relevant_arguments:

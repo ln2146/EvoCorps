@@ -42,7 +42,9 @@ describe('toUserMilestone', () => {
   it('maps leader memory + voting detail labels', () => {
     expect(toUserMilestone('Argument system status: completely_new')).toBe('论据系统状态：completely_new')
     expect(toUserMilestone('Theme: Science & Health')).toBe('主题：Science & Health')
-    expect(toUserMilestone('Keyword: unknown')).toBe('关键词：unknown')
+    expect(toUserMilestone('Keyword: unknown')).toBeNull()
+    expect(toUserMilestone('Keyword: UNKNOWN')).toBeNull()
+    expect(toUserMilestone('Keyword: privacy')).toBe('关键词：privacy')
     expect(toUserMilestone('Argument 1: Legal right to privacy ... (relevance: 0.60)')).toBe(
       '论据1：Legal right to privacy ... (relevance: 0.60)',
     )
@@ -107,6 +109,12 @@ describe('toUserMilestone', () => {
     expect(toUserMilestone('🏆 Best selection: candidate_4 (total: 4.80)')).toBe('领袖：选定版本（candidate_4）')
     expect(toUserMilestone('💬 👑 Leader comment 1 on post post-18e9eb: ...')).toBe('领袖：评论已发布（1）')
     expect(toUserMilestone('✅ USC workflow completed')).toBe('领袖：生成完成')
+  })
+
+  it('maps Leader candidate generation detail lines', () => {
+    expect(toUserMilestone('Successfully generated 6 candidates')).toBe('领袖：生成候选完成（6）')
+    expect(toUserMilestone('Candidate 6: hello world')).toBe('候选6：hello world')
+    expect(toUserMilestone('Candidate 6: hello world (angle: test)')).toBe('候选6：hello world (angle: test)')
   })
 
   it('maps Amplifier lines', () => {

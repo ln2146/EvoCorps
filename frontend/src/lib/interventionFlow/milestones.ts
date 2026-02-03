@@ -51,7 +51,11 @@ export function toUserMilestone(cleanLine: string): string | null {
   }
   {
     const m = s.match(/^Keyword:\s*(.+)$/i)
-    if (m) return `关键词：${m[1].trim()}`
+    if (m) {
+      const kw = m[1].trim()
+      if (kw.toLowerCase() === 'unknown') return null
+      return `关键词：${kw}`
+    }
   }
   {
     const m = s.match(/^Argument\s+(\d+):\s*(.+)$/i)
@@ -235,6 +239,14 @@ export function toUserMilestone(cleanLine: string): string | null {
   {
     const m = s.match(/USC-Generate\s*-\s*generate\s+(\d+)\s+candidate comments/i)
     if (m) return `领袖：生成候选（${m[1]}）`
+  }
+  {
+    const m = s.match(/^Successfully generated\s+(\d+)\s+candidates/i)
+    if (m) return `领袖：生成候选完成（${m[1]}）`
+  }
+  {
+    const m = s.match(/^Candidate\s+(\d+)\s*:\s*(.+)$/i)
+    if (m) return `候选${m[1]}：${m[2].trim()}`
   }
   {
     const m = s.match(/Best selection:\s*(candidate_\d+)/i)

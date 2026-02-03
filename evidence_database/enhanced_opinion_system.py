@@ -698,8 +698,18 @@ Example:
                     content = content.strip()
                     
                     classification = json.loads(content)
-                    # Prefer the single keyword if present; otherwise derive one from the full list
-                    single_keyword = classification.get('keyword', '')
+                    # Prefer the single keyword if present; otherwise derive one from the full list.
+                    single_keyword = (classification.get('keyword') or '').strip()
+                    if not single_keyword:
+                        keywords_full = (classification.get('keywords_full') or '').strip()
+                        # Pick the first token as a stable fallback (avoids empty keyword causing downstream "unknown").
+                        first = keywords_full.split()[0] if keywords_full else ''
+                        if first:
+                            print(f"⚠️ LLM returned empty 'keyword'; falling back to first token from 'keywords_full': {first}")
+                            single_keyword = first
+                        else:
+                            print("⚠️ LLM returned empty 'keyword' and 'keywords_full'; falling back to 'general'")
+                            single_keyword = 'general'
                     
                     # Confirm the returned theme matches the predefined list
                     theme = classification.get('theme', 'Society & Ethics')
@@ -952,6 +962,9 @@ Example:
                 'viewpoint': viewpoint_info[0],
                 'theme': viewpoint_info[1],
                 'keywords': viewpoint_info[2],
+                # Backward-compat: some callers historically used 'keyword' (singular).
+                # Keep it identical to 'keywords' to avoid "unknown" in downstream logs/UI.
+                'keyword': viewpoint_info[2],
                 'evidence_count': len(evidence_list),
                 'evidence': []
             }
@@ -1006,6 +1019,7 @@ Example:
             'viewpoint': opinion,
             'theme': theme,
             'keywords': keywords,
+            'keyword': keywords,
             'evidence_count': len(top_evidence),
             'evidence': []
         }
@@ -1061,6 +1075,7 @@ Example:
             'viewpoint': opinion,
             'theme': theme,
             'keywords': keyword,
+            'keyword': keyword,
             'evidence_count': len(top_evidence),
             'evidence': []
         }

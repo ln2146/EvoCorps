@@ -38,7 +38,6 @@ Please analyze the opinion tendency of this post and whether intervention is nee
 2026-01-30 23:20:39,322 - INFO -       Trigger reasons: Viewpoint extremism too high (8.0/10.0 >= 4.5) & Sentiment too low (0.13/1.0 <= 0.4)
 2026-01-30 23:20:39,322 - INFO -    🚨 Analyst determined opinion balance intervention needed!
 2026-01-30 23:20:39,322 - INFO -   ⚠️  Alert generated - Urgency: 2
-2026-01-30 23:20:39,322 - INFO - ⚖️ Strategist is creating strategy...
 2026-01-30 23:20:39,323 - INFO - 📋 Strategist Agent - start intelligent strategy creation workflow
 2026-01-30 23:20:39,323 - INFO -   ✅ Step 1: Confirm alert information
 2026-01-30 23:20:39,323 - INFO -      📊 Alert ID: post-f053ef

@@ -1320,6 +1320,24 @@ Develop an appropriate strategy for this context. Return a JSON response with re
                     content = recommendation.get("content", {})
                     confidence = recommendation.get("confidence", 0.3)
                     similarity = recommendation.get("similarity", 0.5)
+                    # success rate should come from historical effectiveness_score, not retrieval confidence/similarity.
+                    effectiveness = content.get("effectiveness_score", None)
+                    expected_success_rate = None
+                    try:
+                        if isinstance(effectiveness, (int, float)):
+                            eff = float(effectiveness)
+                            if 0.0 <= eff <= 1.0:
+                                expected_success_rate = eff
+                            elif 0.0 <= eff <= 10.0:
+                                workflow_logger.warning(
+                                    f"     ⚠️ Detected effectiveness_score on 0-10 scale ({eff:.2f}); converting to [0,1] success rate"
+                                )
+                                expected_success_rate = eff / 10.0
+                    except Exception:
+                        expected_success_rate = None
+                    if expected_success_rate is None:
+                        workflow_logger.warning("     ⚠️ Missing effectiveness_score; using confidence as a proxy for expected success rate")
+                        expected_success_rate = float(confidence) if isinstance(confidence, (int, float)) else 0.3
                     
                     # Extract strategy info from action logs
                     strategic_decision = content.get("strategic_decision", "{}")
@@ -1337,7 +1355,7 @@ Develop an appropriate strategy for this context. Return a JSON response with re
                         "strategy_name": f"Learning-based strategy ({action_type})",
                         "description": f"Strategy recommendation based on historical action logs (similarity: {similarity:.1%})",
                         "recommended_actions": [action_type] if action_type != "unknown" else [],
-                        "expected_success_rate": confidence,
+                        "expected_success_rate": expected_success_rate,
                         "confidence": confidence,
                         "source": "intelligent_learning",
                         "similarity_score": similarity
@@ -4621,7 +4639,6 @@ class SimpleCoordinationSystem:
             workflow_logger.info(f"  ⚠️  Alert generated - Urgency: {alert['urgency_level']}")
             
             # 2. Strategist creates strategy
-            workflow_logger.info("⚖️ Strategist is creating strategy...")
             strategy_result = await self.strategist.create_strategy(alert)
 
             # Check whether strategy result is None or invalid
@@ -5736,7 +5753,6 @@ class SimpleCoordinationSystem:
             workflow_logger.info(f"     📋 Action ID: {action_id}")
             
             # 1. Strategist creates strategy - reuse execute_workflow logic
-            workflow_logger.info("⚖️ Strategist is creating strategy...")
             strategy_result = await self.strategist.create_strategy(alert)
             
             # Check whether strategy result is None or invalid

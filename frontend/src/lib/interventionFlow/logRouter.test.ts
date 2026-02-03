@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 
 import { createInitialFlowState, routeLogLine, stripLogPrefix } from './logRouter'
 import { toUserMilestone } from './milestones'
@@ -114,6 +115,45 @@ describe('routeLogLine', () => {
 
     state = routeLogLine(state, '2026-01-30 23:20:29,476 - INFO -    📊 Analyst analysis completed:')
     expect(state.roles.Analyst.during.join('\n')).not.toMatch(/analysis completed/i)
+  })
+
+  it('maps Phase headers to Chinese for display', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-30 23:20:00,000 - INFO - 🚀 Start workflow execution - Action ID: action_20260130_232000')
+    state = routeLogLine(state, '2026-01-30 23:20:18,455 - INFO - 📊 Phase 1: perception and decision')
+    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('📊 阶段 1：感知与决策')
+
+    state = routeLogLine(state, '2026-01-30 23:22:53,393 - INFO - 📈 Phase 3: feedback and iteration')
+    expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toBe('📈 阶段 3：反馈与迭代')
+  })
+
+  it('replay logs show Strategist confirming alert before "生成策略"', () => {
+    const raw = readFileSync('public/workflow/replay_workflow_20260130_round1.txt', 'utf-8')
+    const all = raw.split(/\r?\n/).filter(Boolean)
+    const stopAt = all.findIndex((l) => l.includes('📝 Recommended action:'))
+    const lines = (stopAt >= 0 ? all.slice(0, stopAt + 1) : all.slice(0, 60))
+
+    let state = createInitialFlowState()
+    for (const line of lines) state = routeLogLine(state, line)
+
+    // UI semantics: Strategist should start with "确认告警信息" (and its fields),
+    // and should not show a premature "生成策略" milestone before that.
+    expect(state.roles.Strategist.during).not.toContain('战略家：生成策略')
+  })
+
+  it('deduplicates repeated Strategist milestone lines even when they are not consecutive', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-30 23:20:00,000 - INFO - 🚀 Start workflow execution - Action ID: action_20260130_232000')
+    state = routeLogLine(state, '2026-01-30 23:20:40,000 - INFO - ⚖️ Strategist is creating strategy...')
+
+    state = routeLogLine(state, '2026-01-30 23:20:51,083 - INFO -         🔄 Generated 5 strategy options')
+    state = routeLogLine(state, '2026-01-30 23:20:55,000 - INFO -         Strategy option 1: foo')
+    state = routeLogLine(state, '2026-01-30 23:21:01,331 - INFO -      ✅ Generated 5 strategy options')
+
+    const hits = state.roles.Strategist.during.filter((l) => l === '战略家：生成策略选项（5）').length
+    expect(hits).toBe(1)
   })
 
   it('updates Strategist summary fields from strategy selection lines', () => {
@@ -357,6 +397,42 @@ describe('routeLogLine', () => {
     expect(state.roles.Leader.during).toEqual(before)
   })
 
+  it('suppresses Leader keyword line when keyword is unknown', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-30 23:21:07,935 - INFO - 🎯 Leader Agent starts USC process and generates candidate comments...')
+    const before = [...state.roles.Leader.during]
+
+    state = routeLogLine(state, '2026-01-30 23:21:34,735 - INFO -    Keyword: unknown')
+
+    expect(state.roles.Leader.during).toEqual(before)
+  })
+
+  it('keeps full Leader evidence + candidate lines for review (not truncated by caps)', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-01-30 23:21:07,935 - INFO - 🎯 Leader Agent starts USC process and generates candidate comments...')
+
+    for (let i = 1; i <= 5; i++) {
+      state = routeLogLine(
+        state,
+        `2026-01-30 23:21:10,000 - INFO - Argument ${i} (relevance: 0.60): Evidence ${i}...`,
+      )
+    }
+    for (let i = 1; i <= 6; i++) {
+      state = routeLogLine(state, `2026-01-30 23:21:20,000 - INFO - Candidate ${i}: Draft ${i}...`)
+    }
+
+    // Switch away from Leader; it should preserve the full set of lines for review.
+    state = routeLogLine(state, '2026-01-30 23:22:29,931 - INFO - ⚖️ Activating Echo Agent cluster...')
+
+    const after = (state.roles.Leader.after ?? []).join('\n')
+    expect(after).toContain('Argument 1')
+    expect(after).toContain('Argument 5')
+    expect(after).toContain('候选1：Draft 1...')
+    expect(after).toContain('候选6：Draft 6...')
+  })
+
   it('keeps Leader evidence/candidate context across stage changes', () => {
     let state = createInitialFlowState()
 
@@ -382,8 +458,8 @@ describe('routeLogLine', () => {
     state = routeLogLine(state, "2026-01-30 23:21:40,928 - INFO -    Candidate 2: It's easy to feel scared...")
 
     expect(state.roles.Leader.during.length).toBe(beforeLen + 2)
-    expect(state.roles.Leader.during[state.roles.Leader.during.length - 2]).toContain('Candidate 1:')
-    expect(state.roles.Leader.during[state.roles.Leader.during.length - 1]).toContain('Candidate 2:')
+    expect(state.roles.Leader.during[state.roles.Leader.during.length - 2]).toContain('候选1：')
+    expect(state.roles.Leader.during[state.roles.Leader.during.length - 1]).toContain('候选2：')
   })
 
   it('suppresses allocated echo agent id lines from the dynamic panel', () => {
