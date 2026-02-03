@@ -127,8 +127,9 @@ describe('toUserMilestone', () => {
     expect(toUserMilestone('📋 Amplifier plan: total=12, role distribution={...}')).toBe('扩音器：集群规模（12）')
     expect(toUserMilestone('✅ 12 echo responses generated')).toBe('扩音器：生成回应（12）')
     expect(toUserMilestone('✅ 12 amplifier responses generated')).toBe('扩音器：生成回应（12）')
-    expect(toUserMilestone('💖 Successfully added 240 likes to each of 2 leader comments (total: 480 likes)')).toBe('扩音器：点赞放大')
-    expect(toUserMilestone('🎉 Workflow completed - effectiveness score: 10.0/10')).toBe('扩音器：扩散完成')
+    expect(toUserMilestone('💖 Successfully added 240 likes to each of 2 leader comments (total: 480 likes)')).toBeNull()
+    expect(toUserMilestone('💖 12 Amplifier Agents liked leader comments')).toBe('扩音器：点赞扩散（12）')
+    expect(toUserMilestone('🎉 Workflow completed - effectiveness score: 10.0/10')).toBe('扩音器：点赞扩散完成')
   })
 
   it('maps monitoring/baseline lines', () => {

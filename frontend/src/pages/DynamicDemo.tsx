@@ -42,7 +42,6 @@ const DEMO_BACKEND_LOG_LINES: string[] = [
   '2026-01-28 21:18:33,877 - INFO - ⚖️ Activating Echo Agent cluster...',
   '2026-01-28 21:18:33,892 - INFO -   🚀 Start parallel execution of 12 agent tasks...',
   '2026-01-28 21:18:53,941 - INFO - 📊 Echo Agent results: 12 succeeded, 0 failed',
-  '2026-01-28 21:18:54,726 - INFO -   💖 Successfully added 240 likes to each of 2 leader comments (total: 480 likes)',
   '2026-01-28 21:18:54,727 - INFO - 🎉 Workflow completed - effectiveness score: 10.0/10',
   '2026-01-28 21:18:54,728 - INFO - 🔄 [Monitoring round 1/3]',
   '2026-01-28 21:18:54,728 - INFO -   📊 Analyst Agent - generate baseline effectiveness report',

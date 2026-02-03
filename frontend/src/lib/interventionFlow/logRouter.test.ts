@@ -195,7 +195,7 @@ describe('routeLogLine', () => {
     expect(state.roles.Leader.summary[3]).toContain('1')
   })
 
-  it('updates Amplifier summary fields from echo/likes/effectiveness lines', () => {
+  it('updates Amplifier summary fields from echo/results/completion lines (no like step)', () => {
     let state = createInitialFlowState()
 
     state = routeLogLine(state, '2026-01-28 21:18:33,877 - INFO - ⚖️ Activating Echo Agent cluster...')
@@ -207,7 +207,7 @@ describe('routeLogLine', () => {
     expect(state.roles.Amplifier.summary.join(' ')).toContain('12')
     expect(state.roles.Amplifier.summary.join(' ')).toContain('Amplifier:')
     expect(state.roles.Amplifier.summary.join(' ')).not.toContain('Echo:')
-    expect(state.roles.Amplifier.summary.join(' ')).toContain('点赞：放大')
+    expect(state.roles.Amplifier.summary.join(' ')).not.toContain('点赞')
     expect(state.roles.Amplifier.summary.join(' ')).not.toContain('10.0/10')
   })
 
@@ -485,6 +485,104 @@ describe('routeLogLine', () => {
 
     state = routeLogLine(state, '2026-01-30 23:22:40,001 - INFO - 📊 Echo Agent results: 12 succeeded, 0 failed')
     expect(state.roles.Amplifier.during).toEqual(once)
+  })
+
+  it('rewrites "Echo Agents" to "Amplifier Agents" in Amplifier dynamic lines', () => {
+    let state = createInitialFlowState()
+    state = routeLogLine(state, '2026-01-30 23:22:29,931 - INFO - ⚖️ Activating Echo Agent cluster...')
+
+    state = routeLogLine(state, '2026-01-30 23:22:30,932 - INFO -   ✅ Successfully created 12 Echo Agents')
+    expect(state.roles.Amplifier.during[state.roles.Amplifier.during.length - 1]).toContain('Amplifier Agents')
+    expect(state.roles.Amplifier.during[state.roles.Amplifier.during.length - 1]).not.toContain('Echo Agents')
+  })
+
+  it('deduplicates repeated "Successfully created N Amplifier Agents" lines', () => {
+    let state = createInitialFlowState()
+    state = routeLogLine(state, '2026-01-30 23:22:29,931 - INFO - ⚖️ Activating Echo Agent cluster...')
+
+    state = routeLogLine(state, '2026-01-30 23:22:30,932 - INFO -   ✅ Successfully created 12 Echo Agents (target: 12)')
+    state = routeLogLine(state, '2026-01-30 23:22:30,933 - INFO -   ✅ Successfully created 12 Echo Agents')
+
+    const hits = state.roles.Amplifier.during.filter((l) => l === '✅ Successfully created 12 Amplifier Agents').length
+    expect(hits).toBe(1)
+  })
+
+  it('rewrites "Agent echo_007" to "Agent amplifier_007" in Amplifier dynamic lines', () => {
+    let state = createInitialFlowState()
+    state = routeLogLine(state, '2026-01-30 23:22:29,931 - INFO - ⚖️ Activating Echo Agent cluster...')
+
+    state = routeLogLine(state, '2026-01-30 23:22:31,000 - INFO - 🤖 Agent echo_007 started')
+    expect(state.roles.Amplifier.during[state.roles.Amplifier.during.length - 1]).toContain('Agent amplifier_007')
+    expect(state.roles.Amplifier.during[state.roles.Amplifier.during.length - 1]).not.toContain('Agent echo_007')
+  })
+
+  it('suppresses platform-like detail lines in Amplifier panel', () => {
+    let state = createInitialFlowState()
+    state = routeLogLine(state, '2026-01-30 23:22:29,931 - INFO - ⚖️ Activating Echo Agent cluster...')
+    const before = [...state.roles.Amplifier.during]
+
+    state = routeLogLine(state, '2026-01-30 23:22:50,999 - INFO - 📊 Calculating base effectiveness score...')
+    state = routeLogLine(state, '2026-01-30 23:22:53,000 - INFO - 📊 Second leader comment likes after: 252 (added 240)')
+    state = routeLogLine(state, '2026-01-30 23:22:53,001 - INFO - ✅ Added 240 likes to second leader comment comment-0cd2c7 (echo_agent_count: 12)')
+    state = routeLogLine(state, '2026-01-30 23:22:53,002 - INFO - 📊 Leader comment comment-606ac9 current likes: 12')
+    state = routeLogLine(state, '2026-01-30 23:22:53,003 - INFO - 📊 Prepare bulk likes: echo_agent_count=12, will add 240 likes')
+    state = routeLogLine(state, '2026-01-30 23:22:53,004 - INFO - 🔄 Starting bulk like operation...')
+    state = routeLogLine(state, '2026-01-30 23:22:53,005 - INFO - 🔍 Bulk like method called: leader_comment_id_1=comment-606ac9, leader_comment_id_2=comment-0cd2c7, echo_agent_count=12')
+    state = routeLogLine(state, '2026-01-30 23:22:53,006 - INFO - 📊 Calculated bulk likes: 12 * 20 = 240')
+    state = routeLogLine(state, '2026-01-30 23:22:53,007 - INFO - 🔄 Starting bulk like database operation...')
+    state = routeLogLine(state, '2026-01-30 23:22:53,008 - INFO - 🔄 Adding 240 likes to first leader comment comment-606ac9...')
+    state = routeLogLine(state, '2026-01-30 23:22:53,009 - INFO - 🔄 Adding 240 likes to second leader comment comment-0cd2c7...')
+    state = routeLogLine(state, '2026-01-30 23:22:53,010 - INFO - 📊 Bulk like operation result: 2')
+
+    expect(state.roles.Amplifier.during).toEqual(before)
+  })
+
+  it('advances Amplifier stage to the third stage on like lines; completion stays in the third stage', () => {
+    let state = createInitialFlowState()
+    state = routeLogLine(state, '2026-01-30 23:22:29,931 - INFO - ⚖️ Activating Echo Agent cluster...')
+    expect(state.roles.Amplifier.stage.current).toBe(0)
+
+    state = routeLogLine(state, '2026-01-30 23:22:40,000 - INFO - 📊 Echo Agent results: 12 succeeded, 0 failed')
+    expect(state.roles.Amplifier.stage.current).toBe(1)
+
+    state = routeLogLine(state, '2026-01-30 23:22:52,352 - INFO - 💖 12 Amplifier Agents liked leader comments')
+    expect(state.roles.Amplifier.stage.current).toBe(2)
+
+    state = routeLogLine(state, '2026-01-30 23:22:53,393 - INFO - 🎉 Workflow completed - effectiveness score: 10.0/10')
+    expect(state.roles.Amplifier.stage.current).toBe(2)
+  })
+
+  it('keeps previous Amplifier lines when reaching completion stage', () => {
+    let state = createInitialFlowState()
+    state = routeLogLine(state, '2026-01-30 23:22:29,931 - INFO - ⚖️ Activating Echo Agent cluster...')
+    state = routeLogLine(state, '2026-01-30 23:22:40,000 - INFO - 📊 Echo Agent results: 12 succeeded, 0 failed')
+
+    state = routeLogLine(state, '2026-01-30 23:22:52,352 - INFO - 💖 12 Amplifier Agents liked leader comments')
+    expect(state.roles.Amplifier.stage.current).toBe(2)
+
+    const beforeCompletion = [...state.roles.Amplifier.during]
+    expect(beforeCompletion).toEqual(['扩音器：点赞扩散（12）'])
+
+    state = routeLogLine(state, '2026-01-30 23:22:53,393 - INFO - 🎉 Workflow completed - effectiveness score: 10.0/10')
+    state = routeLogLine(state, '2026-01-30 23:22:53,394 - INFO - 📊 Response success rate: 12/12')
+
+    const joined = state.roles.Amplifier.during.join('\n')
+    // Completion lines should be appended without clearing earlier content.
+    for (const line of beforeCompletion) expect(joined).toContain(line)
+    expect(joined).toContain('扩音器：点赞扩散完成')
+    expect(joined).toContain('Response success rate: 12/12')
+  })
+
+  it('clears Amplifier stage 2 comment lines when entering stage 3 (like diffusion)', () => {
+    let state = createInitialFlowState()
+    state = routeLogLine(state, '2026-01-30 23:22:29,931 - INFO - ⚖️ Activating Echo Agent cluster...')
+    state = routeLogLine(state, '2026-01-30 23:22:45,000 - INFO - 💬 🤖 Echo-12 (positive_ronald_018) (gemini-2.0-flash) commented: That makes sense.')
+    expect(state.roles.Amplifier.stage.current).toBe(0)
+    expect(state.roles.Amplifier.during.join('\n')).toContain('Amplifier-12 (positive_ronald_018) commented:')
+
+    state = routeLogLine(state, '2026-01-30 23:22:52,352 - INFO - 💖 12 Amplifier Agents liked leader comments')
+    expect(state.roles.Amplifier.stage.current).toBe(2)
+    expect(state.roles.Amplifier.during).toEqual(['扩音器：点赞扩散（12）'])
   })
 
   it('does not duplicate sentiment/extremity values in Analyst milestone lines', () => {

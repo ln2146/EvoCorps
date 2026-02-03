@@ -184,11 +184,12 @@ function mapLineToStageIndex(role: Role, cleanLine: string): number | null {
       return null
     }
     case 'Amplifier': {
-      // 启动集群 -> 生成回应 -> 点赞放大 -> 扩散完成
+      // 启动集群 -> 生成回应 -> 点赞扩散（点赞扩散与完成信息合并展示）
       if (/Activating (?:Echo|Amplifier) Agent cluster/i.test(cleanLine) || /(?:Echo|Amplifier) plan:\s*total=/i.test(cleanLine)) return 0
       if (/Start parallel execution/i.test(cleanLine) || /\d+\s+(?:echo|amplifier) responses generated/i.test(cleanLine) || /(?:Echo|Amplifier) Agent results:/i.test(cleanLine)) return 1
-      if (/start liking leader comments/i.test(cleanLine) || /Bulk like/i.test(cleanLine) || /\(total:\s*\d+\s+likes\)/i.test(cleanLine)) return 2
-      if (/Workflow completed\s*-\s*effectiveness score:/i.test(cleanLine) || /Base effectiveness score:/i.test(cleanLine)) return 3
+      if (/(?:Echo|Amplifier)\s+Agents\s+start\s+liking\s+leader comments/i.test(cleanLine)) return 2
+      if (/^\s*💖\s*\d+\s+(?:Echo|Amplifier)\s+Agents\s+liked\s+leader comments/i.test(cleanLine)) return 2
+      if (/Workflow completed\s*-\s*effectiveness score:/i.test(cleanLine) || /Base effectiveness score:/i.test(cleanLine)) return 2
       return null
     }
   }
@@ -216,9 +217,9 @@ function applyStageUpdateForRole(prevRoles: FlowState['roles'], role: Role, clea
   // per-role streaming buffer so the UI shows only the current stage's lines.
   // (Persistent info is rendered via summary/context, not this buffer.)
   // Strategist/Leader panels benefit from keeping earlier context (candidate strategies / evidence / candidates)
-  // across stage transitions; other roles keep stage-only stream for readability.
-  const shouldResetDuring =
-    cur.stage.current !== nextStage.current && role !== 'Strategist' && role !== 'Leader'
+  // across stage transitions.
+  // Other roles keep stage-only stream for readability.
+  const shouldResetDuring = cur.stage.current !== nextStage.current && role !== 'Strategist' && role !== 'Leader'
   return {
     ...prevRoles,
     [role]: { ...cur, stage: nextStage, during: shouldResetDuring ? [] : cur.during },
@@ -348,9 +349,7 @@ function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): 
     const mResp = cleanLine.match(/(\d+)\s+(?:echo|amplifier) responses generated/i)
     if (mResp) update('Amplifier', 1, `回应：${mResp[1]}`)
 
-    const mLikes = cleanLine.match(/\(total:\s*(\d+)\s+likes\)/i)
-    // Do not show exact like counts in the UI; keep it as a qualitative signal.
-    if (mLikes) update('Amplifier', 2, '点赞：放大')
+    // Like-boosting is not surfaced in the UI (keeps the panel focused on amplification outcome).
 
     const mEff = cleanLine.match(/effectiveness score:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
     // Do not display effectiveness score; the stage stepper already communicates completion.
@@ -368,6 +367,32 @@ function compressDisplayLine(cleanLine: string) {
   if (/model\s*\(unknown\)/i.test(trimmed)) return ''
   // Suppress placeholder Leader keyword lines; they are misleading and we hide the keyword pill when unknown.
   if (/^Keyword:\s*unknown\s*$/i.test(trimmed)) return ''
+  // Suppress internal like-boosting steps in the Amplifier panel.
+  if (/(?:Echo|Amplifier)\s+Agents\s+start\s+liking\s+leader comments/i.test(trimmed)) return ''
+  if (/successfully liked leader comments/i.test(trimmed)) return ''
+  if (/\(total:\s*\d+\s+likes\)/i.test(trimmed)) return ''
+
+  // Suppress platform-like detail lines that don't add value in the dynamic panel.
+  if (/^📊\s*(?:First|Second)\s+leader comment likes (?:before|after):/i.test(trimmed)) return ''
+  if (/^✅\s*Added\s+\d+\s+likes\s+to\s+(?:first|second)\s+leader comment\b/i.test(trimmed)) return ''
+  if (/^📊\s*Calculating base effectiveness score\.\.\./i.test(trimmed)) return ''
+  if (/^📊\s*Leader comment\b.*\bcurrent likes:/i.test(trimmed)) return ''
+  if (/^📊\s*Prepare bulk likes:/i.test(trimmed)) return ''
+  if (/^📊\s*Calculated bulk likes:/i.test(trimmed)) return ''
+  if (/^📊\s*Bulk like operation result:/i.test(trimmed)) return ''
+  if (/^🔄\s*Starting bulk like operation\.\.\./i.test(trimmed)) return ''
+  if (/^🔄\s*Starting bulk like database operation\.\.\./i.test(trimmed)) return ''
+  if (/^🔍\s*Bulk like method called:/i.test(trimmed)) return ''
+  if (/^🔄\s*Adding\s+\d+\s+likes\s+to\s+(?:first|second)\s+leader comment\b/i.test(trimmed)) return ''
+
+  // Normalize "Successfully created N Echo/Amplifier Agents" variants to a single stable UI line.
+  // Backends may emit both "… (target: N)" and plain variants; we keep only the normalized form.
+  {
+    const m = trimmed.match(
+      /^✅\s*Successfully created\s+(\d+)\s+(?:Echo|Amplifier)\s+Agents(?:\s*\(target:\s*\d+\))?\s*$/i,
+    )
+    if (m) return `✅ Successfully created ${m[1]} Amplifier Agents`
+  }
 
   // Map Phase headers to Chinese for readability in the dynamic panel.
   // Examples:
@@ -389,6 +414,18 @@ function compressDisplayLine(cleanLine: string) {
       const prefix = prefixRaw ? `${prefixRaw} ` : ''
       return `${prefix}阶段 ${phaseNum}：${descZh}`
     }
+  }
+
+  // Normalize older "Echo Agents" phrasing to "Amplifier Agents" in the UI.
+  if (/\bEcho Agents\b/i.test(trimmed)) {
+    return trimmed.replace(/\bEcho Agents\b/gi, 'Amplifier Agents')
+  }
+
+  // Normalize per-agent Echo IDs to Amplifier IDs for the UI.
+  // Example:
+  //   "🤖 Agent echo_007 started" -> "🤖 Agent amplifier_007 started"
+  if (/\bAgent\s+echo_\d+\b/i.test(trimmed)) {
+    return trimmed.replace(/\bAgent\s+echo_(\d+)\b/gi, 'Agent amplifier_$1')
   }
 
   // Amplifier per-agent comment: keep the body, but normalize the label and hide model name.

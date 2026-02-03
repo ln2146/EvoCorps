@@ -276,12 +276,18 @@ export function toUserMilestone(cleanLine: string): string | null {
     if (m) return `扩音器：生成回应（${m[1]}）`
   }
   {
-    const m = s.match(/\(total:\s*(\d+)\s+likes\)/i)
-    if (m) return '扩音器：点赞放大'
+    // Platform "like boosting" is internal plumbing and should not be shown in the UI.
+    if (/\(total:\s*\d+\s+likes\)/i.test(s)) return null
+    if (/(?:Echo|Amplifier)\s+Agents\s+start\s+liking\s+leader comments/i.test(s)) return null
+    if (/successfully liked leader comments/i.test(s)) return null
+    {
+      const m = s.match(/^\s*💖\s*(\d+)\s+(?:Echo|Amplifier)\s+Agents\s+liked\s+leader comments/i)
+      if (m) return `扩音器：点赞扩散（${m[1]}）`
+    }
   }
   {
     const m = s.match(/effectiveness score:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
-    if (m) return '扩音器：扩散完成'
+    if (m) return '扩音器：点赞扩散完成'
   }
 
   return null

@@ -16,7 +16,7 @@ describe('roleStages', () => {
   })
 
   it('defines Amplifier stages', () => {
-    expect(getRoleStages('Amplifier')).toEqual(['启动集群', '生成回应', '点赞放大', '扩散完成'])
+    expect(getRoleStages('Amplifier')).toEqual(['启动集群', '生成回应', '点赞扩散'])
   })
 
   it('formats tooltip as a single line', () => {
