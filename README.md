@@ -1,18 +1,18 @@
-<div align="center">
+﻿<div align="center">
 
-  # EvoCorps
-  **面向网络舆论去极化的进化式多智能体框架**
   <div align="center">
-    <img src="assets/logo.png" width="100%" alt="EvoCorps logo"/>
+    <img src="assets/logoheng.svg" width="100%" alt="EvoCorps logo"/>
   </div>
+
+  **面向网络舆论去极化的进化式多智能体框架**
+
+[简体中文](README.md) | [English](README_EN.md)
 
   <p>
     <img alt="Python Version" src="https://img.shields.io/badge/python-3.9%2B-blue" />
     <img alt="License" src="https://img.shields.io/badge/license-MIT-green" />
     <img alt="Multi-Agent" src="https://img.shields.io/badge/agents-multi--agent-8a2be2" />
   </p>
-
-  [简体中文](README.md) | [English](README_EN.md)
 
 </div>
 
@@ -71,6 +71,24 @@ EvoCorps 的目标，是让舆论干预从“发现问题再处理”转向“�
 </div>
 
 上述图表对比了四种设置下的情绪随时间变化情况：Case 1（仅普通用户自然讨论，无恶意水军也无干预）、Case 2（恶意水军放大偏置信息，无防护）、Case 3（在Case 2基础上采用事后审核）、Case 4（在Case 2基础上由EvoCorps进行实时的、角色协同的主动干预）。虚线表示平台开始注入事实澄清的时间点（第5个时间步）；在对抗放大场景中，缺乏保护或仅事后干预的情绪更难恢复，而 EvoCorps能更早拉住下滑趋势，使讨论更快趋于稳定。
+
+---
+
+<a id="interface-preview"></a>
+## 📷 界面预览
+
+<div align="center">
+<table align="center">
+<tr>
+<td align="center" width="50%"><strong>🏠 平台首页</strong><br><img src="assets/homepage.gif" width="100%" alt="平台首页"><br>静态与动态模式选择</td>
+<td align="center" width="50%"><strong>📈 数据监控模式</strong><br><img src="assets/datadetect.gif" width="100%" alt="数据监控模式"><br>查看用户和帖子的详细信息</td>
+</tr>
+<tr>
+<td align="center" width="50%"><strong>🕸️ 关系图谱</strong><br><img src="assets/graph.gif" width="100%" alt="关系图谱"><br>可视化用户、帖子、评论之间的关系网络</td>
+<td align="center" width="50%"><strong>💬 采访功能</strong><br><img src="assets/talking.gif" width="100%" alt="采访功能"><br>向模拟用户发送问卷问题并收集回答</td>
+</tr>
+</table>
+</div>
 
 ---
 
@@ -244,3 +262,4 @@ EvoCorps 被定位为一种治理辅助方法，旨在帮助在线平台应对�
 我们明确反对在任何现实世界部署中使用欺骗性策略。尽管本研究的模拟引入了多样化的智能体角色，用以探索影响力动态的理论边界，但任何实际应用都必须严格遵循透明性与问责原则。自动化智能体应被清晰标识为基于人工智能的助手或治理工具（例如经认证的事实核查机器人），不得冒充人类用户，也不得隐瞒其人工属性。
 
 任何受本研究启发的系统部署，都应当与现有的平台治理流程相结合，并遵循平台特定的政策、透明性要求以及持续审计机制。这些保障措施对于降低潜在的非预期危害至关重要，包括差异化影响、用户信任受损，或由自动化判断引发的错误。本研究中 EvoCorps 的预期用途在于支持负责任、透明且可问责的治理干预，而非误导用户或制造虚假共识。
+

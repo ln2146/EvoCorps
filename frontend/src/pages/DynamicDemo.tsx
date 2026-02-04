@@ -8,7 +8,7 @@ import { computeEffectiveRole, nextSelectedRoleOnTabClick } from '../lib/interve
 import { parsePostContent } from '../lib/interventionFlow/postContent'
 import { getEmptyCopy } from '../lib/interventionFlow/emptyCopy'
 import { isPreRunEmptyState } from '../lib/interventionFlow/emptyState'
-import { DEFAULT_WORKFLOW_REPLAY_DELAY_MS, getOpinionBalanceLogStreamUrl, shouldCallOpinionBalanceProcessApi } from '../lib/interventionFlow/replayConfig'
+import { getOpinionBalanceLogStreamUrl, shouldCallOpinionBalanceProcessApi } from '../lib/interventionFlow/replayConfig'
 import { toUserMilestone } from '../lib/interventionFlow/milestones'
 import { getRoleTabButtonClassName } from '../lib/interventionFlow/roleTabStyles'
 import { getInterventionFlowPanelClassName, getLeaderCommentsContainerClassName } from '../lib/interventionFlow/panelLayout'
@@ -265,6 +265,8 @@ export default function DynamicDemo() {
   const [analysisStatus, setAnalysisStatus] = useState<'Idle' | 'Running' | 'Done' | 'Error'>('Idle')
 
   const [isStarting, setIsStarting] = useState(false)
+  const [isTogglingAttack, setIsTogglingAttack] = useState(false)
+  const [isTogglingAftercare, setIsTogglingAftercare] = useState(false)
 
   const [flowState, setFlowState] = useState<FlowState>(() => createInitialFlowState())
   const [opinionBalanceStartMs, setOpinionBalanceStartMs] = useState<number | null>(null)
@@ -290,6 +292,12 @@ export default function DynamicDemo() {
         // NOTE: Do not auto-toggle the opinion balance panel based on backend status.
         // The panel should start streaming only after the user clicks the toggle (so we can
         // treat that moment as the "start time" for which logs should be shown).
+
+        // 同步恶意攻击和事后干预的状态
+        if (data.control_flags) {
+          setEnableAttack(data.control_flags.attack_enabled ?? false)
+          setEnableAftercare(data.control_flags.aftercare_enabled ?? false)
+        }
       } catch (error) {
         console.error('Failed to check status:', error)
       }
@@ -466,8 +474,90 @@ export default function DynamicDemo() {
         enableAttack={enableAttack}
         enableAftercare={enableAftercare}
         enableEvoCorps={enableEvoCorps}
-        onToggleAttack={() => setEnableAttack((prev) => !prev)}
-        onToggleAftercare={() => setEnableAftercare((prev) => !prev)}
+        onToggleAttack={async () => {
+          if (isTogglingAttack) return
+
+          // 如果当前是启用状态，显示确认弹窗
+          if (enableAttack) {
+            if (!confirm('是否确认关闭恶意水军攻击？')) {
+              return
+            }
+          }
+
+          setIsTogglingAttack(true)
+
+          try {
+            const response = await fetch('http://localhost:8000/control/attack', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ enabled: !enableAttack }),
+            })
+
+            const data = await response.json()
+
+            if (response.ok && data.attack_enabled !== undefined) {
+              setEnableAttack(data.attack_enabled)
+
+              // 显示成功提示
+              if (data.attack_enabled) {
+                alert('✅ 恶意水军攻击已开启')
+              } else {
+                alert('✅ 恶意水军攻击已关闭')
+              }
+            } else {
+              throw new Error('API 返回异常')
+            }
+          } catch (error) {
+            alert(`❌ 操作失败：${error instanceof Error ? error.message : '网络错误'}`)
+            console.error('Error toggling attack:', error)
+          } finally {
+            setIsTogglingAttack(false)
+          }
+        }}
+        onToggleAftercare={async () => {
+          if (isTogglingAftercare) return
+
+          // 如果当前是启用状态，显示确认弹窗
+          if (enableAftercare) {
+            if (!confirm('是否确认关闭事后干预？')) {
+              return
+            }
+          }
+
+          setIsTogglingAftercare(true)
+
+          try {
+            const response = await fetch('http://localhost:8000/control/aftercare', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ enabled: !enableAftercare }),
+            })
+
+            const data = await response.json()
+
+            if (response.ok && data.aftercare_enabled !== undefined) {
+              setEnableAftercare(data.aftercare_enabled)
+
+              // 显示成功提示
+              if (data.aftercare_enabled) {
+                alert('✅ 事后干预已开启')
+              } else {
+                alert('✅ 事后干预已关闭')
+              }
+            } else {
+              throw new Error('API 返回异常')
+            }
+          } catch (error) {
+            alert(`❌ 操作失败：${error instanceof Error ? error.message : '网络错误'}`)
+            console.error('Error toggling aftercare:', error)
+          } finally {
+            setIsTogglingAftercare(false)
+          }
+        }}
         onToggleEvoCorps={async () => {
           const manageProcess = shouldCallOpinionBalanceProcessApi(USE_WORKFLOW_LOG_REPLAY)
           // 如果当前是禁用状态，则启用并调用 API
@@ -507,33 +597,6 @@ export default function DynamicDemo() {
               })()
             }, 150)
             return
-
-            try {
-              // 调用后端 API 启动舆论平衡系统
-              const response = await fetch('/api/dynamic/opinion-balance/start', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({}),
-              })
-
-              const data = await response.json()
-
-              if (data.success) {
-                // 成功：设置 enableEvoCorps 为 true
-                setEnableEvoCorps(true)
-                setOpinionBalanceStartMs(clickedAtMs)
-              } else {
-                // 失败：显示错误消息，保持状态不变
-                alert(`启动舆论平衡失败：${data.message || '未知错误'}`)
-                console.error('Failed to start opinion balance:', data)
-              }
-            } catch (error) {
-              // 网络错误或其他异常
-              alert(`启动舆论平衡失败：${error instanceof Error ? error.message : '网络错误'}`)
-              console.error('Error starting opinion balance:', error)
-            }
           } else {
             // 显示确认对话框
             if (!confirm('是否确认关闭舆论平衡系统？')) {
@@ -677,8 +740,8 @@ function DynamicDemoHeader({
   enableAttack: boolean
   enableAftercare: boolean
   enableEvoCorps: boolean
-  onToggleAttack: () => void
-  onToggleAftercare: () => void
+  onToggleAttack: () => void | Promise<void>
+  onToggleAftercare: () => void | Promise<void>
   onToggleEvoCorps: () => void | Promise<void>
   sseStatus: 'connecting' | 'connected' | 'disconnected'
 }) {
@@ -690,16 +753,16 @@ function DynamicDemoHeader({
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
             欢迎使用 EvoCorps
           </h1>
-           <p className="text-slate-600">实时监控舆情变化，动态观察指标变化的舆情现状</p>
-           <div className="flex items-center gap-2 mt-2">
-             <StatusBadge label={formatDemoRunStatus(isRunning)} tone={isRunning ? 'success' : 'muted'} />
-             <StatusBadge
-               label={formatSseStatus(sseStatus)}
-               tone={sseStatus === 'connected' ? 'info' : sseStatus === 'connecting' ? 'warning' : 'muted'}
-             />
-           </div>
-         </div>
-       </div>
+          <p className="text-slate-600">实时监控舆情变化，动态观察指标变化的舆情现状</p>
+          <div className="flex items-center gap-2 mt-2">
+            <StatusBadge label={formatDemoRunStatus(isRunning)} tone={isRunning ? 'success' : 'muted'} />
+            <StatusBadge
+              label={formatSseStatus(sseStatus)}
+              tone={sseStatus === 'connected' ? 'info' : sseStatus === 'connecting' ? 'warning' : 'muted'}
+            />
+          </div>
+        </div>
+      </div>
 
       <div className="flex items-stretch gap-4 w-full xl:w-auto">
         <div className="flex flex-col gap-3 items-center">
@@ -1144,37 +1207,37 @@ function RoleTabsRow({
             key={role}
             onClick={() => onSelect(role)}
             className={getRoleTabButtonClassName(isSelected)}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div
-                    className={[
-                      'w-8 h-8 rounded-xl bg-gradient-to-r flex items-center justify-center text-white font-semibold shrink-0',
-                      tone,
-                    ].join(' ')}
-                  >
-                    {label.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-slate-800 truncate">{label}</div>
-                  </div>
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className={[
+                    'w-8 h-8 rounded-xl bg-gradient-to-r flex items-center justify-center text-white font-semibold shrink-0',
+                    tone,
+                  ].join(' ')}
+                >
+                  {label.charAt(0)}
                 </div>
-                <div className="shrink-0 flex items-center gap-2">
-                  <span
-                    className={[
-                      'w-2 h-2 rounded-full',
-                      isActive
-                        ? 'bg-emerald-500 animate-pulse'
-                        : status === 'done'
-                          ? 'bg-emerald-400'
-                          : status === 'error'
-                            ? 'bg-red-500'
-                            : 'bg-slate-300',
-                    ].join(' ')}
-                    aria-label={isActive ? 'active' : 'inactive'}
-                  />
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-800 truncate">{label}</div>
                 </div>
               </div>
+              <div className="shrink-0 flex items-center gap-2">
+                <span
+                  className={[
+                    'w-2 h-2 rounded-full',
+                    isActive
+                      ? 'bg-emerald-500 animate-pulse'
+                      : status === 'done'
+                        ? 'bg-emerald-400'
+                        : status === 'error'
+                          ? 'bg-red-500'
+                          : 'bg-slate-300',
+                  ].join(' ')}
+                  aria-label={isActive ? 'active' : 'inactive'}
+                />
+              </div>
+            </div>
           </button>
         )
       })}
