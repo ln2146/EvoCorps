@@ -3036,12 +3036,38 @@ def get_dynamic_demo_status():
                 "status": "stopped",
                 "pid": null,
                 "uptime": 0
+            },
+            "control_flags": {
+                "attack_enabled": false,
+                "aftercare_enabled": false
             }
         }
     """
     try:
         # 调用 process_manager.get_process_status()
         result = process_manager.get_process_status()
+        
+        # 从 main.py 的控制服务器获取 control_flags 状态
+        try:
+            import requests
+            control_response = requests.get('http://localhost:8000/control/status', timeout=2)
+            if control_response.status_code == 200:
+                control_data = control_response.json()
+                result['control_flags'] = {
+                    'attack_enabled': control_data.get('attack_enabled', False),
+                    'aftercare_enabled': control_data.get('aftercare_enabled', False)
+                }
+            else:
+                result['control_flags'] = {
+                    'attack_enabled': False,
+                    'aftercare_enabled': False
+                }
+        except Exception:
+            # 如果无法连接到控制服务器，返回默认值
+            result['control_flags'] = {
+                'attack_enabled': False,
+                'aftercare_enabled': False
+            }
         
         # 返回 JSON 响应
         return jsonify(result)
@@ -3054,7 +3080,11 @@ def get_dynamic_demo_status():
             'error': str(e),
             'database': {'status': 'unknown', 'pid': None, 'uptime': 0},
             'main': {'status': 'unknown', 'pid': None, 'uptime': 0},
-            'opinion_balance': {'status': 'unknown', 'pid': None, 'uptime': 0}
+            'opinion_balance': {'status': 'unknown', 'pid': None, 'uptime': 0},
+            'control_flags': {
+                'attack_enabled': False,
+                'aftercare_enabled': False
+            }
         }), 500
 
 
