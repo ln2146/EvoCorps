@@ -49,3 +49,13 @@ def test_iter_log_lines_yields_file_lines_in_order():
             f.write("l1\nl2\nl3\n")
 
         assert list(iter_log_lines(p)) == ["l1\n", "l2\n", "l3\n"]
+
+
+def test_parse_log_timestamp_ms():
+    from log_replay import parse_log_timestamp_ms
+
+    ms = parse_log_timestamp_ms("2026-02-04 12:34:56,789 - INFO - hello")
+    assert isinstance(ms, int)
+    assert ms > 0
+
+    assert parse_log_timestamp_ms("INFO: connected to workflow_x.log") is None

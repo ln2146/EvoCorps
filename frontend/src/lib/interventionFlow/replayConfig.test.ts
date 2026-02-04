@@ -11,8 +11,15 @@ describe('replayConfig', () => {
     const url = getOpinionBalanceLogStreamUrl({ replay: false, replayFile: 'workflow_20260130.log', delayMs: 40 })
     expect(url).toContain('/api/opinion-balance/logs/stream')
     expect(url).toContain('source=workflow')
+    expect(url).toContain('tail=0')
     expect(url).toContain('follow_latest=true')
     expect(url).not.toContain('replay=1')
+  })
+
+  it('adds since_ms when provided in real-time mode', () => {
+    const url = getOpinionBalanceLogStreamUrl({ replay: false, replayFile: 'x.log', delayMs: 40, sinceMs: 123, tail: 200 })
+    expect(url).toContain('tail=200')
+    expect(url).toContain('since_ms=123')
   })
 
   it('builds the replay url when replay is enabled', () => {

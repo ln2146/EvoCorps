@@ -2724,6 +2724,12 @@ def stream_opinion_balance_logs():
     tail = request.args.get('tail', default=0, type=int)
     tail = max(0, min(2000, tail))
 
+    # Only emit log lines whose prefix timestamp is >= since_ms (epoch ms).
+    # This is used by the frontend to avoid showing historical logs that occurred
+    # before the user clicked "舆论平衡".
+    since_ms = request.args.get('since_ms', default=None, type=int)
+    since_ms = int(since_ms) if since_ms is not None else None
+
     follow_latest = request.args.get('follow_latest', default='true')
     follow_latest = str(follow_latest).lower() not in ('0', 'false', 'no', 'off')
 
@@ -2743,6 +2749,29 @@ def stream_opinion_balance_logs():
 
     def generate():
         os.makedirs(base_dir, exist_ok=True)
+        from log_replay import parse_log_timestamp_ms
+
+        allow_continuations = False
+
+        def should_emit(line: str) -> bool:
+            nonlocal allow_continuations
+            if since_ms is None:
+                allow_continuations = True
+                return True
+
+            ts = parse_log_timestamp_ms(line)
+            if ts is None:
+                # Keep SSE/meta lines (INFO:/ERROR:) visible; otherwise treat as continuation.
+                if str(line).startswith(("INFO:", "ERROR:")):
+                    return True
+                return allow_continuations
+
+            if ts >= since_ms:
+                allow_continuations = True
+                return True
+
+            allow_continuations = False
+            return False
 
         if replay:
             try:
@@ -2763,7 +2792,8 @@ def stream_opinion_balance_logs():
             yield sse_data(f"INFO: replaying {os.path.basename(current_path)}")
             try:
                 for line in replay_log_lines(iter_log_lines(current_path), delay_sec=delay_sec):
-                    yield sse_data(line)
+                    if should_emit(line):
+                        yield sse_data(line)
             except Exception as e:
                 yield sse_data(f"ERROR: replay stopped unexpectedly: {e}")
             return
@@ -2779,7 +2809,8 @@ def stream_opinion_balance_logs():
         if tail > 0:
             try:
                 for line in tail_lines(current_path, n=tail):
-                    yield sse_data(line)
+                    if should_emit(line):
+                        yield sse_data(line)
             except Exception as e:
                 yield sse_data(f"ERROR: failed to read log tail: {e}")
 
@@ -2794,7 +2825,8 @@ def stream_opinion_balance_logs():
             while True:
                 line = f.readline()
                 if line:
-                    yield sse_data(line)
+                    if should_emit(line):
+                        yield sse_data(line)
                     continue
 
                 now = time.time()

@@ -20,6 +20,7 @@ import { getAnalystCombinedCardClassName, getAnalystCombinedPostBodyClassName, g
 import { buildStageStepperModel } from '../lib/interventionFlow/stageStepper'
 import { getLiveBadgeClassName, getStageHeaderContainerClassName, getStageHeaderTextClassName, getStageSegmentClassName } from '../lib/interventionFlow/detailHeaderLayout'
 import { getDynamicDemoGridClassName } from '../lib/interventionFlow/pageGridLayout'
+import { createFixedRateLineQueue } from '../lib/interventionFlow/logRenderQueue'
 import { useLeaderboard } from '../hooks/useLeaderboard'
 import { usePostDetail } from '../hooks/usePostDetail'
 import { usePostComments } from '../hooks/usePostComments'
@@ -53,18 +54,16 @@ const DEMO_BACKEND_LOG_LINES: string[] = [
 
 const USE_SIMULATED_LOG_STREAM = false
 // Replay mode: read a fixed workflow log file and stream it via the backend SSE endpoint.
-// Flip this to false when switching back to true real-time backend streaming.
-const USE_WORKFLOW_LOG_REPLAY = true
+// Default to real backend streaming; set to true only when you intentionally demo a fixed replay log.
+const USE_WORKFLOW_LOG_REPLAY = false
 // One full round only (a single "action_..." cycle) so the demo doesn't endlessly chain.
 const WORKFLOW_REPLAY_BACKEND_FILE = 'replay_workflow_20260130_round1.log'
 // Slower replay so the user can actually read the UI while it streams.
 const WORKFLOW_REPLAY_DELAY_MS = DEFAULT_WORKFLOW_REPLAY_DELAY_MS * 5
 
-const OPINION_BALANCE_LOG_STREAM_URL = getOpinionBalanceLogStreamUrl({
-  replay: USE_WORKFLOW_LOG_REPLAY,
-  replayFile: WORKFLOW_REPLAY_BACKEND_FILE,
-  delayMs: WORKFLOW_REPLAY_DELAY_MS,
-})
+// Full-time smoothing: render log lines at a fixed cadence to avoid bursty UI updates.
+const LOG_RENDER_INTERVAL_MS = 80
+const LOG_RENDER_MAX_LINES_PER_TICK = 1
 
 interface HeatPost {
   id: string
@@ -261,8 +260,10 @@ export default function DynamicDemo() {
   const [isStarting, setIsStarting] = useState(false)
 
   const [flowState, setFlowState] = useState<FlowState>(() => createInitialFlowState())
+  const [opinionBalanceStartMs, setOpinionBalanceStartMs] = useState<number | null>(null)
   const streamRef = useRef<LogStream | null>(null)
   const unsubscribeRef = useRef<null | (() => void)>(null)
+  const renderQueueRef = useRef<ReturnType<typeof createFixedRateLineQueue> | null>(null)
 
   // 添加状态轮询机制
   useEffect(() => {
@@ -308,7 +309,10 @@ export default function DynamicDemo() {
       unsubscribeRef.current?.()
       unsubscribeRef.current = null
       streamRef.current = null
+      renderQueueRef.current?.stop()
+      renderQueueRef.current = null
       setFlowState(createInitialFlowState())
+      setOpinionBalanceStartMs(null)
       return
     }
 
@@ -317,12 +321,36 @@ export default function DynamicDemo() {
 
     if (streamRef.current) return
 
+    const sinceMs = opinionBalanceStartMs ?? Date.now()
+
+    const streamUrl = getOpinionBalanceLogStreamUrl({
+      replay: USE_WORKFLOW_LOG_REPLAY,
+      replayFile: WORKFLOW_REPLAY_BACKEND_FILE,
+      delayMs: WORKFLOW_REPLAY_DELAY_MS,
+      // Real-time: only show logs after the user clicked the toggle.
+      sinceMs,
+      // Small tail to cover the click->connect gap, filtered by sinceMs on the backend.
+      tail: 200,
+    })
+
+    const renderQueue = createFixedRateLineQueue({
+      intervalMs: LOG_RENDER_INTERVAL_MS,
+      maxLinesPerTick: LOG_RENDER_MAX_LINES_PER_TICK,
+      onDrain: (lines) => {
+        setFlowState((prev) => {
+          let next = prev
+          for (const line of lines) next = routeLogLine(next, line)
+          return next
+        })
+      },
+    })
+    renderQueue.start()
+    renderQueueRef.current = renderQueue
+
     const stream = USE_SIMULATED_LOG_STREAM
       ? createSimulatedLogStream({ lines: DEMO_BACKEND_LOG_LINES, intervalMs: 320 })
-      : createEventSourceLogStream(OPINION_BALANCE_LOG_STREAM_URL)
-    const unsubscribe = stream.subscribe((line) => {
-      setFlowState((prev) => routeLogLine(prev, line))
-    })
+      : createEventSourceLogStream(streamUrl)
+    const unsubscribe = stream.subscribe((line) => renderQueue.push(line))
     stream.start()
 
     streamRef.current = stream
@@ -333,8 +361,10 @@ export default function DynamicDemo() {
       unsubscribeRef.current?.()
       unsubscribeRef.current = null
       streamRef.current = null
+      renderQueueRef.current?.stop()
+      renderQueueRef.current = null
     }
-  }, [enableEvoCorps])
+  }, [enableEvoCorps, opinionBalanceStartMs])
 
   const currentMetrics = data.metricsSeries[data.metricsSeries.length - 1]
 
@@ -420,9 +450,11 @@ export default function DynamicDemo() {
           const manageProcess = shouldCallOpinionBalanceProcessApi(USE_WORKFLOW_LOG_REPLAY)
           // 如果当前是禁用状态，则启用并调用 API
           if (!enableEvoCorps) {
+            const clickedAtMs = Date.now()
             if (!manageProcess) {
               // Replay-only mode: do not start any backend workflow process, just connect to the SSE replay stream.
               setEnableEvoCorps(true)
+              setOpinionBalanceStartMs(clickedAtMs)
               return
             }
 
@@ -441,6 +473,7 @@ export default function DynamicDemo() {
               if (data.success) {
                 // 成功：设置 enableEvoCorps 为 true
                 setEnableEvoCorps(true)
+                setOpinionBalanceStartMs(clickedAtMs)
               } else {
                 // 失败：显示错误消息，保持状态不变
                 alert(`启动舆论平衡失败：${data.message || '未知错误'}`)
@@ -460,6 +493,7 @@ export default function DynamicDemo() {
             if (!manageProcess) {
               // Replay-only mode: no backend process to stop.
               setEnableEvoCorps(false)
+              setOpinionBalanceStartMs(null)
               return
             }
 
@@ -478,6 +512,7 @@ export default function DynamicDemo() {
               if (data.success) {
                 // 成功：设置 enableEvoCorps 为 false
                 setEnableEvoCorps(false)
+                setOpinionBalanceStartMs(null)
               } else {
                 // 失败：显示错误消息，保持状态不变
                 alert(`关闭舆论平衡失败：${data.message || '未知错误'}`)

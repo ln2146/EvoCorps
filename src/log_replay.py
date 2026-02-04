@@ -1,4 +1,7 @@
 import os
+import re
+import time
+import datetime
 from typing import Iterable, Iterator
 
 
@@ -60,3 +63,30 @@ def replay_log_lines(
         first = False
         yield line
 
+
+_TS_RE = re.compile(r"^(?P<date>\d{4}-\d{2}-\d{2})\s+(?P<hms>\d{2}:\d{2}:\d{2}),(?P<ms>\d{3})\b")
+
+
+def parse_log_timestamp_ms(line: str) -> int | None:
+    """
+    Parse a standard workflow log prefix timestamp into epoch milliseconds.
+
+    Expected prefix format:
+      YYYY-MM-DD HH:MM:SS,mmm - LEVEL - ...
+
+    Returns None if the line doesn't start with a timestamp.
+    """
+    if not line:
+        return None
+
+    m = _TS_RE.match(line)
+    if not m:
+        return None
+
+    try:
+        dt = datetime.datetime.strptime(f"{m.group('date')} {m.group('hms')}", "%Y-%m-%d %H:%M:%S")
+        # Treat as local time (the log timestamps are emitted in local time).
+        sec = time.mktime(dt.timetuple())
+        return int(sec * 1000) + int(m.group("ms"))
+    except Exception:
+        return None
