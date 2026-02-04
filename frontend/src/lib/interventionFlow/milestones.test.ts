@@ -34,9 +34,8 @@ describe('toUserMilestone', () => {
     expect(toUserMilestone('Author: agentverse_news')).toBe('作者：agentverse_news')
     expect(toUserMilestone('Total engagement: 48')).toBe('总互动量：48')
     expect(toUserMilestone('Feed score: 205.20')).toBe('热度值：205.20')
-    expect(toUserMilestone("Post content: [NEWS] Purdue's 'Robust Testing' is Actually Mass Surveillance!")).toBe(
-      "帖子内容：[NEWS] Purdue's 'Robust Testing' is Actually Mass Surveillance!",
-    )
+    // Post content is rendered via the dedicated post content block; do not repeat it as a milestone line.
+    expect(toUserMilestone("Post content: [NEWS] Purdue's 'Robust Testing' is Actually Mass Surveillance!")).toBeNull()
   })
 
   it('maps leader memory + voting detail labels', () => {
@@ -145,7 +144,7 @@ describe('toUserMilestone', () => {
   })
 
   it('maps post content + feed score labels (keep body original)', () => {
-    expect(toUserMilestone('Post content: hello world')).toBe('帖子内容：hello world')
+    expect(toUserMilestone('Post content: hello world')).toBeNull()
     expect(toUserMilestone('Feed score: 27.10')).toBe('热度值：27.10')
   })
 })

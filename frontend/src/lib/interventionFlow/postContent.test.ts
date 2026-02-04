@@ -32,5 +32,20 @@ describe('parsePostContent', () => {
     expect(parsed.preview).toBe('')
     expect(parsed.full).toBe('')
   })
-})
 
+  it('removes [OFFICIAL EXPLANATION] block and trailing analysis prompt from preview', () => {
+    const raw = [
+      '[NEWS] Headline',
+      '',
+      "[OFFICIAL EXPLANATION] : The island's Ministry of Health reported positive cases in a vulnerable setting, like a residential and nursing home.",
+      'Please analyze the opinion tendency of this post and whether intervention is needed.',
+    ].join('\n')
+
+    const parsed = parsePostContent(raw, { previewChars: 500 })
+    expect(parsed.preview).toContain('Headline')
+    expect(parsed.preview).not.toContain('OFFICIAL EXPLANATION')
+    expect(parsed.preview).not.toContain('Please analyze the opinion tendency')
+    expect(parsed.full).not.toContain('OFFICIAL EXPLANATION')
+    expect(parsed.full).not.toContain('Please analyze the opinion tendency')
+  })
+})

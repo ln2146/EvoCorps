@@ -11,25 +11,30 @@ export function buildStageStepperModel(
 ) {
   const canonical = getRoleStages(role)
 
-  // Option A: only render stages that actually appeared in the current round,
-  // and keep their order as the first time they appeared in the log stream.
-  const order = Array.isArray(input.order) ? input.order : []
-  const stages = order
-    .map((idx) => canonical[idx])
-    .filter((label) => typeof label === 'string' && label.trim().length > 0)
+  // Always render canonical stages so the stepper stays stable and the step number
+  // matches the meaning of each stage (even if the log stream is sparse or interleaved).
+  const stages = canonical
+  const total = canonical.length
 
-  const currentPos = order.indexOf(input.current)
-  const maxPos = order.indexOf(input.max)
+  const inRange = (n: number) => Number.isFinite(n) && n >= 0 && n < total
+
+  const order = Array.isArray(input.order) ? input.order : []
+  const seen = Array.from(new Set(order.filter((idx) => inRange(idx))))
+  const seenCount = seen.length
+
+  const currentPos = inRange(input.current) ? input.current : -1
+  const maxPos = inRange(input.max) ? input.max : -1
   const currentLabel = currentPos >= 0 ? stages[currentPos] : ''
+  const currentStep = currentPos >= 0 ? currentPos + 1 : 0
 
   return {
     stages,
     currentPos,
     maxPos,
     currentLabel,
-    // Denominator should stay stable (e.g. 1/5) even if only 1 stage has shown up so far.
-    total: canonical.length,
-    seenCount: stages.length,
+    currentStep,
+    total,
+    seenCount,
     tooltip: formatRoleStagesTooltip(role),
   }
 }

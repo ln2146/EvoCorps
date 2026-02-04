@@ -88,6 +88,41 @@ describe('routeLogLine', () => {
     expect(state.roles.Analyst.during[state.roles.Analyst.during.length - 1]).toContain('监测')
   })
 
+  it('does not regress Analyst stage when Phase 1/core viewpoint lines repeat later', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-02-04 10:00:00,000 - INFO -   🔍 Analyst is analyzing content...')
+    state = routeLogLine(state, '2026-02-04 10:00:01,000 - INFO - Total weight calculated: 1.0')
+    expect(state.roles.Analyst.stage.current).toBe(1)
+
+    const before = [...state.roles.Analyst.during]
+    state = routeLogLine(state, '2026-02-04 10:00:02,000 - INFO - Core viewpoint: foo')
+
+    expect(state.roles.Analyst.stage.current).toBe(1)
+    expect(state.roles.Analyst.during.length).toBeGreaterThan(before.length)
+    expect(state.roles.Analyst.during[0]).toBe(before[0])
+  })
+
+  it('ignores multiline analyst comment content blocks so key metrics remain visible', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-02-04 10:00:00,000 - INFO -   🔍 Analyst is analyzing content...')
+    state = routeLogLine(state, '2026-02-04 10:00:01,000 - INFO -     📊 Total weight calculated: 508.0 (based on 4 comments: 2 hot + 2 latest)')
+
+    state = routeLogLine(state, '2026-02-04 10:00:02,000 - INFO -     📝 Comment 2 content: Okay, here is a long comment:')
+    state = routeLogLine(state, '**Comment:**')
+    state = routeLogLine(state, 'This line should not appear in the panel.')
+
+    state = routeLogLine(state, '2026-02-04 10:00:03,000 - INFO -       Viewpoint extremism: 3.4/10.0')
+    state = routeLogLine(state, '2026-02-04 10:00:04,000 - INFO -       Overall sentiment: 0.65/1.0')
+    state = routeLogLine(state, '2026-02-04 10:00:05,000 - INFO -       Needs intervention: no')
+
+    expect(state.roles.Analyst.during.join('\n')).not.toContain('This line should not appear in the panel.')
+    expect(state.roles.Analyst.during.join('\n')).toContain('分析师：极端度 3.4/10.0')
+    expect(state.roles.Analyst.during.join('\n')).toContain('分析师：情绪度 0.65/1.0')
+    expect(state.roles.Analyst.during.join('\n')).toContain('分析师：判定无需干预')
+  })
+
   it('updates Analyst summary fields from key result lines', () => {
     let state = createInitialFlowState()
 
@@ -294,19 +329,32 @@ describe('routeLogLine', () => {
     expect(state.roles.Analyst.stage.order).toEqual([0, 1, 2, 3, 4, 5])
   })
 
-  it('clears role stream buffer when stage changes to keep content aligned', () => {
+  it('keeps Analyst stream buffer across stage changes so the full flow is visible', () => {
     let state = createInitialFlowState()
 
     const analyzingMilestone = toUserMilestone('Analyst is analyzing content...')!
     const weightMilestone = toUserMilestone('Total weight calculated: 34.0 (based on 4 comments)')!
 
-    state = routeLogLine(state, '2026-01-28 21:13:09,286 - INFO -   馃攳 Analyst is analyzing content...')
+    state = routeLogLine(state, '2026-01-28 21:13:09,286 - INFO -   🔍 Analyst is analyzing content...')
     expect(state.roles.Analyst.during).toEqual([analyzingMilestone])
 
-    // Stage changes to 评论抽样/权重汇总; streaming buffer should reset to this stage's lines only.
-    state = routeLogLine(state, '2026-01-28 21:13:46,170 - INFO -     馃搳 Total weight calculated: 34.0 (based on 4 comments: 2 hot + 2 latest)')
+    state = routeLogLine(state, '2026-01-28 21:13:46,170 - INFO -     📊 Total weight calculated: 34.0 (based on 4 comments: 2 hot + 2 latest)')
     expect(state.roles.Analyst.stage.current).toBe(1)
-    expect(state.roles.Analyst.during).toEqual([weightMilestone])
+    expect(state.roles.Analyst.during).toEqual([analyzingMilestone, weightMilestone])
+  })
+
+  it('keeps more Analyst lines so long analyses do not look like panel refreshes', () => {
+    let state = createInitialFlowState()
+
+    state = routeLogLine(state, '2026-02-04 10:00:00,000 - INFO -   🔍 Analyst is analyzing content...')
+
+    const first = 'dbg-00'
+    state = routeLogLine(state, `2026-02-04 10:00:00,010 - INFO - ${first}`)
+    for (let i = 1; i <= 14; i++) {
+      state = routeLogLine(state, `2026-02-04 10:00:00,0${10 + i} - INFO - dbg-${String(i).padStart(2, '0')}`)
+    }
+
+    expect(state.roles.Analyst.during).toContain(first)
   })
 
   it('keeps Strategist candidate strategy lines across stage changes', () => {

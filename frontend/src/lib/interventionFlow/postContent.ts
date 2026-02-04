@@ -7,7 +7,20 @@ export function parsePostContent(
   title?: string
   preview: string
 } {
-  const full = raw ?? ''
+  const rawFull = raw ?? ''
+  // Strip internal scaffolding that should not be shown in the UI:
+  // - "[OFFICIAL EXPLANATION] ..." appended by simulation
+  // - trailing "Please analyze ..." prompt used by agents
+  const full = (() => {
+    const lines = rawFull.split(/\r?\n/)
+    const idxOfficial = lines.findIndex((l) => /\[OFFICIAL EXPLANATION\]/i.test(l))
+    const idxPrompt = lines.findIndex((l) =>
+      /^\s*Please analyze the opinion tendency of this post and whether intervention is needed\.\s*$/i.test(l),
+    )
+    const cut = [idxOfficial, idxPrompt].filter((n) => n >= 0).sort((a, b) => a - b)[0]
+    const kept = (cut == null ? lines : lines.slice(0, cut)).join('\n')
+    return kept.replace(/\s+$/g, '').trimEnd()
+  })()
   const previewChars = Math.max(0, opts?.previewChars ?? 220)
 
   const firstLine = full.split(/\r?\n/, 1)[0]?.trim() ?? ''
@@ -31,4 +44,3 @@ export function parsePostContent(
 
   return { full, tag, title, preview }
 }
-

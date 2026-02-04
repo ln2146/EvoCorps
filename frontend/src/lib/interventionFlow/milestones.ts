@@ -37,7 +37,8 @@ export function toUserMilestone(cleanLine: string): string | null {
   }
   {
     const m = s.match(/^Post content:\s*(.+)$/i)
-    if (m) return `帖子内容：${m[1].trim()}`
+    // Post content is rendered in the dedicated post card; avoid duplicating it in the stream.
+    if (m) return null
   }
 
   // Leader memory + voting detail (fixed labels; values stay original)
@@ -151,7 +152,7 @@ export function toUserMilestone(cleanLine: string): string | null {
   if (/Monitoring task started/i.test(s)) return '分析师：启动监测任务'
   if (/Will continue monitoring/i.test(s)) return '分析师：持续监测与动态调整'
   if (/Needs intervention:\s*yes\b/i.test(s)) return '分析师：判定需要干预'
-  if (/Needs intervention:\s*no\b/i.test(s)) return '分析师：判定无需干预'
+  if (/Needs intervention:\s*no\b/i.test(s)) return '分析师：判定无需干预（继续监测，无需执行干预）'
   {
     const m = s.match(/^Overall sentiment:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
     if (m) return `分析师：情绪度 ${m[1].replace(/\s+/g, '')}`

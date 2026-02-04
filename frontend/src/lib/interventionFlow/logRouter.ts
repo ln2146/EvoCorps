@@ -26,7 +26,7 @@ export interface FlowState {
     leaderComments: string[]
     leaderCommentKeys: Record<string, true>
     leaderCommentIndices: Record<string, number>
-    pendingMultiline: null | { kind: 'postContent' | 'leaderComment'; key?: string }
+    pendingMultiline: null | { kind: 'postContent' | 'leaderComment' | 'skip'; key?: string }
   }
   roles: Record<Role, RoleCardState>
 }
@@ -38,6 +38,9 @@ const MAX_AFTER_LINES_DEFAULT = 6
 
 function maxDuringLines(role: Role) {
   switch (role) {
+    case 'Analyst':
+      // Analyst runs a multi-step pipeline and emits many lines; keep more so the full flow stays visible.
+      return 25
     case 'Strategist':
       // Strategist often emits multiple candidate strategies; keep more for readability.
       return 20
@@ -151,8 +154,8 @@ function mapLineToStageIndex(role: Role, cleanLine: string): number | null {
       // 内容识别 -> 评论抽样 -> 极端度 -> 情绪度 -> 干预判定 -> 监测评估
       if (/Analyst is analyzing/i.test(cleanLine) || /^📊\s*Phase 1:/i.test(cleanLine) || /^Core viewpoint:/i.test(cleanLine)) return 0
       if (/Total weight calculated:/i.test(cleanLine) || /Comment\s+\d+\s+content:/i.test(cleanLine)) return 1
-      // Sentiment summary is part of sampling; keep it in stage 1 so later stages stay aligned.
-      if (/Weighted per-comment sentiment:/i.test(cleanLine)) return 1
+      // Weighted sentiment summary belongs to the "情绪度" stage for the UI stepper.
+      if (/Weighted per-comment sentiment:/i.test(cleanLine)) return 3
       if (/^Viewpoint extremism:/i.test(cleanLine)) return 2
       if (/^Overall sentiment:/i.test(cleanLine)) return 3
       if (/Needs intervention:/i.test(cleanLine) || /Urgency level:/i.test(cleanLine) || /Analyst determined opinion balance intervention needed/i.test(cleanLine)) return 4
@@ -200,6 +203,11 @@ function applyStageUpdateForRole(prevRoles: FlowState['roles'], role: Role, clea
   if (nextIndex === null) return prevRoles
 
   const cur = prevRoles[role]
+  // Prevent stage regressions within the same workflow round. Replay logs (and some backends)
+  // can emit earlier-phase lines again (e.g. repeated "Core viewpoint:"), which would otherwise
+  // cause the UI to jump back to 1/6 and clear the streamed buffer (visible as flicker).
+  if (cur.stage.current >= 0 && nextIndex < cur.stage.current) return prevRoles
+
   const order = cur.stage.order.includes(nextIndex) ? cur.stage.order : [...cur.stage.order, nextIndex]
   const nextStage = {
     current: nextIndex,
@@ -219,7 +227,7 @@ function applyStageUpdateForRole(prevRoles: FlowState['roles'], role: Role, clea
   // Strategist/Leader panels benefit from keeping earlier context (candidate strategies / evidence / candidates)
   // across stage transitions.
   // Other roles keep stage-only stream for readability.
-  const shouldResetDuring = cur.stage.current !== nextStage.current && role !== 'Strategist' && role !== 'Leader'
+  const shouldResetDuring = cur.stage.current !== nextStage.current && role !== 'Strategist' && role !== 'Leader' && role !== 'Analyst'
   return {
     ...prevRoles,
     [role]: { ...cur, stage: nextStage, during: shouldResetDuring ? [] : cur.during },
@@ -510,6 +518,10 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
   if (!hasPrefix && prev.context.pendingMultiline) {
     const pending = prev.context.pendingMultiline
 
+    if (pending.kind === 'skip') {
+      return prev
+    }
+
     if (pending.kind === 'postContent' && prev.context.postContent) {
       return {
         ...prev,
@@ -543,6 +555,19 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
       context: {
         ...prev.context,
         pendingMultiline: null,
+      },
+    }
+  }
+
+  // Some backend log lines include embedded newlines inside "Comment N content:" blocks (markdown bodies).
+  // Those continuation lines come without a prefix and would otherwise flood the dynamic panel, pushing
+  // out key metrics like extremity/sentiment. We skip that whole block until the next prefixed line.
+  if (hasPrefix && /^(?:📝\s*)?Comment\s+\d+\s+content:\s*/i.test(cleanLine)) {
+    return {
+      ...prev,
+      context: {
+        ...prev.context,
+        pendingMultiline: { kind: 'skip' },
       },
     }
   }

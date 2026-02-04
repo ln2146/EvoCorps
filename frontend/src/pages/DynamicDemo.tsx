@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState, type ReactNode, type ElementType 
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { createInitialFlowState, routeLogLine, type FlowState, type Role } from '../lib/interventionFlow/logRouter'
+import { createInitialFlowState, routeLogLine, stripLogPrefix, type FlowState, type Role } from '../lib/interventionFlow/logRouter'
 import { createEventSourceLogStream, createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
 import { computeEffectiveRole, nextSelectedRoleOnTabClick } from '../lib/interventionFlow/selection'
 import { parsePostContent } from '../lib/interventionFlow/postContent'
 import { getEmptyCopy } from '../lib/interventionFlow/emptyCopy'
 import { isPreRunEmptyState } from '../lib/interventionFlow/emptyState'
 import { DEFAULT_WORKFLOW_REPLAY_DELAY_MS, getOpinionBalanceLogStreamUrl, shouldCallOpinionBalanceProcessApi } from '../lib/interventionFlow/replayConfig'
+import { toUserMilestone } from '../lib/interventionFlow/milestones'
 import { getRoleTabButtonClassName } from '../lib/interventionFlow/roleTabStyles'
 import { getInterventionFlowPanelClassName, getLeaderCommentsContainerClassName } from '../lib/interventionFlow/panelLayout'
 import { buildRolePills } from '../lib/interventionFlow/rolePills'
@@ -20,7 +21,7 @@ import { getAnalystCombinedCardClassName, getAnalystCombinedPostBodyClassName, g
 import { buildStageStepperModel } from '../lib/interventionFlow/stageStepper'
 import { getLiveBadgeClassName, getStageHeaderContainerClassName, getStageHeaderTextClassName, getStageSegmentClassName } from '../lib/interventionFlow/detailHeaderLayout'
 import { getDynamicDemoGridClassName } from '../lib/interventionFlow/pageGridLayout'
-import { createFixedRateLineQueue } from '../lib/interventionFlow/logRenderQueue'
+import { createTimestampSmoothLineQueue } from '../lib/interventionFlow/logRenderQueue'
 import { useLeaderboard } from '../hooks/useLeaderboard'
 import { usePostDetail } from '../hooks/usePostDetail'
 import { usePostComments } from '../hooks/usePostComments'
@@ -58,12 +59,18 @@ const USE_SIMULATED_LOG_STREAM = false
 const USE_WORKFLOW_LOG_REPLAY = false
 // One full round only (a single "action_..." cycle) so the demo doesn't endlessly chain.
 const WORKFLOW_REPLAY_BACKEND_FILE = 'replay_workflow_20260130_round1.log'
-// Slower replay so the user can actually read the UI while it streams.
-const WORKFLOW_REPLAY_DELAY_MS = DEFAULT_WORKFLOW_REPLAY_DELAY_MS * 5
+// Replay: let the frontend control pacing based on timestamps (avoid double-throttling).
+const WORKFLOW_REPLAY_DELAY_MS = 0
 
-// Full-time smoothing: render log lines at a fixed cadence to avoid bursty UI updates.
-const LOG_RENDER_INTERVAL_MS = 80
-const LOG_RENDER_MAX_LINES_PER_TICK = 1
+// Fixed-speed replay: slow and readable (consistent pacing across lines).
+const LOG_RENDER_MIN_DELAY_MS = 200
+const LOG_RENDER_MAX_DELAY_MS = 4000
+const LOG_RENDER_TIME_SCALE = 0.01
+const LOG_RENDER_SMOOTHING_ALPHA = 0
+const LOG_RENDER_DELAY_DEFAULT_MS = 1400
+const LOG_RENDER_DELAY_ANALYST_STAGE0_MS = 650
+const LOG_RENDER_DELAY_ANALYST_STAGE_1_TO_3_MS = 2200
+const LOG_RENDER_DELAY_ANALYST_STAGE_4_TO_5_MS = 1800
 
 interface HeatPost {
   id: string
@@ -261,9 +268,10 @@ export default function DynamicDemo() {
 
   const [flowState, setFlowState] = useState<FlowState>(() => createInitialFlowState())
   const [opinionBalanceStartMs, setOpinionBalanceStartMs] = useState<number | null>(null)
+  const enableEvoCorpsRef = useRef<boolean>(false)
   const streamRef = useRef<LogStream | null>(null)
   const unsubscribeRef = useRef<null | (() => void)>(null)
-  const renderQueueRef = useRef<ReturnType<typeof createFixedRateLineQueue> | null>(null)
+  const renderQueueRef = useRef<ReturnType<typeof createTimestampSmoothLineQueue> | null>(null)
 
   // 添加状态轮询机制
   useEffect(() => {
@@ -279,13 +287,9 @@ export default function DynamicDemo() {
 
         setIsRunning(bothRunning)
 
-        // Only sync opinion-balance toggle from backend when we actually manage the backend process.
-        // In workflow log replay mode, enableEvoCorps is a pure UI stream toggle and must not be
-        // overridden by status polling (otherwise it flips back off immediately).
-        if (shouldCallOpinionBalanceProcessApi(USE_WORKFLOW_LOG_REPLAY)) {
-          const obRunning = data.opinion_balance?.status === 'running'
-          setEnableEvoCorps(obRunning)
-        }
+        // NOTE: Do not auto-toggle the opinion balance panel based on backend status.
+        // The panel should start streaming only after the user clicks the toggle (so we can
+        // treat that moment as the "start time" for which logs should be shown).
       } catch (error) {
         console.error('Failed to check status:', error)
       }
@@ -299,6 +303,10 @@ export default function DynamicDemo() {
 
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    enableEvoCorpsRef.current = enableEvoCorps
+  }, [enableEvoCorps])
 
   useEffect(() => {
     // Spec:
@@ -329,13 +337,27 @@ export default function DynamicDemo() {
       delayMs: WORKFLOW_REPLAY_DELAY_MS,
       // Real-time: only show logs after the user clicked the toggle.
       sinceMs,
-      // Small tail to cover the click->connect gap, filtered by sinceMs on the backend.
-      tail: 200,
+      // Strict "after click": do not tail historical lines.
+      tail: 0,
     })
 
-    const renderQueue = createFixedRateLineQueue({
-      intervalMs: LOG_RENDER_INTERVAL_MS,
-      maxLinesPerTick: LOG_RENDER_MAX_LINES_PER_TICK,
+    const renderQueue = createTimestampSmoothLineQueue({
+      minDelayMs: LOG_RENDER_MIN_DELAY_MS,
+      maxDelayMs: LOG_RENDER_MAX_DELAY_MS,
+      timeScale: LOG_RENDER_TIME_SCALE,
+      smoothingAlpha: LOG_RENDER_SMOOTHING_ALPHA,
+      delayOverrideMs: (line) => {
+        const milestone = toUserMilestone(stripLogPrefix(line))
+        if (!milestone) return LOG_RENDER_DELAY_DEFAULT_MS
+        if (milestone === '分析师：开始分析' || milestone.startsWith('核心观点：') || milestone.startsWith('新回合：')) {
+          return LOG_RENDER_DELAY_ANALYST_STAGE0_MS
+        }
+        if (milestone === '分析师：权重汇总' || milestone === '分析师：极端度' || milestone.startsWith('分析师：情绪')) {
+          return LOG_RENDER_DELAY_ANALYST_STAGE_1_TO_3_MS
+        }
+        if (milestone.startsWith('分析师：')) return LOG_RENDER_DELAY_ANALYST_STAGE_4_TO_5_MS
+        return LOG_RENDER_DELAY_DEFAULT_MS
+      },
       onDrain: (lines) => {
         setFlowState((prev) => {
           let next = prev
@@ -457,6 +479,34 @@ export default function DynamicDemo() {
               setOpinionBalanceStartMs(clickedAtMs)
               return
             }
+
+            // UI first: connect SSE from the current EOF so we only show logs after the click.
+            setOpinionBalanceStartMs(clickedAtMs)
+            setEnableEvoCorps(true)
+
+            // Then start the backend process slightly later (best-effort) to reduce the chance
+            // that startup logs are written before the SSE connection is established.
+            setTimeout(() => {
+              if (!enableEvoCorpsRef.current) return
+              void (async () => {
+                try {
+                  const response = await fetch('/api/dynamic/opinion-balance/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                  })
+                  const data = await response.json()
+                  if (!data.success && data.error !== 'ProcessAlreadyRunning') {
+                    alert(`启动舆论平衡失败：${data.message || '未知错误'}`)
+                    console.error('Failed to start opinion balance:', data)
+                  }
+                } catch (error) {
+                  alert(`启动舆论平衡失败：${error instanceof Error ? error.message : '网络错误'}`)
+                  console.error('Error starting opinion balance:', error)
+                }
+              })()
+            }, 150)
+            return
 
             try {
               // 调用后端 API 启动舆论平衡系统
@@ -1203,7 +1253,7 @@ function RoleDetailSection({
         {shouldShowStage ? (
           <div className={getStageHeaderContainerClassName()} title={stageModel.tooltip}>
             <div className={getStageHeaderTextClassName()}>
-              阶段：{stageModel.currentLabel}（{stageModel.seenCount}/{stageModel.total}）
+              阶段：{stageModel.currentLabel}（{stageModel.currentStep}/{stageModel.total}）
             </div>
             <div className="mt-1 flex items-center justify-end gap-1">
               {stageModel.stages.map((_, idx) => {
