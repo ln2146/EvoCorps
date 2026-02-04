@@ -192,27 +192,32 @@ def analyze_post_comments(body: PostCommentsAnalysisRequest):
 
     user_prompt = f"""请基于下面的内容进行分析：
 
-[主帖]
-作者: {post_author}
-内容: {post_content}
+    [主帖]
+    作者: {post_author}
+    内容: {post_content}
 
-[评论区]
-{comments_block}
+    [评论区]
+    {comments_block}
 
-你的任务是：
-1. 基于“全部评论的内容”，给出一个整体情绪度评分 sentiment_score_overall：
-   - 取值必须是以下五个离散值之一：0, 0.25, 0.5, 0.75, 1。
-2. 基于“全部评论的内容”，给出一个整体极端度评分 extremeness_score_overall：
-   - 取值必须是以下五个离散值之一：0, 0.25, 0.5, 0.75, 1。
-3. 用一段中文总结评论区的主要观点结构。
+    你的任务是：
+    1. **内部评估每条评论**（不在最终输出中显示）：
+    * 对每条评论的情感分数（sentiment_score）进行评估，使用以下五个离散值之一：0, 0.25, 0.5, 0.75, 1。
+    * 对每条评论的极端程度分数（extremeness_score）进行评估，使用以下五个离散值之一：0, 0.25, 0.5, 0.75, 1。
 
-请严格按照下面的 JSON 格式直接作答：
+    2. **计算整体分数**：
+    * 基于所有评论的情感分数，计算平均值，得到最终的 `sentiment_score_overall`。
+    * 基于所有评论的极端程度分数，计算平均值，得到最终的 `extremeness_score_overall`。
+    * **重要**：这两个整体分数应为 0 到 1 之间的任意数值（不限于那五个离散值），例如 0.33、0.67 等，以更精确地反映整体水平。
 
-{{
-  "sentiment_score_overall": <0|0.25|0.5|0.75|1>,
-  "extremeness_score_overall": <0|0.25|0.5|0.75|1>,
-  "summary": "……"
-}}"""
+    3. 用一段中文总结评论区的主要观点结构。
+
+    请严格按照下面的 JSON 格式直接作答，只返回整体分析结果：
+
+    {{
+    "sentiment_score_overall": 0.42, // 计算出的0-1之间的任意值
+    "extremeness_score_overall": 0.38, // 计算出的0-1之间的任意值
+    "summary": "一段中文总结，概括评论区的主要观点结构。"
+    }}"""
 
     # 3) 直接用 requests 调用 AIHUBMIX（与 curl 完全一致）
     try:
