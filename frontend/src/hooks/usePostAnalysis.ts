@@ -76,6 +76,52 @@ export interface UsePostAnalysisResult {
 const DEFAULT_INTERVAL = 60000 // 1 分钟
 const MIN_INTERVAL = 10000 // 最小 10 秒
 
+// localStorage 键名
+const STORAGE_KEY_PREFIX = 'postAnalysis_'
+const STORAGE_KEYS = {
+    trackedPostId: `${STORAGE_KEY_PREFIX}trackedPostId`,
+    currentMetrics: `${STORAGE_KEY_PREFIX}currentMetrics`,
+    metricsSeries: `${STORAGE_KEY_PREFIX}metricsSeries`,
+    latestResult: `${STORAGE_KEY_PREFIX}latestResult`,
+    summary: `${STORAGE_KEY_PREFIX}summary`,
+    interval: `${STORAGE_KEY_PREFIX}interval`,
+}
+
+/**
+ * 从 localStorage 加载数据
+ */
+function loadFromStorage<T>(key: string, defaultValue: T): T {
+    try {
+        const item = localStorage.getItem(key)
+        return item ? JSON.parse(item) : defaultValue
+    } catch (error) {
+        console.warn(`Failed to load from localStorage: ${key}`, error)
+        return defaultValue
+    }
+}
+
+/**
+ * 保存数据到 localStorage
+ */
+function saveToStorage<T>(key: string, value: T): void {
+    try {
+        localStorage.setItem(key, JSON.stringify(value))
+    } catch (error) {
+        console.warn(`Failed to save to localStorage: ${key}`, error)
+    }
+}
+
+/**
+ * 从 localStorage 删除数据
+ */
+function removeFromStorage(key: string): void {
+    try {
+        localStorage.removeItem(key)
+    } catch (error) {
+        console.warn(`Failed to remove from localStorage: ${key}`, error)
+    }
+}
+
 /**
  * 验证间隔值是否有效
  * @param value - 间隔值（毫秒）
@@ -103,33 +149,43 @@ function formatTime(date: Date): string {
 export function usePostAnalysis(options?: UsePostAnalysisOptions): UsePostAnalysisResult {
     const { defaultInterval = DEFAULT_INTERVAL } = options || {}
 
-    // 追踪状态
-    const [trackedPostId, setTrackedPostId] = useState<string | null>(null)
+    // 从 localStorage 加载初始状态
+    const [trackedPostId, setTrackedPostId] = useState<string | null>(() =>
+        loadFromStorage(STORAGE_KEYS.trackedPostId, null)
+    )
     const [isAnalyzing, setIsAnalyzing] = useState(false)
     const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>('Idle')
 
-    // 当前指标
-    const [currentMetrics, setCurrentMetrics] = useState({
-        sentiment: 0,
-        extremeness: 0,
+    // 当前指标 - 从 localStorage 加载
+    const [currentMetrics, setCurrentMetrics] = useState(() =>
+        loadFromStorage(STORAGE_KEYS.currentMetrics, { sentiment: 0, extremeness: 0 })
+    )
+
+    // 趋势数据 - 从 localStorage 加载
+    const [metricsSeries, setMetricsSeries] = useState<MetricsDataPoint[]>(() =>
+        loadFromStorage(STORAGE_KEYS.metricsSeries, [])
+    )
+
+    // 分析结果 - 从 localStorage 加载
+    const [latestResult, setLatestResult] = useState<AnalysisResult | null>(() =>
+        loadFromStorage(STORAGE_KEYS.latestResult, null)
+    )
+    const [summary, setSummary] = useState<string | null>(() =>
+        loadFromStorage(STORAGE_KEYS.summary, null)
+    )
+
+    // 配置 - 从 localStorage 加载
+    const [interval, setIntervalState] = useState(() => {
+        const saved = loadFromStorage(STORAGE_KEYS.interval, defaultInterval)
+        return validateInterval(saved) ? saved : defaultInterval
     })
-
-    // 趋势数据
-    const [metricsSeries, setMetricsSeries] = useState<MetricsDataPoint[]>([])
-
-    // 分析结果
-    const [latestResult, setLatestResult] = useState<AnalysisResult | null>(null)
-    const [summary, setSummary] = useState<string | null>(null)
-
-    // 配置
-    const [interval, setIntervalState] = useState(defaultInterval)
 
     // 定时器引用
     const timerRef = useRef<number | null>(null)
     // 追踪的 postId 引用（用于定时器回调中访问最新值）
-    const trackedPostIdRef = useRef<string | null>(null)
+    const trackedPostIdRef = useRef<string | null>(trackedPostId)
     // 间隔值引用
-    const intervalRef = useRef(defaultInterval)
+    const intervalRef = useRef(interval)
 
     // 同步 ref 值
     useEffect(() => {
@@ -142,6 +198,62 @@ export function usePostAnalysis(options?: UsePostAnalysisOptions): UsePostAnalys
 
     // 计算 isTracking
     const isTracking = trackedPostId !== null
+
+    // 持久化 trackedPostId
+    useEffect(() => {
+        if (trackedPostId !== null) {
+            saveToStorage(STORAGE_KEYS.trackedPostId, trackedPostId)
+        } else {
+            removeFromStorage(STORAGE_KEYS.trackedPostId)
+        }
+    }, [trackedPostId])
+
+    // 持久化 currentMetrics
+    useEffect(() => {
+        saveToStorage(STORAGE_KEYS.currentMetrics, currentMetrics)
+    }, [currentMetrics])
+
+    // 持久化 metricsSeries
+    useEffect(() => {
+        saveToStorage(STORAGE_KEYS.metricsSeries, metricsSeries)
+    }, [metricsSeries])
+
+    // 持久化 latestResult
+    useEffect(() => {
+        if (latestResult !== null) {
+            saveToStorage(STORAGE_KEYS.latestResult, latestResult)
+        } else {
+            removeFromStorage(STORAGE_KEYS.latestResult)
+        }
+    }, [latestResult])
+
+    // 持久化 summary
+    useEffect(() => {
+        if (summary !== null) {
+            saveToStorage(STORAGE_KEYS.summary, summary)
+        } else {
+            removeFromStorage(STORAGE_KEYS.summary)
+        }
+    }, [summary])
+
+    // 持久化 interval
+    useEffect(() => {
+        saveToStorage(STORAGE_KEYS.interval, interval)
+    }, [interval])
+
+    // 页面加载时恢复定时器（如果有追踪的帖子）
+    useEffect(() => {
+        if (trackedPostId && !timerRef.current) {
+            // 启动定时器
+            timerRef.current = window.setInterval(() => {
+                const currentPostId = trackedPostIdRef.current
+                if (currentPostId) {
+                    performAnalysis(currentPostId)
+                }
+            }, intervalRef.current)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []) // 只在组件挂载时执行一次
 
 
     /**
@@ -284,6 +396,19 @@ export function usePostAnalysis(options?: UsePostAnalysisOptions): UsePostAnalys
         setTrackedPostId(null)
         trackedPostIdRef.current = null
         setAnalysisStatus('Idle')
+
+        // 清除 localStorage 中的追踪数据
+        removeFromStorage(STORAGE_KEYS.trackedPostId)
+        removeFromStorage(STORAGE_KEYS.currentMetrics)
+        removeFromStorage(STORAGE_KEYS.metricsSeries)
+        removeFromStorage(STORAGE_KEYS.latestResult)
+        removeFromStorage(STORAGE_KEYS.summary)
+
+        // 重置状态
+        setCurrentMetrics({ sentiment: 0, extremeness: 0 })
+        setMetricsSeries([])
+        setLatestResult(null)
+        setSummary(null)
     }, [clearTimer])
 
 

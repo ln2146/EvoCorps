@@ -116,7 +116,15 @@ interface DynamicDemoData {
 }
 
 function useDynamicDemoApi() {
-  const [selectedPost, setSelectedPost] = useState<HeatPost | null>(null)
+  // 从 localStorage 加载 selectedPost
+  const [selectedPost, setSelectedPost] = useState<HeatPost | null>(() => {
+    try {
+      const saved = localStorage.getItem('dynamicDemo_selectedPost')
+      return saved ? JSON.parse(saved) : null
+    } catch {
+      return null
+    }
+  })
   const [commentSort, setCommentSort] = useState<'likes' | 'time'>('likes')
 
   // 使用 useLeaderboard Hook 获取热度榜数据
@@ -209,6 +217,39 @@ function useDynamicDemoApi() {
       },
     }
   }, [heatPosts, commentItems])
+
+  // 持久化 selectedPost
+  useEffect(() => {
+    if (selectedPost) {
+      try {
+        localStorage.setItem('dynamicDemo_selectedPost', JSON.stringify(selectedPost))
+      } catch (error) {
+        console.warn('Failed to save selectedPost to localStorage:', error)
+      }
+    } else {
+      try {
+        localStorage.removeItem('dynamicDemo_selectedPost')
+      } catch (error) {
+        console.warn('Failed to remove selectedPost from localStorage:', error)
+      }
+    }
+  }, [selectedPost])
+
+  // 页面加载时，如果有 trackedPostId 但没有 selectedPost，尝试从热度榜中恢复
+  useEffect(() => {
+    const trackedPostId = localStorage.getItem('postAnalysis_trackedPostId')
+    if (trackedPostId && !selectedPost && heatPosts.length > 0) {
+      try {
+        const postId = JSON.parse(trackedPostId)
+        const foundPost = heatPosts.find(p => (p.postId || p.id) === postId)
+        if (foundPost) {
+          setSelectedPost(foundPost)
+        }
+      } catch (error) {
+        console.warn('Failed to restore selectedPost from trackedPostId:', error)
+      }
+    }
+  }, [heatPosts, selectedPost])
 
   return {
     data,
