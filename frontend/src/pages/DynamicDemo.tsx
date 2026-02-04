@@ -14,7 +14,7 @@ import { getInterventionFlowPanelClassName, getLeaderCommentsContainerClassName 
 import { buildRolePills } from '../lib/interventionFlow/rolePills'
 import { getSummaryCardClassName } from '../lib/interventionFlow/summaryCardStyles'
 import { getSummaryGridClassName } from '../lib/interventionFlow/summaryGridLayout'
-import { formatAnalysisStatus, formatDemoRunStatus, formatSseStatus, formatTopCount } from '../lib/interventionFlow/uiLabels'
+import { formatDemoRunStatus, formatSseStatus, formatTopCount } from '../lib/interventionFlow/uiLabels'
 import { getHeatLeaderboardCardClassName, getHeatLeaderboardListClassName } from '../lib/interventionFlow/heatLeaderboardLayout'
 import { getAnalystCombinedCardClassName, getAnalystCombinedPostBodyClassName, getAnalystCombinedStreamClassName } from '../lib/interventionFlow/analystCombinedLayout'
 import { buildStageStepperModel } from '../lib/interventionFlow/stageStepper'
@@ -24,6 +24,7 @@ import { createFixedRateLineQueue } from '../lib/interventionFlow/logRenderQueue
 import { useLeaderboard } from '../hooks/useLeaderboard'
 import { usePostDetail } from '../hooks/usePostDetail'
 import { usePostComments } from '../hooks/usePostComments'
+import { usePostAnalysis } from '../hooks/usePostAnalysis'
 
 const DEMO_BACKEND_LOG_LINES: string[] = [
   '2026-01-28 21:13:09,286 - INFO - 📊 Phase 1: perception and decision',
@@ -249,13 +250,15 @@ export default function DynamicDemo() {
   } = useDynamicDemoApi()
   const sse = useDynamicDemoSSE()
 
+  // 集成 usePostAnalysis Hook
+  const postAnalysis = usePostAnalysis({ defaultInterval: 60000 })
+
   const [isRunning, setIsRunning] = useState(false)
   const [enableAttack, setEnableAttack] = useState(false)
   const [enableAftercare, setEnableAftercare] = useState(false)
   const [enableEvoCorps, setEnableEvoCorps] = useState(false)
 
   const [analysisOpen, setAnalysisOpen] = useState(false)
-  const [analysisStatus, setAnalysisStatus] = useState<'Idle' | 'Running' | 'Done' | 'Error'>('Idle')
 
   const [isStarting, setIsStarting] = useState(false)
   const [isTogglingAttack, setIsTogglingAttack] = useState(false)
@@ -374,7 +377,17 @@ export default function DynamicDemo() {
     }
   }, [enableEvoCorps, opinionBalanceStartMs])
 
-  const currentMetrics = data.metricsSeries[data.metricsSeries.length - 1]
+  // 使用 postAnalysis Hook 的指标数据，如果没有追踪则使用默认数据
+  // 统一字段名：emotion/extremity 用于显示
+  const defaultMetrics = data.metricsSeries[data.metricsSeries.length - 1] || { emotion: 0, extremity: 0 }
+  const currentMetrics = postAnalysis.isTracking
+    ? { emotion: postAnalysis.currentMetrics.sentiment, extremity: postAnalysis.currentMetrics.extremeness }
+    : defaultMetrics
+
+  // 使用 postAnalysis Hook 的趋势数据，如果没有追踪则使用默认数据
+  const metricsSeries = postAnalysis.isTracking && postAnalysis.metricsSeries.length > 0
+    ? postAnalysis.metricsSeries
+    : data.metricsSeries
 
   return (
     <DynamicDemoPage>
@@ -635,6 +648,8 @@ export default function DynamicDemo() {
                 onBack={() => setSelectedPost(null)}
                 isLoading={isLoading}
                 error={error || undefined}
+                isTracking={postAnalysis.trackedPostId === (selectedPost.postId || selectedPost.id)}
+                onStartTracking={() => postAnalysis.startTracking(selectedPost.postId || selectedPost.id)}
               />
               <CommentsCard
                 comments={data.comments}
@@ -649,7 +664,7 @@ export default function DynamicDemo() {
 
         <div className="space-y-6">
           <MetricsBarsCard emotion={currentMetrics.emotion} extremity={currentMetrics.extremity} />
-          <MetricsLineChartCard data={data.metricsSeries} />
+          <MetricsLineChartCard data={metricsSeries} />
         </div>
 
         <div className="space-y-6">
@@ -672,14 +687,29 @@ export default function DynamicDemo() {
       </div>
 
       <CommentaryAnalysisPanel
-        status={analysisStatus}
+        status={postAnalysis.analysisStatus}
+        summary={postAnalysis.summary}
         onOpenConfig={() => setAnalysisOpen(true)}
-        onRun={() => setAnalysisStatus('Running')}
+        onRun={() => postAnalysis.analyzeNow()}
+        isRunDisabled={!postAnalysis.isTracking}
+        runDisabledReason="请先选择一个帖子并开始分析"
+        trackedPostId={postAnalysis.trackedPostId}
+        trackedPostStats={
+          postAnalysis.isTracking && selectedPost
+            ? {
+              likeCount: postDetail?.likeCount ?? selectedPost.likeCount,
+              commentCount: postDetail?.commentCount ?? selectedPost.commentCount,
+              shareCount: postDetail?.shareCount ?? selectedPost.shareCount,
+            }
+            : null
+        }
       />
 
       <AnalysisConfigDialog
         open={analysisOpen}
         onClose={() => setAnalysisOpen(false)}
+        interval={postAnalysis.interval}
+        onSave={(newInterval) => postAnalysis.setInterval(newInterval)}
       />
     </DynamicDemoPage>
   )
@@ -867,13 +897,17 @@ function PostDetailCard({
   postDetail,
   onBack,
   isLoading,
-  error
+  error,
+  isTracking,
+  onStartTracking
 }: {
   post: HeatPost
   postDetail?: any
   onBack: () => void
   isLoading?: boolean
   error?: Error | null
+  isTracking?: boolean
+  onStartTracking?: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -883,6 +917,8 @@ function PostDetailCard({
     if (fullContent.length <= 180) return fullContent
     return `${fullContent.slice(0, 180)}...`
   }, [fullContent])
+
+  const shouldShowExpandButton = fullContent.length > 180
 
   return (
     <div className="glass-card p-6">
@@ -898,15 +934,23 @@ function PostDetailCard({
         </div>
         <div className="flex items-center gap-2">
           {isLoading && <StatusBadge label="加载中" tone="warning" />}
-          <button
-            onClick={() => setExpanded((prev) => !prev)}
-            className="w-9 h-9 rounded-full bg-white/80 border border-white/40 shadow-lg flex items-center justify-center text-slate-600 hover:bg-white transition-all"
-            title={expanded ? '折叠内容' : '展开内容'}
-          >
-            {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-          </button>
-          <button onClick={onBack} className="btn-secondary inline-flex items-center gap-2">
-            <ArrowLeft size={16} />
+          {isTracking && <StatusBadge label="追踪中" tone="success" />}
+          {onStartTracking && (
+            <button
+              onClick={onStartTracking}
+              disabled={isTracking}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 transition-all ${isTracking
+                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-blue-500 to-green-500 text-white hover:shadow-lg'
+                }`}
+              title={isTracking ? '已在追踪中' : '开始分析此帖子'}
+            >
+              <Activity size={14} />
+              {isTracking ? '分析中' : '开始分析'}
+            </button>
+          )}
+          <button onClick={onBack} className="px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 bg-white/80 border border-white/40 text-slate-700 hover:bg-white transition-all">
+            <ArrowLeft size={14} />
             返回榜单
           </button>
         </div>
@@ -918,11 +962,33 @@ function PostDetailCard({
         </div>
       )}
 
-      <div className="space-y-3 text-sm text-slate-700">
+      <div className="space-y-2 text-sm text-slate-700">
         <p className="whitespace-pre-wrap break-words leading-relaxed">
           {expanded ? fullContent : previewText}
         </p>
-        <div className="flex items-center gap-4 text-xs text-slate-500">
+
+        {shouldShowExpandButton && (
+          <div className="flex justify-center py-1">
+            <button
+              onClick={() => setExpanded((prev) => !prev)}
+              className="px-4 py-2 rounded-lg bg-white/80 border border-white/40 text-slate-600 hover:bg-white transition-all inline-flex items-center gap-2 text-sm font-medium"
+            >
+              {expanded ? (
+                <>
+                  <ChevronUp size={16} />
+                  收起内容
+                </>
+              ) : (
+                <>
+                  <ChevronDown size={16} />
+                  展开全文
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-center gap-4 text-xs text-slate-500 pt-1 border-t border-slate-200/50">
           <span>作者：{post.authorId || post.author}</span>
           <span>发布时间：{new Date(post.createdAt).toLocaleString('zh-CN')}</span>
           {(post.likeCount !== undefined || postDetail?.likeCount !== undefined) && (
@@ -1400,7 +1466,32 @@ function RoleDetailSection({
 }
 
 
-function CommentaryAnalysisPanel({ status, onOpenConfig, onRun }: { status: 'Idle' | 'Running' | 'Done' | 'Error'; onOpenConfig: () => void; onRun: () => void }) {
+// CommentaryAnalysisPanel 组件接口
+interface CommentaryAnalysisPanelProps {
+  status: 'Idle' | 'Running' | 'Done' | 'Error'
+  summary: string | null
+  onOpenConfig: () => void
+  onRun: () => void
+  isRunDisabled?: boolean
+  runDisabledReason?: string
+  trackedPostId?: string | null
+  trackedPostStats?: {
+    likeCount?: number
+    commentCount?: number
+    shareCount?: number
+  } | null
+}
+
+function CommentaryAnalysisPanel({
+  status,
+  summary,
+  onOpenConfig,
+  onRun,
+  isRunDisabled = false,
+  runDisabledReason = '请先选择一个帖子并开始分析',
+  trackedPostId = null,
+  trackedPostStats = null
+}: CommentaryAnalysisPanelProps) {
   return (
     <div className="glass-card p-6">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
@@ -1409,61 +1500,242 @@ function CommentaryAnalysisPanel({ status, onOpenConfig, onRun }: { status: 'Idl
           <p className="text-sm text-slate-600">大模型周期性分析评论情绪与极化趋势</p>
         </div>
         <div className="flex flex-wrap gap-3">
+          {/* 分析配置按钮 */}
           <button className="btn-secondary" onClick={onOpenConfig}>分析配置</button>
-          <button className="btn-primary" onClick={onRun}>立即分析</button>
-          <StatusBadge label={formatAnalysisStatus(status)} tone={status === 'Running' ? 'warning' : status === 'Done' ? 'success' : status === 'Error' ? 'danger' : 'muted'} />
+          {/* 立即分析按钮 - 支持禁用状态和提示 */}
+          <div className="relative group">
+            <button
+              className={`btn-primary ${isRunDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              onClick={isRunDisabled ? undefined : onRun}
+              disabled={isRunDisabled}
+            >
+              立即分析
+            </button>
+            {/* 禁用时显示提示 */}
+            {isRunDisabled && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                {runDisabledReason}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+              </div>
+            )}
+          </div>
+          {/* 分析状态徽章 */}
+          <AnalysisStatusBadge status={status} />
         </div>
       </div>
-      <AnalysisResultView status={status} />
+
+      {/* 追踪帖子信息 */}
+      {trackedPostId && (
+        <div className="mt-4 bg-blue-50/70 border border-blue-200/50 rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Activity className="text-blue-600" size={16} />
+            <span className="text-sm text-slate-700">
+              正在追踪：<span className="font-semibold text-blue-700">{trackedPostId}</span>
+            </span>
+          </div>
+          {trackedPostStats && (
+            <div className="flex items-center gap-4 text-xs text-slate-600 ml-6">
+              {trackedPostStats.likeCount !== undefined && (
+                <span>👍 点赞：<span className="font-medium">{trackedPostStats.likeCount}</span></span>
+              )}
+              {trackedPostStats.commentCount !== undefined && (
+                <span>💬 评论：<span className="font-medium">{trackedPostStats.commentCount}</span></span>
+              )}
+              {trackedPostStats.shareCount !== undefined && (
+                <span>🔄 分享：<span className="font-medium">{trackedPostStats.shareCount}</span></span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      <AnalysisResultView status={status} summary={summary} />
     </div>
   )
 }
 
-function AnalysisConfigDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+// 分析状态徽章组件
+function AnalysisStatusBadge({ status }: { status: 'Idle' | 'Running' | 'Done' | 'Error' }) {
+  const statusConfig: Record<typeof status, { label: string; tone: 'success' | 'warning' | 'danger' | 'info' | 'muted' }> = {
+    Idle: { label: '空闲', tone: 'muted' },
+    Running: { label: '分析中', tone: 'warning' },
+    Done: { label: '已完成', tone: 'success' },
+    Error: { label: '错误', tone: 'danger' }
+  }
+
+  const config = statusConfig[status]
+  return <StatusBadge label={config.label} tone={config.tone} />
+}
+
+/**
+ * 分析配置对话框 Props 接口
+ * Requirements: 7.2, 7.3
+ */
+interface AnalysisConfigDialogProps {
+  /** 对话框是否打开 */
+  open: boolean
+  /** 关闭对话框回调 */
+  onClose: () => void
+  /** 当前分析间隔（毫秒） */
+  interval: number
+  /** 保存新间隔值回调 */
+  onSave: (interval: number) => void
+}
+
+/**
+ * 验证间隔值是否有效
+ * Requirements: 7.5, 7.6
+ * @param value - 间隔值（毫秒）
+ * @returns 验证结果对象，包含是否有效和错误信息
+ */
+export function validateIntervalInput(value: number): { valid: boolean; error: string | null } {
+  // 检查是否为正整数
+  if (!Number.isInteger(value) || value <= 0) {
+    return { valid: false, error: '请输入正整数' }
+  }
+  // 检查是否不小于 10 秒（10000ms）
+  if (value < 10000) {
+    return { valid: false, error: '分析间隔不能小于 10 秒' }
+  }
+  return { valid: true, error: null }
+}
+
+/**
+ * 分析配置对话框组件
+ * 
+ * 提供 Analysis_Interval 输入框，支持输入验证
+ * 默认值为 1 分钟（60000ms）
+ * 
+ * Requirements: 7.2, 7.3, 7.5, 7.6
+ */
+function AnalysisConfigDialog({ open, onClose, interval, onSave }: AnalysisConfigDialogProps) {
+  // 将毫秒转换为秒用于显示
+  const [inputValue, setInputValue] = useState<string>(String(interval / 1000))
+  const [validationError, setValidationError] = useState<string | null>(null)
+
+  // 当对话框打开或 interval 变化时，重置输入值
+  useEffect(() => {
+    if (open) {
+      setInputValue(String(interval / 1000))
+      setValidationError(null)
+    }
+  }, [open, interval])
+
+  // 处理输入变化
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setInputValue(value)
+
+    // 实时验证
+    const numValue = parseFloat(value)
+    if (isNaN(numValue)) {
+      setValidationError('请输入有效数字')
+    } else {
+      const msValue = Math.round(numValue * 1000)
+      const result = validateIntervalInput(msValue)
+      setValidationError(result.error)
+    }
+  }
+
+  // 处理保存
+  const handleSave = () => {
+    const numValue = parseFloat(inputValue)
+    if (isNaN(numValue)) {
+      setValidationError('请输入有效数字')
+      return
+    }
+
+    const msValue = Math.round(numValue * 1000)
+    const result = validateIntervalInput(msValue)
+
+    if (!result.valid) {
+      setValidationError(result.error)
+      return
+    }
+
+    // 验证通过，保存并关闭
+    onSave(msValue)
+    onClose()
+  }
+
+  // 处理取消
+  const handleCancel = () => {
+    // 重置输入值并关闭
+    setInputValue(String(interval / 1000))
+    setValidationError(null)
+    onClose()
+  }
+
   if (!open) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-slate-900/30" onClick={onClose} />
+      <div className="absolute inset-0 bg-slate-900/30" onClick={handleCancel} />
       <div className="relative glass-card p-6 w-full max-w-lg mx-4">
         <h3 className="text-xl font-bold text-slate-800 mb-4">分析配置</h3>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">分析间隔（分钟）</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              分析间隔（秒）
+            </label>
             <input
               type="number"
-              defaultValue={10}
-              className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              min="10"
+              step="1"
+              value={inputValue}
+              onChange={handleInputChange}
+              className={`w-full px-4 py-2 rounded-xl border focus:outline-none focus:ring-2 ${validationError
+                ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                : 'border-slate-200 focus:ring-primary-500 focus:border-primary-500'
+                }`}
+              placeholder="输入分析间隔（秒）"
             />
-          </div>
-          <div className="flex items-center gap-3">
-            <input type="checkbox" defaultChecked className="w-5 h-5 rounded" />
-            <span className="text-sm text-slate-700">启用周期分析</span>
+            {/* 验证错误提示 */}
+            {validationError && (
+              <p className="mt-2 text-sm text-red-600">{validationError}</p>
+            )}
+            <p className="mt-2 text-xs text-slate-500">
+              最小值：10 秒，默认值：60 秒（1 分钟）
+            </p>
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
-          <button className="btn-secondary" onClick={onClose}>取消</button>
-          <button className="btn-primary" onClick={onClose}>保存</button>
+          <button className="btn-secondary" onClick={handleCancel}>取消</button>
+          <button
+            className={`btn-primary ${validationError ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={handleSave}
+            disabled={!!validationError}
+          >
+            保存
+          </button>
         </div>
       </div>
     </div>
   )
 }
 
-function AnalysisResultView({ status }: { status: 'Idle' | 'Running' | 'Done' | 'Error' }) {
+function AnalysisResultView({ status, summary }: { status: 'Idle' | 'Running' | 'Done' | 'Error'; summary: string | null }) {
+  // 根据状态确定摘要显示内容
+  const getSummaryContent = () => {
+    if (status === 'Running') {
+      return (
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-slate-500">正在分析中...</span>
+        </div>
+      )
+    }
+    if (summary && summary.trim() !== '') {
+      return <p className="text-sm text-slate-600 leading-relaxed">{summary}</p>
+    }
+    return <p className="text-sm text-slate-500">暂无分析结果</p>
+  }
+
   return (
-    <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div className="mt-6">
       <div className="bg-white/70 rounded-2xl p-4 border border-white/40">
-        <h4 className="text-sm font-semibold text-slate-700 mb-2">分析摘要</h4>
-        <p className="text-sm text-slate-600">当前分析状态：{formatAnalysisStatus(status)}。后续将展示总结性文本。</p>
-      </div>
-      <div className="bg-white/70 rounded-2xl p-4 border border-white/40">
-        <h4 className="text-sm font-semibold text-slate-700 mb-2">情绪结构</h4>
-        <p className="text-sm text-slate-600">结构化结果占位：正/负情绪比例，重点人群。</p>
-      </div>
-      <div className="bg-white/70 rounded-2xl p-4 border border-white/40">
-        <h4 className="text-sm font-semibold text-slate-700 mb-2">系统建议</h4>
-        <p className="text-sm text-slate-600">策略建议与风险提示占位。</p>
+        <h4 className="text-sm font-semibold text-slate-700 mb-3">分析摘要</h4>
+        {getSummaryContent()}
       </div>
     </div>
   )

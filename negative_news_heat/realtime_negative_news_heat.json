@@ -1,10 +1,10 @@
 {
-  "simulation_timestamp": "20260204_103642",
-  "created_at": "2026-02-04T10:41:33.378339",
-  "last_update": "2026-02-04T10:41:33.378339",
-  "total_timesteps": 1,
+  "simulation_timestamp": "20260204_212907",
+  "created_at": "2026-02-04T21:36:29.818643",
+  "last_update": "2026-02-04T21:36:29.818643",
+  "total_timesteps": 2,
   "posts": {
-    "post-7589bf": {
+    "post-bdcd65": {
       "info": {
         "extremism_level": 3,
         "news_type": "fake",
@@ -14,8 +14,30 @@
       "history": [
         {
           "timestep": 1,
+          "comments": 3,
+          "likes": 0,
+          "shares": 0
+        },
+        {
+          "timestep": 2,
           "comments": 7,
-          "likes": 2,
+          "likes": 0,
+          "shares": 0
+        }
+      ]
+    },
+    "post-c09bd0": {
+      "info": {
+        "extremism_level": 3,
+        "news_type": "fake",
+        "bucket": "extreme",
+        "injection_timestep": 2
+      },
+      "history": [
+        {
+          "timestep": 2,
+          "comments": 3,
+          "likes": 0,
           "shares": 0
         }
       ]
