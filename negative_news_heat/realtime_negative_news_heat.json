@@ -1,10 +1,10 @@
 {
-  "simulation_timestamp": "20260204_214438",
-  "created_at": "2026-02-04T22:02:08.358489",
-  "last_update": "2026-02-04T22:02:08.358489",
-  "total_timesteps": 4,
+  "simulation_timestamp": "20260204_221753",
+  "created_at": "2026-02-04T22:25:25.184702",
+  "last_update": "2026-02-04T22:25:25.184702",
+  "total_timesteps": 2,
   "posts": {
-    "post-b5701e": {
+    "post-d439fa": {
       "info": {
         "extremism_level": 3,
         "news_type": "fake",
@@ -14,31 +14,19 @@
       "history": [
         {
           "timestep": 1,
-          "comments": 4,
-          "likes": 1,
+          "comments": 5,
+          "likes": 0,
           "shares": 0
         },
         {
           "timestep": 2,
-          "comments": 8,
-          "likes": 1,
-          "shares": 0
-        },
-        {
-          "timestep": 3,
-          "comments": 13,
-          "likes": 1,
-          "shares": 0
-        },
-        {
-          "timestep": 4,
-          "comments": 14,
-          "likes": 1,
+          "comments": 12,
+          "likes": 0,
           "shares": 0
         }
       ]
     },
-    "post-8b5b99": {
+    "post-f40dc3": {
       "info": {
         "extremism_level": 3,
         "news_type": "fake",
@@ -49,56 +37,6 @@
         {
           "timestep": 2,
           "comments": 4,
-          "likes": 1,
-          "shares": 0
-        },
-        {
-          "timestep": 3,
-          "comments": 10,
-          "likes": 1,
-          "shares": 0
-        },
-        {
-          "timestep": 4,
-          "comments": 14,
-          "likes": 1,
-          "shares": 0
-        }
-      ]
-    },
-    "post-a4da64": {
-      "info": {
-        "extremism_level": 3,
-        "news_type": "fake",
-        "bucket": "extreme",
-        "injection_timestep": 3
-      },
-      "history": [
-        {
-          "timestep": 3,
-          "comments": 2,
-          "likes": 0,
-          "shares": 0
-        },
-        {
-          "timestep": 4,
-          "comments": 5,
-          "likes": 0,
-          "shares": 0
-        }
-      ]
-    },
-    "post-7d4de8": {
-      "info": {
-        "extremism_level": 3,
-        "news_type": "fake",
-        "bucket": "extreme",
-        "injection_timestep": 4
-      },
-      "history": [
-        {
-          "timestep": 4,
-          "comments": 2,
           "likes": 0,
           "shares": 0
         }

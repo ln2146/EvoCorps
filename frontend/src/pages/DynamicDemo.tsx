@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode, type ElementType } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type ElementType, useCallback } from 'react'
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -134,19 +134,24 @@ function useDynamicDemoApi() {
     error: leaderboardError
   } = useLeaderboard({ enableSSE: true, limit: 20 })
 
+  // 计算当前选中的帖子 ID，确保状态一致性
+  const selectedPostId = useMemo(() => {
+    return selectedPost?.postId || selectedPost?.id || null
+  }, [selectedPost])
+
   // 使用 usePostDetail Hook 获取帖子详情
   const {
     data: postDetail,
     isLoading: postDetailLoading,
     error: postDetailError
-  } = usePostDetail(selectedPost?.postId || selectedPost?.id || null)
+  } = usePostDetail(selectedPostId)
 
   // 使用 usePostComments Hook 获取评论列表
   const {
     data: comments,
     isLoading: commentsLoading,
     error: commentsError
-  } = usePostComments(selectedPost?.postId || selectedPost?.id || null, commentSort)
+  } = usePostComments(selectedPostId, commentSort)
 
   // 将 API 数据转换为组件所需格式
   const heatPosts: HeatPost[] = useMemo(() => {
@@ -235,28 +240,39 @@ function useDynamicDemoApi() {
     }
   }, [selectedPost])
 
+  // 创建一个安全的 setSelectedPost 包装函数，确保状态更新正确触发
+  const handleSetSelectedPost = useCallback((post: HeatPost | null) => {
+    setSelectedPost(post)
+  }, [])
+
   // 页面加载时，如果有 trackedPostId 但没有 selectedPost，尝试从热度榜中恢复
+  // 使用 ref 来避免在用户主动点击"返回榜单"后自动恢复
+  const hasRestoredRef = useRef(false)
   useEffect(() => {
+    // 只在首次加载时尝试恢复一次
+    if (hasRestoredRef.current) return
+
     const trackedPostId = localStorage.getItem('postAnalysis_trackedPostId')
     if (trackedPostId && !selectedPost && heatPosts.length > 0) {
       try {
         const postId = JSON.parse(trackedPostId)
         const foundPost = heatPosts.find(p => (p.postId || p.id) === postId)
         if (foundPost) {
-          setSelectedPost(foundPost)
+          handleSetSelectedPost(foundPost)
+          hasRestoredRef.current = true
         }
       } catch (error) {
         console.warn('Failed to restore selectedPost from trackedPostId:', error)
       }
     }
-  }, [heatPosts, selectedPost])
+  }, [heatPosts, selectedPost, handleSetSelectedPost])
 
   return {
     data,
     isLoading,
     error,
     selectedPost,
-    setSelectedPost,
+    setSelectedPost: handleSetSelectedPost,
     commentSort,
     setCommentSort,
     postDetail
@@ -673,7 +689,7 @@ export default function DynamicDemo() {
       />
 
       <div className={getDynamicDemoGridClassName()}>
-        <div className="space-y-6">
+        <div className="space-y-6" key={selectedPost ? 'detail-view' : 'list-view'}>
           {!selectedPost ? (
             <HeatLeaderboardCard
               posts={data.heatPosts}
