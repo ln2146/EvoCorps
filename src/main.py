@@ -78,7 +78,11 @@ def set_attack_flag(body: ToggleRequest):
 
 @control_app.post("/control/aftercare")
 def set_aftercare_flag(body: ToggleRequest):
-    """Enable or disable post-hoc intervention at runtime."""
+    """Enable or disable third-party fact checking at runtime.
+    
+    This controls the third-party fact checking system (_run_fact_checking_async).
+    Truth appending is NOT affected by this flag and runs unconditionally.
+    """
 
     control_flags.aftercare_enabled = bool(body.enabled)
     return {"aftercare_enabled": control_flags.aftercare_enabled}
@@ -762,6 +766,13 @@ if __name__ == "__main__":
     # Select fact-checking system
     fact_check_type = get_user_choice_fact_checking()
     fact_check_settings = get_fact_checking_settings(fact_check_type)
+    
+    # CLI 选择直接写入全局事实核查开关，成为单一真值来源
+    # 与恶意攻击开关类似的控制逻辑
+    if fact_check_type == "third_party_fact_checking":
+        control_flags.aftercare_enabled = True
+    else:
+        control_flags.aftercare_enabled = False
 
     # Get user choice for the prebunking system
     enable_prebunking = get_user_choice_prebunking()
@@ -790,6 +801,8 @@ if __name__ == "__main__":
     config['opinion_balance_system']['monitoring_interval'] = monitoring_interval
 
     # Update fact-checking config
+    # 保留 experiment type 和 settings 供日志/其他组件参考，
+    # 但实际是否执行事实核查已完全由 control_flags.aftercare_enabled 控制
     if 'experiment' not in config:
         config['experiment'] = {}
 
@@ -829,12 +842,15 @@ if __name__ == "__main__":
     if enable_prebunking:
         print("   • Will insert safety prompts into regular users' feeds")
 
-    if fact_check_type == "third_party_fact_checking":
+    # 显示第三方事实核查状态（由全局开关控制）
+    if control_flags.aftercare_enabled:
         print("🔍 Third-party fact checking: ✅ enabled")
         print("   • Asynchronously check news content after each time step")
         print("   • Run in parallel with the main flow, without affecting user interaction")
+        print("   • Can be toggled via API at runtime")
     else:
         print("🔍 Third-party fact checking: ❌ disabled")
+        print("   • Can be enabled via API at runtime")
 
     # Show news configuration info
     news_config = config.get('news_injection', {})

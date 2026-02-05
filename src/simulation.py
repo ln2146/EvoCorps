@@ -98,26 +98,26 @@ class Simulation:
         # Initialize news spread analyzer with config
         self.news_spread_analyzer = NewsSpreadAnalyzer(self.db_manager, self.config)
 
-        # Initialize fact checker for both third-party and hybrid approaches
+        # Initialize fact checker - always initialize regardless of config
+        # Actual execution is controlled by control_flags.aftercare_enabled
         self.experiment_type = config.get('experiment', {}).get('type', 'none')
         self.experiment_settings = config.get('experiment', {}).get('settings', {})
-        if self.experiment_type in ["third_party_fact_checking", "hybrid_fact_checking"]:
-            # Use dedicated fact checker engine if specified, otherwise fallback to main engine
-            fact_checker_engine = self.experiment_settings.get("fact_checker_engine")
-            if not fact_checker_engine:
-                if self.multi_model_selector:
-                    fact_checker_engine = self.multi_model_selector.select_random_model(role="fact_checker")
-                else:
-                    fact_checker_engine = self.engine
-            self.fact_checker_engine = fact_checker_engine
-            self.fact_checker = FactChecker(
-                checker_id="main_checker",
-                temperature=self.experiment_settings.get('fact_checker_temperature', 0.3)
-            )
-            logging.info(f"🔍 Fact-check system initialized using model: {fact_checker_engine}")
-        else:
-            self.fact_checker = None
-            self.fact_checker_engine = None
+        
+        # Always initialize fact checker infrastructure
+        fact_checker_engine = self.experiment_settings.get("fact_checker_engine")
+        if not fact_checker_engine:
+            if self.multi_model_selector:
+                fact_checker_engine = self.multi_model_selector.select_random_model(role="fact_checker")
+            else:
+                fact_checker_engine = self.engine
+        
+        self.fact_checker_engine = fact_checker_engine
+        self.fact_checker = FactChecker(
+            checker_id="main_checker",
+            temperature=self.experiment_settings.get('fact_checker_temperature', 0.3)
+        )
+        logging.info(f"🔍 Fact-check infrastructure initialized using model: {fact_checker_engine}")
+        logging.info(f"🔍 Fact-check execution controlled by control_flags.aftercare_enabled (current: {control_flags.aftercare_enabled})")
 
         # Initialize opinion balance manager (only if enabled)
         if config.get("opinion_balance_system", {}).get("enabled", False):
@@ -253,8 +253,9 @@ class Simulation:
             logging.error(f"Failed to preload/ask first malicious news before timestep 1: {e}")
 
         # Get fact checking settings if applicable for both third-party and hybrid
-        fact_check_limit = self.experiment_settings.get('posts_per_step', 5) if self.experiment_type in ["third_party_fact_checking", "hybrid_fact_checking"] else 0
-        fact_check_start_delay = self.experiment_settings.get('start_delay_minutes', 5) if self.experiment_type in ["third_party_fact_checking", "hybrid_fact_checking"] else 0
+        # 始终使用第三方事实核查的设置，实际执行由 control_flags.aftercare_enabled 控制
+        fact_check_limit = self.experiment_settings.get('posts_per_step', 5)
+        fact_check_start_delay = self.experiment_settings.get('start_delay_minutes', 5)
 
         # Track all injected news post IDs
         injected_news_posts = []
@@ -283,10 +284,11 @@ class Simulation:
 
             # Run fact checking at the START of each step (checks news from 3 timesteps ago)
             # e.g., timestep 4 checks news from timestep 1, timestep 5 checks news from timestep 2
-            if (self.experiment_type in ["third_party_fact_checking", "hybrid_fact_checking"] and
-                self.fact_checker and step >= 3):
+            # 完全由全局开关 control_flags.aftercare_enabled 控制（CLI 输入或 API 修改）
+            if self.fact_checker and step >= 3 and control_flags.aftercare_enabled:
                 logging.info(f"🔍 Time step {step + 1}: starting third-party fact check (checking news from time step {step - 2})")
-                await self._run_fact_checking_async(step, fact_check_limit, current_timestep=step)
+                # 始终使用 "third_party_fact_checking" 作为 experiment_type，不受 CLI 输入影响
+                await self._run_fact_checking_async(step, fact_check_limit, current_timestep=step, experiment_type="third_party_fact_checking")
 
             # Discover the very first malicious news if not yet captured
             try:
@@ -521,9 +523,15 @@ class Simulation:
         except Exception as e:
             logging.error(f"❌ Malicious bot batch attack exception: {e}")
 
-    async def _run_fact_checking_async(self, step: int, fact_check_limit: int, current_timestep: int = None):
+    async def _run_fact_checking_async(self, step: int, fact_check_limit: int, current_timestep: int = None, experiment_type: str = "third_party_fact_checking"):
         """
         Run fact checking asynchronously without blocking the main flow
+        
+        Args:
+            step: Current simulation step
+            fact_check_limit: Maximum number of posts to check
+            current_timestep: Current timestep for filtering posts
+            experiment_type: Type of fact checking experiment (default: "third_party_fact_checking")
         """
         try:
             if current_timestep is not None:
@@ -533,7 +541,7 @@ class Simulation:
 
             posts_to_check = self.fact_checker.get_posts_to_check(
                 limit=fact_check_limit,
-                experiment_type=self.experiment_type,
+                experiment_type=experiment_type,  # 使用传入的 experiment_type
                 current_timestep=current_timestep
             )
 
@@ -549,7 +557,7 @@ class Simulation:
 
             fact_check_tasks = []
             for post in posts_to_check:
-                task = self._fact_check_single_post_async(post, step)
+                task = self._fact_check_single_post_async(post, step, experiment_type)
                 fact_check_tasks.append(task)
 
             # Wait for all fact-checking tasks to finish
@@ -574,9 +582,14 @@ class Simulation:
         except Exception as e:
             logging.error(f"Error occurred during async fact checking: {e}")
 
-    async def _fact_check_single_post_async(self, post, step: int):
+    async def _fact_check_single_post_async(self, post, step: int, experiment_type: str = "third_party_fact_checking"):
         """
         Asynchronously check a single post
+        
+        Args:
+            post: Post object to check
+            step: Current simulation step
+            experiment_type: Type of fact checking experiment
         """
         try:
             # LLM call section (can run concurrently and is time-consuming)
@@ -604,7 +617,7 @@ class Simulation:
                 self.fact_checker._record_verdict(
                     post.post_id,
                     verdict,
-                    self.experiment_type
+                    experiment_type  # 使用传入的 experiment_type
                 )
 
             # NOTE: Takedown mechanism disabled (see src/fact_checker.py).
@@ -689,11 +702,8 @@ class Simulation:
             # User reacts to their feed — even in fact-check mode, show the full feed (including user posts)
             feed = user.get_feed(experiment_config=self.config, time_step=step)
 
-            # 事后干预完全由全局开关 control_flags.aftercare_enabled 控制：
-            # True 时启用，False/None 时关闭。
-            aftercare_effective = bool(control_flags.aftercare_enabled)
-
-            if aftercare_effective and step >= 4 and self.news_manager:
+            # 真相拼接机制：到达规定时间步后无条件执行，不受 aftercare_enabled 控制
+            if step >= 4 and self.news_manager:
                 feed = self._append_truth_to_fake_news_posts_with_delay(feed, step)
 
             await user.react_to_feed(self.openai_client, self.engine, feed)

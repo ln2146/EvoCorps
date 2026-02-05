@@ -1,10 +1,10 @@
 {
-  "simulation_timestamp": "20260205_134848",
-  "created_at": "2026-02-05T14:01:59.217361",
-  "last_update": "2026-02-05T14:01:59.217361",
-  "total_timesteps": 3,
+  "simulation_timestamp": "20260205_212116",
+  "created_at": "2026-02-05T21:24:23.296367",
+  "last_update": "2026-02-05T21:24:23.296367",
+  "total_timesteps": 6,
   "posts": {
-    "post-33c0be": {
+    "post-6c8ee5": {
       "info": {
         "extremism_level": 3,
         "news_type": "fake",
@@ -14,25 +14,43 @@
       "history": [
         {
           "timestep": 1,
-          "comments": 2,
+          "comments": 1,
           "likes": 0,
           "shares": 0
         },
         {
           "timestep": 2,
-          "comments": 19,
-          "likes": 15,
+          "comments": 2,
+          "likes": 0,
           "shares": 0
         },
         {
           "timestep": 3,
-          "comments": 20,
-          "likes": 15,
+          "comments": 2,
+          "likes": 0,
+          "shares": 0
+        },
+        {
+          "timestep": 4,
+          "comments": 3,
+          "likes": 0,
+          "shares": 0
+        },
+        {
+          "timestep": 5,
+          "comments": 3,
+          "likes": 0,
+          "shares": 0
+        },
+        {
+          "timestep": 6,
+          "comments": 4,
+          "likes": 0,
           "shares": 0
         }
       ]
     },
-    "post-a66a58": {
+    "post-143938": {
       "info": {
         "extremism_level": 3,
         "news_type": "fake",
@@ -42,19 +60,37 @@
       "history": [
         {
           "timestep": 2,
-          "comments": 19,
-          "likes": 15,
+          "comments": 1,
+          "likes": 0,
           "shares": 0
         },
         {
           "timestep": 3,
-          "comments": 25,
-          "likes": 15,
+          "comments": 2,
+          "likes": 0,
+          "shares": 0
+        },
+        {
+          "timestep": 4,
+          "comments": 2,
+          "likes": 0,
+          "shares": 0
+        },
+        {
+          "timestep": 5,
+          "comments": 2,
+          "likes": 0,
+          "shares": 0
+        },
+        {
+          "timestep": 6,
+          "comments": 2,
+          "likes": 0,
           "shares": 0
         }
       ]
     },
-    "post-a718c1": {
+    "post-3e305d": {
       "info": {
         "extremism_level": 3,
         "news_type": "fake",
@@ -64,7 +100,91 @@
       "history": [
         {
           "timestep": 3,
+          "comments": 1,
+          "likes": 0,
+          "shares": 0
+        },
+        {
+          "timestep": 4,
+          "comments": 1,
+          "likes": 0,
+          "shares": 0
+        },
+        {
+          "timestep": 5,
+          "comments": 2,
+          "likes": 0,
+          "shares": 0
+        },
+        {
+          "timestep": 6,
+          "comments": 2,
+          "likes": 0,
+          "shares": 0
+        }
+      ]
+    },
+    "post-395fa7": {
+      "info": {
+        "extremism_level": 3,
+        "news_type": "fake",
+        "bucket": "extreme",
+        "injection_timestep": 4
+      },
+      "history": [
+        {
+          "timestep": 4,
+          "comments": 1,
+          "likes": 1,
+          "shares": 0
+        },
+        {
+          "timestep": 5,
+          "comments": 1,
+          "likes": 1,
+          "shares": 0
+        },
+        {
+          "timestep": 6,
+          "comments": 1,
+          "likes": 1,
+          "shares": 0
+        }
+      ]
+    },
+    "post-4b2e52": {
+      "info": {
+        "extremism_level": 3,
+        "news_type": "fake",
+        "bucket": "extreme",
+        "injection_timestep": 5
+      },
+      "history": [
+        {
+          "timestep": 5,
           "comments": 0,
+          "likes": 0,
+          "shares": 0
+        },
+        {
+          "timestep": 6,
+          "comments": 0,
+          "likes": 0,
+          "shares": 0
+        }
+      ]
+    },
+    "post-e8cfef": {
+      "info": {
+        "extremism_level": 3,
+        "news_type": "fake",
+        "bucket": "extreme",
+        "injection_timestep": 6
+      },
+      "history": [
+        {
+          "timestep": 6,
+          "comments": 1,
           "likes": 0,
           "shares": 0
         }

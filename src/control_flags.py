@@ -21,10 +21,14 @@ from typing import Dict, Optional
 attack_enabled: bool = False
 
 
-# Whether post‑hoc intervention (e.g. official explanations / fact
-# notes) is enabled during the simulation.
-# True  -> enable aftercare logic
-# False -> completely disable aftercare
+# Whether post‑hoc intervention (third-party fact checking) is enabled.
+# This flag controls the third-party fact checking system.
+#
+# True  -> enable third-party fact checking (_run_fact_checking_async)
+# False -> completely disable third-party fact checking
+#
+# NOTE: Truth appending (_append_truth_to_fake_news_posts_with_delay) 
+# executes unconditionally and is NOT controlled by this flag.
 aftercare_enabled: bool = True
 
 
