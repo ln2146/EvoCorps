@@ -514,7 +514,9 @@ class Simulation:
                 else:
                     logging.info("📊 Malicious bots: no qualifying target posts")
             else:
-                logging.warning(f"⚠️ Malicious bot batch attack failed: {attack_result.get('error', 'unknown')}")
+                # 同时检查 error 和 reason 字段
+                error_msg = attack_result.get('error') or attack_result.get('reason', 'unknown')
+                logging.warning(f"⚠️ Malicious bot batch attack failed: {error_msg}")
 
         except Exception as e:
             logging.error(f"❌ Malicious bot batch attack exception: {e}")

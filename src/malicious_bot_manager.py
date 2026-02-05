@@ -24,7 +24,8 @@ class MaliciousBotManager:
     
     def __init__(self, config: Dict[str, Any], db_manager):
         self.config = config.get("malicious_bot_system", {})
-        self.enabled = self.config.get("enabled", False)
+        # 移除 self.enabled，不再依赖配置文件的 enabled 字段
+        # 运行时控制完全由 control_flags.attack_enabled 负责
         self.db_manager = db_manager
         self.conn = db_manager.conn
 
@@ -38,16 +39,14 @@ class MaliciousBotManager:
         self.malicious_prefix = ""  # Remove obvious prefix to make malicious comments less obvious
         self.fake_news_attack_size = self.config.get("fake_news_attack_size", self.cluster_size)
        
-        # Initialize the malicious bot cluster using the dynamic persona extraction version
-        if self.enabled:
-            self.bot_cluster = SimpleMaliciousCluster(self.cluster_size)
-            self._create_database_tables()
-            logging.info(f"🔥 Malicious bot system enabled – selecting {self.cluster_size} personas per attack")
-            print(f"Malicious bot cluster initialized. Cluster size: {self.cluster_size}")
-            # Threshold-based prints removed to avoid confusion; thresholds are not used in batch mode
-        else:
-            self.bot_cluster = None
-            logging.info("Malicious bot system disabled")
+        # 始终初始化 bot_cluster，不管配置如何
+        # 实际的执行控制由 control_flags.attack_enabled 在运行时决定
+        self.bot_cluster = SimpleMaliciousCluster(self.cluster_size)
+        self._create_database_tables()
+        logging.info(f"🔥 Malicious bot manager initialized with cluster size: {self.cluster_size}")
+        logging.info(f"   Runtime control via control_flags.attack_enabled")
+        print(f"Malicious bot cluster initialized. Cluster size: {self.cluster_size}")
+        print(f"💡 Note: Actual attack execution is controlled by control_flags.attack_enabled")
     
     def _create_database_tables(self):
         """Create and validate tables that support the malicious bot workflows."""
@@ -820,8 +819,10 @@ Write your hostile post:"""
         Returns:
             A summary of the attack results
         """
-        if not self.enabled or not self.bot_cluster:
-            return {"success": False, "reason": "malicious_bot_system_disabled"}
+        # 只检查 bot_cluster 是否初始化，不再检查 self.enabled
+        # 实际的执行控制由 simulation.py 中的 control_flags.attack_enabled 负责
+        if not self.bot_cluster:
+            return {"success": False, "error": "bot_cluster_not_initialized"}
 
         try:
             # Unified result collection
