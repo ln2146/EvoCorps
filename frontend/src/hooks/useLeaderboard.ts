@@ -34,6 +34,7 @@ interface UseLeaderboardResult {
     error: Error | null
     timeStep: number | undefined
     fingerprint: string | undefined
+    refetch: () => Promise<void>
 }
 
 /**
@@ -53,7 +54,7 @@ export function useLeaderboard(options: UseLeaderboardOptions = {}): UseLeaderbo
     const lastFingerprintRef = useRef<string | null>(null)
 
     // 使用 React Query 获取初始数据
-    const { data, isLoading, error } = useQuery<LeaderboardResponse, Error>({
+    const { data, isLoading, error, refetch } = useQuery<LeaderboardResponse, Error>({
         queryKey: ['leaderboard', limit],
         queryFn: async () => {
             const response = await axios.get<LeaderboardResponse>('/api/leaderboard', {
@@ -127,5 +128,8 @@ export function useLeaderboard(options: UseLeaderboardOptions = {}): UseLeaderbo
         error: error || null,
         timeStep: data?.timeStep,
         fingerprint: data?.fingerprint,
+        refetch: async () => {
+            await refetch()
+        },
     }
 }

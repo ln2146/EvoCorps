@@ -138,7 +138,8 @@ function useDynamicDemoApi() {
   const {
     data: leaderboardItems,
     isLoading: leaderboardLoading,
-    error: leaderboardError
+    error: leaderboardError,
+    refetch: refetchLeaderboard
   } = useLeaderboard({ enableSSE: true, limit: 20 })
 
   // 计算当前选中的帖子 ID，确保状态一致性
@@ -202,13 +203,13 @@ function useDynamicDemoApi() {
       heatPosts,
       comments: commentItems,
       metricsSeries: [
-        { time: '10:00', emotion: 0.42, extremity: 0.18 },
-        { time: '10:05', emotion: 0.48, extremity: 0.21 },
-        { time: '10:10', emotion: 0.55, extremity: 0.27 },
-        { time: '10:15', emotion: 0.51, extremity: 0.24 },
-        { time: '10:20', emotion: 0.58, extremity: 0.32 },
-        { time: '10:25', emotion: 0.61, extremity: 0.29 },
-        { time: '10:30', emotion: 0.56, extremity: 0.23 },
+        { time: '10:00', emotion: 0.5, extremity: 0.5 },
+        { time: '10:05', emotion: 0.5, extremity: 0.5 },
+        { time: '10:10', emotion: 0.5, extremity: 0.5 },
+        { time: '10:15', emotion: 0.5, extremity: 0.5 },
+        { time: '10:20', emotion: 0.5, extremity: 0.5 },
+        { time: '10:25', emotion: 0.5, extremity: 0.5 },
+        { time: '10:30', emotion: 0.5, extremity: 0.5 },
       ],
       agentLogs: {
         Analyst: [
@@ -282,7 +283,8 @@ function useDynamicDemoApi() {
     setSelectedPost: handleSetSelectedPost,
     commentSort,
     setCommentSort,
-    postDetail
+    postDetail,
+    refetchLeaderboard
   }
 }
 
@@ -310,7 +312,8 @@ export default function DynamicDemo() {
     setSelectedPost,
     commentSort,
     setCommentSort,
-    postDetail
+    postDetail,
+    refetchLeaderboard
   } = useDynamicDemoApi()
   const sse = useDynamicDemoSSE()
 
@@ -458,7 +461,8 @@ export default function DynamicDemo() {
 
   // 使用 postAnalysis Hook 的指标数据，如果没有追踪则使用默认数据
   // 统一字段名：emotion/extremity 用于显示
-  const defaultMetrics = data.metricsSeries[data.metricsSeries.length - 1] || { emotion: 0, extremity: 0 }
+  // 默认值固定为 0.5
+  const defaultMetrics = { emotion: 0.5, extremity: 0.5 }
   const currentMetrics = postAnalysis.isTracking
     ? { emotion: postAnalysis.currentMetrics.sentiment, extremity: postAnalysis.currentMetrics.extremeness }
     : defaultMetrics
@@ -494,6 +498,16 @@ export default function DynamicDemo() {
               setIsRunning(true)
               sse.connect()
               setFlowState(createInitialFlowState())
+
+              // 重置所有状态到初始默认状态
+              // 1. 停止并清除帖子分析追踪
+              postAnalysis.stopTracking()
+
+              // 2. 清除选中的帖子
+              setSelectedPost(null)
+
+              // 3. 刷新热度榜数据
+              await refetchLeaderboard()
             } else {
               // 失败：显示错误消息
               alert(`启动失败：${data.message || '未知错误'}`)
@@ -529,6 +543,9 @@ export default function DynamicDemo() {
               // 成功：设置 isRunning 为 false，断开 SSE
               setIsRunning(false)
               sse.disconnect()
+
+              // 暂停帖子分析追踪（保留最后的分析结果）
+              postAnalysis.pauseTracking()
             } else {
               // 失败：显示错误消息
               alert(`停止失败：${data.message || '未知错误'}`)

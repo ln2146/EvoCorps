@@ -68,6 +68,7 @@ export interface UsePostAnalysisResult {
     // 操作
     startTracking: (postId: string) => void
     stopTracking: () => void
+    pauseTracking: () => void
     analyzeNow: () => Promise<void>
 }
 
@@ -156,9 +157,9 @@ export function usePostAnalysis(options?: UsePostAnalysisOptions): UsePostAnalys
     const [isAnalyzing, setIsAnalyzing] = useState(false)
     const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>('Idle')
 
-    // 当前指标 - 从 localStorage 加载
+    // 当前指标 - 从 localStorage 加载，默认值为 0.5
     const [currentMetrics, setCurrentMetrics] = useState(() =>
-        loadFromStorage(STORAGE_KEYS.currentMetrics, { sentiment: 0, extremeness: 0 })
+        loadFromStorage(STORAGE_KEYS.currentMetrics, { sentiment: 0.5, extremeness: 0.5 })
     )
 
     // 趋势数据 - 从 localStorage 加载
@@ -367,8 +368,8 @@ export function usePostAnalysis(options?: UsePostAnalysisOptions): UsePostAnalys
         // 清空趋势数据
         setMetricsSeries([])
 
-        // 重置状态
-        setCurrentMetrics({ sentiment: 0, extremeness: 0 })
+        // 重置状态为默认值 0.5
+        setCurrentMetrics({ sentiment: 0.5, extremeness: 0.5 })
         setSummary(null)
         setLatestResult(null)
 
@@ -404,11 +405,21 @@ export function usePostAnalysis(options?: UsePostAnalysisOptions): UsePostAnalys
         removeFromStorage(STORAGE_KEYS.latestResult)
         removeFromStorage(STORAGE_KEYS.summary)
 
-        // 重置状态
-        setCurrentMetrics({ sentiment: 0, extremeness: 0 })
+        // 重置状态为默认值 0.5
+        setCurrentMetrics({ sentiment: 0.5, extremeness: 0.5 })
         setMetricsSeries([])
         setLatestResult(null)
         setSummary(null)
+    }, [clearTimer])
+
+    /**
+     * 暂停追踪（保留数据）
+     * 只停止定时器，不清除追踪状态和分析结果
+     */
+    const pauseTracking = useCallback(() => {
+        clearTimer()
+        // 不清除 trackedPostId，保持追踪状态
+        // 不清除分析结果和指标数据
     }, [clearTimer])
 
 
@@ -481,6 +492,7 @@ export function usePostAnalysis(options?: UsePostAnalysisOptions): UsePostAnalys
         // 操作
         startTracking,
         stopTracking,
+        pauseTracking,
         analyzeNow,
     }
 }
