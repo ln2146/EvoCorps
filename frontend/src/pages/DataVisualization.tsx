@@ -20,6 +20,16 @@ export default function DataVisualization() {
   const [postLimit, setPostLimit] = useState(100)
   const [commentLimit, setCommentLimit] = useState(100)
 
+  // 力导向参数
+  const [chargeStrength, setChargeStrength] = useState(-8000)
+  const [linkDistance, setLinkDistance] = useState(500)
+  const [linkStrength, setLinkStrength] = useState(0.05)
+  
+  // 临时参数（用于调整但未应用）
+  const [tempChargeStrength, setTempChargeStrength] = useState(-8000)
+  const [tempLinkDistance, setTempLinkDistance] = useState(500)
+  const [tempLinkStrength, setTempLinkStrength] = useState(0.05)
+
   // 关系网络数据
   const [networkData, setNetworkData] = useState<any>({
     nodes: [],
@@ -303,17 +313,32 @@ export default function DataVisualization() {
 
   // 配置力导向参数
   useEffect(() => {
-    if (graphRef.current) {
-      // 使用更强的排斥力，让节点更分散
-      graphRef.current.d3Force('charge')?.strength(-8000)
-      graphRef.current.d3Force('link')?.distance(500).strength(0.05)
+    if (graphRef.current && graphData.nodes && graphData.nodes.length > 0) {
+      const graph = graphRef.current
+      
+      // 更新力导向参数
+      const chargeForce = graph.d3Force('charge')
+      if (chargeForce) {
+        chargeForce.strength(chargeStrength)
+      }
+      
+      const linkForce = graph.d3Force('link')
+      if (linkForce) {
+        linkForce.distance(linkDistance).strength(linkStrength)
+      }
+      
       // 移除径向力，让节点自由分布
-      graphRef.current.d3Force('radial', null)
+      graph.d3Force('radial', null)
       // 取消中心引力
-      graphRef.current.d3Force('center', null)
+      graph.d3Force('center', null)
+      
+      // 重新启动模拟 - 关键步骤！
+      if (graph.d3ReheatSimulation) {
+        graph.d3ReheatSimulation()
+      }
     }
-  }, [graphData])
-
+  }, [chargeStrength, linkDistance, linkStrength, graphData.nodes.length])
+  
   // 全屏切换函数
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -359,13 +384,48 @@ export default function DataVisualization() {
         />
       </div>
       
-      {/* 过滤控制面板 */}
+      {/* 参数调节面板 - 合并节点过滤和力导向参数 */}
       {selectedDb && (
         <div className="glass-card p-6">
-          <h3 className="text-2xl font-bold text-slate-800 mb-4">节点过滤</h3>
-          <div className="grid grid-cols-3 gap-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-2xl font-bold text-slate-800">参数调节</h3>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  // 应用力导向参数
+                  setChargeStrength(tempChargeStrength)
+                  setLinkDistance(tempLinkDistance)
+                  setLinkStrength(tempLinkStrength)
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-1.5"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                应用更改
+              </button>
+              <button
+                onClick={() => {
+                  setTempChargeStrength(-8000)
+                  setTempLinkDistance(500)
+                  setTempLinkStrength(0.05)
+                  setChargeStrength(-8000)
+                  setLinkDistance(500)
+                  setLinkStrength(0.05)
+                }}
+                className="px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                重置默认值
+              </button>
+            </div>
+          </div>
+
+          {/* 六个参数在一行 */}
+          <div className="grid grid-cols-6 gap-6">
+            {/* 左侧：节点过滤 (3列) */}
+            
             {/* 用户节点 */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -374,29 +434,32 @@ export default function DataVisualization() {
                   onChange={(e) => setShowUsers(e.target.checked)}
                   className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                 />
-                <label htmlFor="showUsers" className="text-base font-medium text-slate-700">
-                  显示用户节点 (共 {networkData.nodes?.filter((n: any) => n.type === 'user').length || 0} 条, 
-                  非0: {networkData.nodes?.filter((n: any) => n.type === 'user' && (n.follower_count > 0 || n.influence_score > 0)).length || 0} 条)
+                <label htmlFor="showUsers" className="text-sm font-medium text-slate-700">
+                  用户节点
                 </label>
               </div>
               {showUsers && (
-                <div className="ml-6">
-                  <label className="text-sm text-slate-600">显示前</label>
+                <div className="flex items-center gap-1">
+                  <label className="text-xs text-slate-600">显示前</label>
                   <input
                     type="number"
                     value={userLimit}
                     onChange={(e) => setUserLimit(Math.max(1, parseInt(e.target.value) || 100))}
                     min="1"
                     max="10000"
-                    className="ml-2 w-20 px-2 py-1 text-base border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-16 px-2 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <span className="ml-2 text-sm text-slate-600">条</span>
+                  <span className="text-xs text-slate-600">条</span>
                 </div>
               )}
+              <p className="text-xs text-slate-500">
+                共 {networkData.nodes?.filter((n: any) => n.type === 'user').length || 0} 条
+                (非0: {networkData.nodes?.filter((n: any) => n.type === 'user' && (n.follower_count > 0 || n.influence_score > 0)).length || 0})
+              </p>
             </div>
             
             {/* 帖子节点 */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -405,13 +468,12 @@ export default function DataVisualization() {
                   onChange={(e) => setShowPosts(e.target.checked)}
                   className="w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
                 />
-                <label htmlFor="showPosts" className="text-base font-medium text-slate-700">
-                  显示帖子节点 (共 {networkData.nodes?.filter((n: any) => n.type === 'post').length || 0} 条, 
-                  非0: {networkData.nodes?.filter((n: any) => n.type === 'post' && (n.num_likes > 0 || n.num_comments > 0 || n.num_shares > 0)).length || 0} 条)
+                <label htmlFor="showPosts" className="text-sm font-medium text-slate-700">
+                  帖子节点
                 </label>
               </div>
               {showPosts && (
-                <div className="ml-6">
+                <div className="flex items-center gap-1">
                   <label className="text-xs text-slate-600">显示前</label>
                   <input
                     type="number"
@@ -419,15 +481,19 @@ export default function DataVisualization() {
                     onChange={(e) => setPostLimit(Math.max(1, parseInt(e.target.value) || 100))}
                     min="1"
                     max="10000"
-                    className="ml-2 w-20 px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-16 px-2 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
-                  <span className="ml-2 text-xs text-slate-600">条</span>
+                  <span className="text-xs text-slate-600">条</span>
                 </div>
               )}
+              <p className="text-xs text-slate-500">
+                共 {networkData.nodes?.filter((n: any) => n.type === 'post').length || 0} 条
+                (非0: {networkData.nodes?.filter((n: any) => n.type === 'post' && (n.num_likes > 0 || n.num_comments > 0 || n.num_shares > 0)).length || 0})
+              </p>
             </div>
             
             {/* 评论节点 */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -437,12 +503,11 @@ export default function DataVisualization() {
                   className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500"
                 />
                 <label htmlFor="showComments" className="text-sm font-medium text-slate-700">
-                  显示评论节点 (共 {networkData.nodes?.filter((n: any) => n.type === 'comment').length || 0} 条, 
-                  非0: {networkData.nodes?.filter((n: any) => n.type === 'comment' && n.num_likes > 0).length || 0} 条)
+                  评论节点
                 </label>
               </div>
               {showComments && (
-                <div className="ml-6">
+                <div className="flex items-center gap-1">
                   <label className="text-xs text-slate-600">显示前</label>
                   <input
                     type="number"
@@ -450,12 +515,91 @@ export default function DataVisualization() {
                     onChange={(e) => setCommentLimit(Math.max(1, parseInt(e.target.value) || 100))}
                     min="1"
                     max="10000"
-                    className="ml-2 w-20 px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-16 px-2 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
-                  <span className="ml-2 text-xs text-slate-600">条</span>
+                  <span className="text-xs text-slate-600">条</span>
                 </div>
               )}
+              <p className="text-xs text-slate-500">
+                共 {networkData.nodes?.filter((n: any) => n.type === 'comment').length || 0} 条
+                (非0: {networkData.nodes?.filter((n: any) => n.type === 'comment' && n.num_likes > 0).length || 0})
+              </p>
             </div>
+
+            {/* 右侧：力导向参数 (3列) */}
+            {!loading && graphData.nodes && graphData.nodes.length > 0 && (
+              <>
+                {/* 排斥力 */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-slate-700">
+                      排斥力
+                    </label>
+                    <span className="text-xs text-slate-500">(默认: -8000)</span>
+                  </div>
+                  <input
+                    type="number"
+                    value={tempChargeStrength}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || -8000
+                      setTempChargeStrength(Math.max(-15000, Math.min(-2000, val)))
+                    }}
+                    className="w-20 px-2 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    增大：节点更紧凑<br/>
+                    减小：节点更分散
+                  </p>
+                </div>
+
+                {/* 连接距离 */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-slate-700">
+                      连接距离
+                    </label>
+                    <span className="text-xs text-slate-500">(默认: 500)</span>
+                  </div>
+                  <input
+                    type="number"
+                    value={tempLinkDistance}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 500
+                      setTempLinkDistance(Math.max(100, Math.min(1000, val)))
+                    }}
+                    className="w-20 px-2 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    增大：间距更远<br/>
+                    减小：间距更近
+                  </p>
+                </div>
+
+                {/* 连接强度 */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-slate-700">
+                      连接强度
+                    </label>
+                    <span className="text-xs text-slate-500">(默认: 0.05)</span>
+                  </div>
+                  <input
+                    type="number"
+                    value={tempLinkStrength.toFixed(2)}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0.05
+                      setTempLinkStrength(Math.max(0.01, Math.min(0.5, val)))
+                    }}
+                    step="0.01"
+                    className="w-20 px-2 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    增大：连接更紧密<br/>
+                    减小：连接更松散
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -559,13 +703,13 @@ export default function DataVisualization() {
                 {/* 图谱主体 */}
                 <div 
                   className="bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50 rounded-xl overflow-hidden shadow-inner flex-1"
-                  style={{ height: isFullscreen ? '100%' : '800px' }}
+                  style={{ height: isFullscreen ? '100%' : '1100px' }}
                 >
                   <ForceGraph2D
                     ref={graphRef}
                     graphData={graphData}
                     width={undefined}
-                    height={isFullscreen ? window.innerHeight - 120 : 800}
+                    height={isFullscreen ? window.innerHeight - 120 : 1100}
                     nodeLabel={(node: any) => `${getNodeTypeName(node.type)}: ${node.name}`}
                     enableNodeDrag={true}
                     enableZoomInteraction={true}
@@ -803,7 +947,7 @@ export default function DataVisualization() {
                 </div>
                 
                 {/* 右侧详情面板 */}
-                <div className={`w-80 flex flex-col gap-3 overflow-y-auto ${isFullscreen ? 'h-full' : ''}`} style={{ maxHeight: isFullscreen ? '100%' : '800px' }}>
+                <div className={`w-80 flex flex-col gap-3 overflow-y-auto ${isFullscreen ? 'h-full' : ''}`} style={{ maxHeight: isFullscreen ? '100%' : '1100px' }}>
                   {selectedNodes.size === 0 ? (
                     <div className="bg-gradient-to-br from-white to-slate-50 rounded-xl shadow-lg p-6 text-center">
                       <Network size={48} className="mx-auto mb-3 opacity-30 text-slate-400" />
