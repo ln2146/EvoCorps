@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ElementType, type ReactNode } from 'react'
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, ArrowLeft, ChevronDown, ChevronUp, ThumbsUp, Share2, MessageCircle } from 'lucide-react'
+import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, ArrowLeft, ChevronDown, ChevronUp, ThumbsUp, Share2, MessageCircle, BarChart3 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { createInitialFlowState, routeLogLine, stripLogPrefix, type FlowState, type Role } from '../lib/interventionFlow/logRouter'
 import { createEventSourceLogStream, createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
@@ -555,7 +555,7 @@ export default function DynamicDemo() {
             console.error('Error stopping dynamic demo:', error)
           }
         }}
-        onBack={() => navigate('/')}
+        onBack={(path) => navigate(path || '/')}
         enableAttack={enableAttack}
         enableAftercare={enableAftercare}
         enableEvoCorps={enableEvoCorps}
@@ -768,7 +768,7 @@ export default function DynamicDemo() {
                   <Shield className="text-slate-400" size={32} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-800">干预流程</h3>
+                  <h3 className="text-2xl font-semibold text-slate-800">干预流程</h3>
                   <p className="text-sm text-slate-600">启用舆论平衡系统后展示实时干预过程。</p>
                 </div>
               </div>
@@ -833,7 +833,7 @@ function DynamicDemoHeader({
   isStarting?: boolean
   onStart: () => void
   onStop: () => void
-  onBack: () => void
+  onBack: (path?: string) => void
   enableAttack: boolean
   enableAftercare: boolean
   enableEvoCorps: boolean
@@ -844,27 +844,27 @@ function DynamicDemoHeader({
   return (
     <div className="glass-card p-6 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
       <div className="flex items-center gap-4">
-        <img src="/logo.png" alt="EvoCorps Logo" className="w-[120px] h-auto max-w-full drop-shadow-xl" />
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
+        <img src="/logo.png" alt="EvoCorps Logo" className="w-[120px] h-auto max-w-full drop-shadow-xl transition-transform duration-300 hover:scale-110 cursor-pointer" />
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent leading-tight">
             欢迎使用 EvoCorps
           </h1>
-          <p className="text-slate-600">实时监控舆情变化，动态观察指标变化的舆情现状</p>
+          <p className="text-slate-600 text-xl leading-relaxed">实时监控舆情变化，动态观察指标变化的舆情现状</p>
         </div>
       </div>
 
-      <div className="flex items-stretch gap-4 w-full xl:w-auto">
-        <div className="flex flex-col gap-3 items-center">
-          <div className="flex flex-wrap gap-3 justify-center">
+      <div className="flex items-start gap-4 w-full xl:w-auto">
+        <div className="flex flex-col gap-3 items-stretch">
+          <div className="flex gap-3 justify-between">
             <button
-              className="btn-primary inline-flex items-center gap-2"
+              className="btn-primary inline-flex items-center justify-center gap-2 flex-1 text-lg font-medium"
               onClick={onStart}
               disabled={isRunning || isStarting}
             >
               <Play size={18} />
               {isStarting ? '启动中...' : isRunning ? '运行中' : '开启演示'}
             </button>
-            <button className="btn-secondary inline-flex items-center gap-2" onClick={onStop}>
+            <button className="btn-secondary inline-flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-rose-500 text-white border-transparent hover:shadow-xl flex-1 text-lg font-medium" onClick={onStop}>
               <Square size={18} />
               停止演示
             </button>
@@ -890,14 +890,24 @@ function DynamicDemoHeader({
             />
           </div>
         </div>
-        <button
-          className="btn-secondary aspect-square h-full min-h-[120px] w-[120px] flex flex-col items-center justify-center gap-2 px-4"
-          onClick={onBack}
-          title="返回首页"
-        >
-          <ArrowLeft size={20} />
-          <span className="text-lg font-semibold">返回首页</span>
-        </button>
+        <div className="flex flex-col gap-2 justify-between h-full">
+          <button
+            className="btn-secondary h-[59px] w-[140px] flex flex-row items-center justify-center gap-2 px-4"
+            onClick={() => onBack('/dashboard/')}
+            title="静态分析"
+          >
+            <BarChart3 size={18} />
+            <span className="text-base font-semibold">静态分析</span>
+          </button>
+          <button
+            className="btn-secondary h-[59px] w-[140px] flex flex-row items-center justify-center gap-2 px-4"
+            onClick={() => onBack('/')}
+            title="返回首页"
+          >
+            <ArrowLeft size={18} />
+            <span className="text-base font-semibold">返回首页</span>
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -918,7 +928,7 @@ function HeatLeaderboardCard({
         <div className="flex items-center gap-3">
           <Flame className="text-orange-500" />
           <div>
-            <h2 className="text-xl font-bold text-slate-800">帖子热度榜</h2>
+            <h2 className="text-2xl font-bold text-slate-800">帖子热度榜</h2>
             <p className="text-sm text-slate-600">实时热度排名</p>
           </div>
         </div>
@@ -1104,11 +1114,14 @@ function CommentsCard({
   }, [comments, sort])
 
   return (
-    <div className="glass-card p-6">
+    <div className="glass-card p-6 flex flex-col h-full">
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-lg font-semibold text-slate-800">评论区</h3>
-          <p className="text-sm text-slate-600">展示帖子实时评论流</p>
+        <div className="flex items-center gap-3">
+          <MessageCircle className="text-blue-500" />
+          <div>
+            <h3 className="text-2xl font-bold text-slate-800">评论区</h3>
+            <p className="text-sm text-slate-600">展示帖子实时评论流</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <CommentSortTabs value={sort} onChange={onSortChange} />
@@ -1121,7 +1134,7 @@ function CommentsCard({
         </div>
       )}
 
-      <div className="space-y-3 max-h-[320px] overflow-auto pr-2">
+      <div className="space-y-3 max-h-[240px] overflow-auto pr-2 flex-1">
         {comments.length === 0 ? (
           <div className="flex items-center justify-center py-8">
             <p className="text-slate-500">暂无评论</p>
@@ -1172,7 +1185,7 @@ function MetricsBarsCard({ emotion, extremity }: { emotion: number; extremity: n
       <div className="flex items-center gap-3 mb-4">
         <Activity className="text-blue-500" />
         <div>
-          <h2 className="text-xl font-bold text-slate-800">指标变化</h2>
+          <h2 className="text-2xl font-bold text-slate-800">指标变化</h2>
           <p className="text-sm text-slate-600">情绪度与极端度实时变化</p>
         </div>
       </div>
@@ -1212,7 +1225,7 @@ function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
       <div className="flex items-center gap-3 mb-4">
         <Sparkles className="text-green-500" />
         <div>
-          <h2 className="text-xl font-bold text-slate-800">指标趋势</h2>
+          <h2 className="text-2xl font-bold text-slate-800">指标趋势</h2>
           <p className="text-sm text-slate-600">情绪度 / 极端度趋势曲线</p>
         </div>
       </div>
@@ -1257,7 +1270,7 @@ function InterventionFlowPanel({ state, enabled }: { state: FlowState; enabled: 
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <Shield className="text-emerald-500" />
-          <h2 className="text-xl font-bold text-slate-800">干预流程</h2>
+          <h2 className="text-2xl font-bold text-slate-800">干预流程</h2>
         </div>
         {/* No follow button; user can exit review mode by clicking the active role tab. */}
       </div>
@@ -1333,7 +1346,7 @@ function RoleTabsRow({
                   {label.charAt(0)}
                 </div>
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-slate-800 truncate">{label}</div>
+                  <div className="text-base font-semibold text-slate-800 truncate">{label}</div>
                 </div>
               </div>
               <div className="shrink-0 flex items-center gap-2">
@@ -1566,9 +1579,12 @@ function CommentaryAnalysisPanel({
   return (
     <div className="glass-card p-6">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">评论区总体状态分析</h2>
-          <p className="text-sm text-slate-600">大模型周期性分析评论情绪与极化趋势</p>
+        <div className="flex items-center gap-3">
+          <BarChart3 className="text-purple-500" />
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">评论区总体状态分析</h2>
+            <p className="text-sm text-slate-600">大模型周期性分析评论情绪与极化趋势</p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-3">
           {/* 分析配置按钮 */}
@@ -1776,22 +1792,26 @@ function AnalysisResultView({ status, summary }: { status: 'Idle' | 'Running' | 
     if (status === 'Running') {
       return (
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-slate-500">正在分析中...</span>
+          <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-green-700">正在分析中...</span>
         </div>
       )
     }
     if (summary && summary.trim() !== '') {
-      return <p className="text-sm text-slate-600 leading-relaxed">{summary}</p>
+      return <span className="text-base text-green-700">{summary}</span>
     }
-    return <p className="text-sm text-slate-500">暂无分析结果</p>
+    return <span className="text-base text-green-600">暂无分析结果</span>
   }
 
   return (
     <div className="mt-6">
-      <div className="bg-white/70 rounded-2xl p-4 border border-white/40">
-        <h4 className="text-sm font-semibold text-slate-700 mb-3">分析摘要</h4>
-        {getSummaryContent()}
+      <div className="bg-green-50/50 rounded-2xl p-4 border border-green-300">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="inline-block bg-green-100 border border-green-400 rounded-lg px-4 py-2">
+            <h4 className="text-base font-bold text-green-800">分析摘要</h4>
+          </div>
+          {getSummaryContent()}
+        </div>
       </div>
     </div>
   )
@@ -1801,13 +1821,13 @@ function ToggleCard({ icon: Icon, label, enabled, onToggle }: { icon: ElementTyp
   return (
     <button
       onClick={onToggle}
-      className={`flex items-center gap-3 rounded-2xl px-4 py-3 border transition-all duration-300 ${enabled
+      className={`flex items-center gap-3 rounded-2xl px-4 py-4 border-2 transition-all duration-300 ${enabled
         ? 'bg-gradient-to-r from-blue-500 to-green-500 text-white border-transparent shadow-lg'
-        : 'bg-white/70 text-slate-700 border-white/40 shadow-lg'
+        : 'bg-gradient-to-br from-blue-50 to-purple-50 text-slate-700 border-blue-200 shadow-md hover:shadow-lg hover:border-blue-300'
         }`}
     >
       <Icon size={18} />
-      <span className="text-sm font-medium">{label}</span>
+      <span className="text-base font-medium">{label}</span>
     </button>
   )
 }

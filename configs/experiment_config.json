@@ -51,7 +51,7 @@
         "monitoring_interval": 30
     },
     "malicious_bot_system": {
-        "enabled": false,
+        "enabled": true,
         "cluster_size": 15,
         "attack_probability": 1.0,
         "target_post_types": [

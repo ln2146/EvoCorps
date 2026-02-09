@@ -78,7 +78,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 title={isCollapsed ? item.label : ''}
               >
                 <Icon size={24} />
-                {!isCollapsed && <span className="font-medium text-xl">{item.label}</span>}
+                {!isCollapsed && <span className="font-medium text-base">{item.label}</span>}
               </Link>
             )
           })}
