@@ -1006,16 +1006,8 @@ function PostDetailCard({
   isTracking?: boolean
   onStartTracking?: () => void
 }) {
-  const [expanded, setExpanded] = useState(false)
-
   // 优先使用 postDetail 的完整内容，否则使用 post 的 summary
   const fullContent = postDetail?.content || post.content || post.summary || post.excerpt || ''
-  const previewText = useMemo(() => {
-    if (fullContent.length <= 180) return fullContent
-    return fullContent.slice(0, 180)
-  }, [fullContent])
-
-  const shouldShowExpandButton = fullContent.length > 180
 
   return (
     <div className="glass-card p-6">
@@ -1023,7 +1015,7 @@ function PostDetailCard({
         <div className="flex items-start gap-3">
           <MessageSquare className="text-blue-500 mt-1" />
           <div>
-            <h2 className="text-2xl font-bold text-slate-800 leading-tight">{post.postId || post.id}</h2>
+            <h2 className="text-xl font-bold text-slate-800 leading-tight">{post.postId || post.id}</h2>
             <p className="text-sm text-slate-600 mt-1.5">
               热度 {(post.feedScore || post.heat).toFixed(2)}
             </p>
@@ -1061,30 +1053,11 @@ function PostDetailCard({
       )}
 
       <div className="space-y-2 text-sm text-slate-700">
-        <p className="whitespace-pre-wrap break-words leading-relaxed">
-          {expanded ? fullContent : previewText}
-          {shouldShowExpandButton && (
-            <>
-              {!expanded && '... '}
-              <button
-                onClick={() => setExpanded((prev) => !prev)}
-                className="text-blue-600 hover:text-blue-700 font-medium transition-colors inline-flex items-center gap-1"
-              >
-                {expanded ? (
-                  <>
-                    收起
-                    <ChevronUp size={14} />
-                  </>
-                ) : (
-                  <>
-                    展开
-                    <ChevronDown size={14} />
-                  </>
-                )}
-              </button>
-            </>
-          )}
-        </p>
+        <div className="max-h-[120px] overflow-y-auto pr-2">
+          <p className="whitespace-pre-wrap break-words leading-relaxed">
+            {fullContent}
+          </p>
+        </div>
 
         <div className="flex items-center justify-center gap-20 text-sm text-slate-500 pt-3 border-t border-slate-200/50">
           {(post.likeCount !== undefined || postDetail?.likeCount !== undefined) && (
@@ -1148,7 +1121,7 @@ function CommentsCard({
         </div>
       )}
 
-      <div className="space-y-3 max-h-[420px] overflow-auto pr-2">
+      <div className="space-y-3 max-h-[320px] overflow-auto pr-2">
         {comments.length === 0 ? (
           <div className="flex items-center justify-center py-8">
             <p className="text-slate-500">暂无评论</p>
