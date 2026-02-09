@@ -335,6 +335,7 @@ export default function DynamicDemo() {
   const streamRef = useRef<LogStream | null>(null)
   const unsubscribeRef = useRef<null | (() => void)>(null)
   const renderQueueRef = useRef<ReturnType<typeof createTimestampSmoothLineQueue> | null>(null)
+  const hasCheckedInitialStatusRef = useRef(false)
 
   // 添加状态轮询机制
   useEffect(() => {
@@ -349,6 +350,14 @@ export default function DynamicDemo() {
         const bothRunning = dbRunning && mainRunning
 
         setIsRunning(bothRunning)
+
+        // 只在页面首次加载时，如果系统未运行且有追踪数据，则清除缓存
+        if (!hasCheckedInitialStatusRef.current) {
+          hasCheckedInitialStatusRef.current = true
+          if (!bothRunning && postAnalysis.isTracking) {
+            postAnalysis.stopTracking()
+          }
+        }
 
         // NOTE: Do not auto-toggle the opinion balance panel based on backend status.
         // The panel should start streaming only after the user clicks the toggle (so we can
@@ -937,6 +946,7 @@ function HeatLeaderboardCard({
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-4">
           <p className="text-sm text-red-700">加载失败：{error.message}</p>
+          <p className="text-sm text-red-600 mt-1">请检查系统是否运行 (Please check if the system is running)</p>
         </div>
       )}
 
@@ -1064,6 +1074,7 @@ function PostDetailCard({
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-4">
           <p className="text-sm text-red-700">加载失败：{error.message}</p>
+          <p className="text-sm text-red-600 mt-1">请检查系统是否运行 (Please check if the system is running)</p>
         </div>
       )}
 
@@ -1136,6 +1147,7 @@ function CommentsCard({
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-4">
           <p className="text-sm text-red-700">加载失败：{error.message}</p>
+          <p className="text-sm text-red-600 mt-1">请检查系统是否运行 (Please check if the system is running)</p>
         </div>
       )}
 
@@ -1803,6 +1815,9 @@ function AnalysisResultView({ status, summary }: { status: 'Idle' | 'Running' | 
           <span className="text-green-700">正在分析中...</span>
         </div>
       )
+    }
+    if (status === 'Error') {
+      return <span className="text-base text-red-600">分析失败，请检查系统是否运行或帖子是否有评论</span>
     }
     if (summary && summary.trim() !== '') {
       return <span className="text-base text-green-700">{summary}</span>
