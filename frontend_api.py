@@ -1416,6 +1416,188 @@ def delete_experiment(experiment_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/experiments/<experiment_id>/export', methods=['GET'])
+def export_experiment(experiment_id):
+    """导出实验数据为CSV/JSON格式"""
+    try:
+        exp_path = os.path.join('experiments', experiment_id)
+        
+        if not os.path.exists(exp_path):
+            return jsonify({'error': 'Experiment not found'}), 404
+        
+        # 读取元信息
+        metadata_file = os.path.join(exp_path, 'metadata.json')
+        if not os.path.exists(metadata_file):
+            return jsonify({'error': 'Metadata not found'}), 404
+        
+        import json
+        import csv
+        import io
+        import zipfile
+        from io import BytesIO
+        
+        with open(metadata_file, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+        
+        # 连接实验数据库
+        db_path = os.path.join(exp_path, 'database.db')
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database not found'}), 404
+        
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # 创建内存中的ZIP文件
+        zip_buffer = BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # 1. 导出元信息
+            zip_file.writestr(
+                f'{experiment_id}_metadata.json',
+                json.dumps(metadata, ensure_ascii=False, indent=2)
+            )
+            
+            # 2. 导出用户数据
+            cursor.execute("SELECT * FROM users")
+            users = [dict(row) for row in cursor.fetchall()]
+            
+            # JSON格式
+            zip_file.writestr(
+                f'{experiment_id}_users.json',
+                json.dumps(users, ensure_ascii=False, indent=2)
+            )
+            
+            # CSV格式
+            if users:
+                csv_buffer = io.StringIO()
+                writer = csv.DictWriter(csv_buffer, fieldnames=users[0].keys())
+                writer.writeheader()
+                writer.writerows(users)
+                zip_file.writestr(f'{experiment_id}_users.csv', csv_buffer.getvalue())
+            
+            # 3. 导出帖子数据
+            cursor.execute("SELECT * FROM posts ORDER BY created_at")
+            posts = [dict(row) for row in cursor.fetchall()]
+            
+            zip_file.writestr(
+                f'{experiment_id}_posts.json',
+                json.dumps(posts, ensure_ascii=False, indent=2)
+            )
+            
+            if posts:
+                csv_buffer = io.StringIO()
+                writer = csv.DictWriter(csv_buffer, fieldnames=posts[0].keys())
+                writer.writeheader()
+                writer.writerows(posts)
+                zip_file.writestr(f'{experiment_id}_posts.csv', csv_buffer.getvalue())
+            
+            # 4. 导出评论数据
+            cursor.execute("SELECT * FROM comments ORDER BY created_at")
+            comments = [dict(row) for row in cursor.fetchall()]
+            
+            zip_file.writestr(
+                f'{experiment_id}_comments.json',
+                json.dumps(comments, ensure_ascii=False, indent=2)
+            )
+            
+            if comments:
+                csv_buffer = io.StringIO()
+                writer = csv.DictWriter(csv_buffer, fieldnames=comments[0].keys())
+                writer.writeheader()
+                writer.writerows(comments)
+                zip_file.writestr(f'{experiment_id}_comments.csv', csv_buffer.getvalue())
+            
+            # 5. 导出干预记录（如果存在）
+            try:
+                cursor.execute("SELECT * FROM opinion_interventions ORDER BY created_at")
+                interventions = [dict(row) for row in cursor.fetchall()]
+                
+                if interventions:
+                    zip_file.writestr(
+                        f'{experiment_id}_interventions.json',
+                        json.dumps(interventions, ensure_ascii=False, indent=2)
+                    )
+                    
+                    csv_buffer = io.StringIO()
+                    writer = csv.DictWriter(csv_buffer, fieldnames=interventions[0].keys())
+                    writer.writeheader()
+                    writer.writerows(interventions)
+                    zip_file.writestr(f'{experiment_id}_interventions.csv', csv_buffer.getvalue())
+            except:
+                pass
+            
+            # 6. 导出统计摘要
+            stats = {
+                'experiment_info': metadata,
+                'total_users': len(users),
+                'total_posts': len(posts),
+                'total_comments': len(comments),
+                'timestamp': datetime.datetime.now().isoformat()
+            }
+            
+            # 计算情绪统计
+            try:
+                cursor.execute("""
+                    SELECT 
+                        COUNT(*) as total,
+                        AVG(CASE WHEN sentiment = 'positive' THEN 1 ELSE 0 END) as positive_ratio,
+                        AVG(CASE WHEN sentiment = 'negative' THEN 1 ELSE 0 END) as negative_ratio,
+                        AVG(CASE WHEN sentiment = 'neutral' THEN 1 ELSE 0 END) as neutral_ratio
+                    FROM posts
+                """)
+                sentiment_stats = dict(cursor.fetchone())
+                stats['sentiment_distribution'] = sentiment_stats
+            except:
+                pass
+            
+            zip_file.writestr(
+                f'{experiment_id}_summary.json',
+                json.dumps(stats, ensure_ascii=False, indent=2)
+            )
+            
+            # 7. 导出认知记忆数据（如果存在）
+            cognitive_memory_dir = os.path.join(exp_path, 'cognitive_memory')
+            if os.path.exists(cognitive_memory_dir):
+                for file in os.listdir(cognitive_memory_dir):
+                    if file.endswith('.json'):
+                        file_path = os.path.join(cognitive_memory_dir, file)
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            zip_file.writestr(f'cognitive_memory/{file}', f.read())
+        
+        conn.close()
+        
+        # 准备下载
+        zip_buffer.seek(0)
+        
+        from flask import send_file
+        
+        # 兼容不同版本的Flask
+        try:
+            # Flask 2.0+ 使用 download_name
+            return send_file(
+                zip_buffer,
+                mimetype='application/zip',
+                as_attachment=True,
+                download_name=f'{experiment_id}_export.zip'
+            )
+        except TypeError:
+            # Flask 1.x 使用 attachment_filename
+            return send_file(
+                zip_buffer,
+                mimetype='application/zip',
+                as_attachment=True,
+                attachment_filename=f'{experiment_id}_export.zip'
+            )
+        
+    except Exception as e:
+        import traceback
+        print("=" * 60)
+        print("导出实验数据时发生错误:")
+        traceback.print_exc()
+        print("=" * 60)
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/visualization/<db_name>/emotion', methods=['GET'])
 def get_emotion_data(db_name):
     """获取情绪分析数据 - 每个时间步的情绪度"""

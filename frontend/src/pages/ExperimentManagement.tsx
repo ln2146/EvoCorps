@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Save, FolderOpen, Trash2, Database, Clock, Tag } from 'lucide-react'
-import { getExperiments, saveExperiment, loadExperiment, deleteExperiment, getDatabases, type Experiment } from '../services/api'
+import { Save, FolderOpen, Trash2, Database, Clock, Tag, Download } from 'lucide-react'
+import { getExperiments, saveExperiment, loadExperiment, deleteExperiment, exportExperiment, getDatabases, type Experiment } from '../services/api'
 
 export default function ExperimentManagement() {
   const [experiments, setExperiments] = useState<Experiment[]>([])
@@ -12,7 +12,7 @@ export default function ExperimentManagement() {
   const [saveForm, setSaveForm] = useState({
     experiment_name: '',
     scenario_type: 'scenario_1',
-    database_name: 'simulation.db'
+    database_name: '' // 初始为空，等待从后端加载
   })
 
   // 加载实验列表
@@ -25,7 +25,8 @@ export default function ExperimentManagement() {
   const loadDatabases = async () => {
     const dbs = await getDatabases()
     setDatabases(dbs)
-    if (dbs.length > 0 && !saveForm.database_name) {
+    // 自动选择第一个可用的数据库
+    if (dbs.length > 0) {
       setSaveForm(prev => ({ ...prev, database_name: dbs[0] }))
     }
   }
@@ -37,20 +38,22 @@ export default function ExperimentManagement() {
 
   // 保存当前实验
   const handleSave = async () => {
-    if (!saveForm.experiment_name.trim()) {
-      alert('请输入实验名称')
-      return
-    }
+    // 如果实验名称为空，使用默认名称（时间戳）
+    const finalExperimentName = saveForm.experiment_name.trim() || 
+      `experiment_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}`
 
     setLoading(true)
     try {
-      await saveExperiment(saveForm)
+      await saveExperiment({
+        ...saveForm,
+        experiment_name: finalExperimentName
+      })
       alert('实验保存成功！')
       setShowSaveForm(false)
       setSaveForm({
         experiment_name: '',
         scenario_type: 'scenario_1',
-        database_name: databases[0] || 'simulation.db'
+        database_name: databases[0] || '' // 使用第一个可用数据库，如果没有则为空
       })
       await loadExperiments()
     } catch (error: any) {
@@ -92,6 +95,32 @@ export default function ExperimentManagement() {
       await loadExperiments()
     } catch (error: any) {
       alert(`删除失败: ${error.response?.data?.error || error.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 导出实验数据
+  const handleExport = async (experimentId: string, experimentName: string) => {
+    setLoading(true)
+    try {
+      const blob = await exportExperiment(experimentId)
+      
+      // 创建下载链接
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${experimentId}_export.zip`
+      document.body.appendChild(link)
+      link.click()
+      
+      // 清理
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      alert(`实验数据导出成功！\n\n文件名: ${experimentId}_export.zip\n\n包含内容:\n- 用户数据 (JSON + CSV)\n- 帖子数据 (JSON + CSV)\n- 评论数据 (JSON + CSV)\n- 干预记录 (JSON + CSV)\n- 认知记忆数据\n- 统计摘要`)
+    } catch (error: any) {
+      alert(`导出失败: ${error.response?.data?.error || error.message}`)
     } finally {
       setLoading(false)
     }
@@ -151,15 +180,16 @@ export default function ExperimentManagement() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                实验名称
+                实验名称 <span className="text-slate-500 text-xs">(留空则自动生成)</span>
               </label>
               <input
                 type="text"
                 value={saveForm.experiment_name}
                 onChange={(e) => setSaveForm({ ...saveForm, experiment_name: e.target.value })}
-                placeholder="例如: experiment_20260110_193906"
+                placeholder="留空将自动生成时间戳名称，如: experiment_2026-02-09T14-30-00"
                 className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              <p className="text-xs text-slate-500 mt-1">💡 提示：留空将使用当前时间作为实验名称</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -280,6 +310,15 @@ export default function ExperimentManagement() {
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          onClick={() => handleExport(exp.experiment_id, exp.experiment_name)}
+                          disabled={loading}
+                          className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                          title="导出实验数据"
+                        >
+                          <Download size={16} />
+                          导出
+                        </button>
+                        <button
                           onClick={() => handleLoad(exp.experiment_id, exp.experiment_name)}
                           disabled={loading}
                           className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -310,10 +349,12 @@ export default function ExperimentManagement() {
         <h3 className="text-lg font-bold text-slate-800 mb-3">使用说明</h3>
         <div className="space-y-2 text-sm text-slate-700">
           <p>1. <strong>保存实验</strong>：完成模拟后，点击"保存为新实验"按钮，系统会保存当前数据库快照和情绪数据</p>
-          <p>2. <strong>加载实验</strong>：点击"加载实验"按钮可恢复历史实验状态，当前数据库会自动备份</p>
-          <p>3. <strong>删除实验</strong>：点击删除按钮可永久删除实验快照，此操作不可恢复</p>
-          <p>4. <strong>数据包含</strong>：每个实验快照包含完整的数据库文件、情绪数据和实验元信息</p>
-          <p className="text-orange-600 font-medium mt-3">⚠️ 加载实验会覆盖当前数据库，请确保已保存当前实验或不再需要当前数据</p>
+          <p>2. <strong>导出数据</strong>：点击"导出"按钮可下载实验数据压缩包，包含用户、帖子、评论、干预记录等完整数据（JSON + CSV格式）</p>
+          <p>3. <strong>加载实验</strong>：点击"加载实验"按钮可恢复历史实验状态，当前数据库会自动备份</p>
+          <p>4. <strong>删除实验</strong>：点击删除按钮可永久删除实验快照，此操作不可恢复</p>
+          <p>5. <strong>数据包含</strong>：每个实验快照包含完整的数据库文件、情绪数据和实验元信息</p>
+          <p className="text-green-600 font-medium mt-3">💡 导出的ZIP文件包含JSON和CSV两种格式，方便用于数据分析、可视化和论文撰写</p>
+          <p className="text-orange-600 font-medium">⚠️ 加载实验会覆盖当前数据库，请确保已保存当前实验或不再需要当前数据</p>
         </div>
       </div>
     </div>

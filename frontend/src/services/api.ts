@@ -207,6 +207,13 @@ export const deleteExperiment = async (experimentId: string) => {
   return response.data
 }
 
+export const exportExperiment = async (experimentId: string) => {
+  const response = await api.get(`/experiments/${experimentId}/export`, {
+    responseType: 'blob'
+  })
+  return response.data
+}
+
 // Visualization APIs
 export const getEmotionData = async (dbName: string) => {
   const response = await api.get(`/visualization/${dbName}/emotion`)
