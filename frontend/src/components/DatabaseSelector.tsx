@@ -16,7 +16,7 @@ export default function DatabaseSelector({
   return (
     <div className="flex items-center gap-4">
       <Database size={20} className="text-slate-600" />
-      <label className="text-sm font-medium text-slate-700">{label}</label>
+      <label className="text-lg font-medium text-slate-700">{label}</label>
       <select
         value={selectedDb}
         onChange={(e) => onSelect(e.target.value)}

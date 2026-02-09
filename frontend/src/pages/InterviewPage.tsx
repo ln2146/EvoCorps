@@ -389,7 +389,7 @@ export default function InterviewPage() {
             databases={databases}
             selectedDb={selectedDb}
             onSelect={setSelectedDb}
-            label="选择数据库:"
+            label="选择数据库："
           />
           <div className="ml-auto text-base text-slate-600">
             已选择 <span className="font-bold text-green-600">{selectedUsers.size}</span> / {totalUniqueUsers} 个用户
