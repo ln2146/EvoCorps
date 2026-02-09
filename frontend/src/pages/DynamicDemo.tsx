@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ElementType, type ReactNode } from 'react'
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
+import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, ArrowLeft, ChevronDown, ChevronUp, ThumbsUp, Share2, MessageCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { createInitialFlowState, routeLogLine, stripLogPrefix, type FlowState, type Role } from '../lib/interventionFlow/logRouter'
 import { createEventSourceLogStream, createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
@@ -951,9 +951,36 @@ function HeatLeaderboardCard({
                   <span className="text-sm font-bold text-orange-500">{score.toFixed(2)}</span>
                 </div>
                 <p className="text-sm text-slate-700 line-clamp-2">{post.excerpt || post.summary}</p>
-                <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
-                  <span className="truncate max-w-[55%]">{author}</span>
-                  <span className="shrink-0">{post.createdAt}</span>
+                <div className="flex items-center justify-between mt-3 gap-2">
+                  <div className="flex items-center gap-2 text-xs text-slate-500 min-w-0">
+                    <span className="truncate">{author}</span>
+                    <span className="shrink-0">{new Date(post.createdAt).toLocaleString('zh-CN', {
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-slate-500 shrink-0">
+                    {post.likeCount !== undefined && (
+                      <div className="flex items-center gap-1">
+                        <ThumbsUp size={14} className="text-slate-400" />
+                        <span className="font-medium">{post.likeCount}</span>
+                      </div>
+                    )}
+                    {post.commentCount !== undefined && (
+                      <div className="flex items-center gap-1">
+                        <MessageCircle size={14} className="text-slate-400" />
+                        <span className="font-medium">{post.commentCount}</span>
+                      </div>
+                    )}
+                    {post.shareCount !== undefined && (
+                      <div className="flex items-center gap-1">
+                        <Share2 size={14} className="text-slate-400" />
+                        <span className="font-medium">{post.shareCount}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </button>
             )
@@ -985,20 +1012,23 @@ function PostDetailCard({
   const fullContent = postDetail?.content || post.content || post.summary || post.excerpt || ''
   const previewText = useMemo(() => {
     if (fullContent.length <= 180) return fullContent
-    return `${fullContent.slice(0, 180)}...`
+    return fullContent.slice(0, 180)
   }, [fullContent])
 
   const shouldShowExpandButton = fullContent.length > 180
 
   return (
     <div className="glass-card p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <MessageSquare className="text-blue-500" />
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start gap-3">
+          <MessageSquare className="text-blue-500 mt-1" />
           <div>
-            <h2 className="text-xl font-bold text-slate-800">帖子详情</h2>
-            <p className="text-sm text-slate-600">
-              {post.postId || post.id} · 热度 {(post.feedScore || post.heat).toFixed(2)}
+            <h2 className="text-2xl font-bold text-slate-800 leading-tight">{post.postId || post.id}</h2>
+            <p className="text-sm text-slate-600 mt-1.5">
+              热度 {(post.feedScore || post.heat).toFixed(2)}
+            </p>
+            <p className="text-sm text-slate-600 mt-0.5">
+              作者：{post.authorId || post.author}
             </p>
           </div>
         </div>
@@ -1033,40 +1063,47 @@ function PostDetailCard({
       <div className="space-y-2 text-sm text-slate-700">
         <p className="whitespace-pre-wrap break-words leading-relaxed">
           {expanded ? fullContent : previewText}
+          {shouldShowExpandButton && (
+            <>
+              {!expanded && '... '}
+              <button
+                onClick={() => setExpanded((prev) => !prev)}
+                className="text-blue-600 hover:text-blue-700 font-medium transition-colors inline-flex items-center gap-1"
+              >
+                {expanded ? (
+                  <>
+                    收起
+                    <ChevronUp size={14} />
+                  </>
+                ) : (
+                  <>
+                    展开
+                    <ChevronDown size={14} />
+                  </>
+                )}
+              </button>
+            </>
+          )}
         </p>
 
-        {shouldShowExpandButton && (
-          <div className="flex justify-center py-1">
-            <button
-              onClick={() => setExpanded((prev) => !prev)}
-              className="px-4 py-2 rounded-lg bg-white/80 border border-white/40 text-slate-600 hover:bg-white transition-all inline-flex items-center gap-2 text-sm font-medium"
-            >
-              {expanded ? (
-                <>
-                  <ChevronUp size={16} />
-                  收起内容
-                </>
-              ) : (
-                <>
-                  <ChevronDown size={16} />
-                  展开全文
-                </>
-              )}
-            </button>
-          </div>
-        )}
-
-        <div className="flex items-center gap-4 text-xs text-slate-500 pt-1 border-t border-slate-200/50">
-          <span>作者：{post.authorId || post.author}</span>
-          <span>发布时间：{new Date(post.createdAt).toLocaleString('zh-CN')}</span>
+        <div className="flex items-center justify-center gap-20 text-sm text-slate-500 pt-3 border-t border-slate-200/50">
           {(post.likeCount !== undefined || postDetail?.likeCount !== undefined) && (
-            <span>点赞：{postDetail?.likeCount ?? post.likeCount}</span>
-          )}
-          {(post.shareCount !== undefined || postDetail?.shareCount !== undefined) && (
-            <span>分享：{postDetail?.shareCount ?? post.shareCount}</span>
+            <div className="flex items-center gap-1.5">
+              <ThumbsUp size={16} className="text-slate-400" />
+              <span className="font-medium">{postDetail?.likeCount ?? post.likeCount ?? 0}</span>
+            </div>
           )}
           {(post.commentCount !== undefined || postDetail?.commentCount !== undefined) && (
-            <span>评论：{postDetail?.commentCount ?? post.commentCount}</span>
+            <div className="flex items-center gap-1.5">
+              <MessageCircle size={16} className="text-slate-400" />
+              <span className="font-medium">{postDetail?.commentCount ?? post.commentCount ?? 0}</span>
+            </div>
+          )}
+          {(post.shareCount !== undefined || postDetail?.shareCount !== undefined) && (
+            <div className="flex items-center gap-1.5">
+              <Share2 size={16} className="text-slate-400" />
+              <span className="font-medium">{postDetail?.shareCount ?? post.shareCount ?? 0}</span>
+            </div>
           )}
         </div>
       </div>
@@ -1158,7 +1195,7 @@ function CommentSortTabs({ value, onChange }: { value: 'likes' | 'time'; onChang
 
 function MetricsBarsCard({ emotion, extremity }: { emotion: number; extremity: number }) {
   return (
-    <div className="glass-card p-6">
+    <div className="glass-card p-6 h-[300px] flex flex-col">
       <div className="flex items-center gap-3 mb-4">
         <Activity className="text-blue-500" />
         <div>
@@ -1166,7 +1203,7 @@ function MetricsBarsCard({ emotion, extremity }: { emotion: number; extremity: n
           <p className="text-sm text-slate-600">情绪度与极端度实时变化</p>
         </div>
       </div>
-      <div className="space-y-6">
+      <div className="space-y-6 flex-1 flex flex-col justify-center">
         <MetricBar label="情绪度" value={emotion} />
         <MetricBar label="内容极端度" value={extremity} />
       </div>
@@ -1198,7 +1235,7 @@ function MetricBar({ label, value }: { label: string; value: number }) {
 
 function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
   return (
-    <div className="glass-card p-6">
+    <div className="glass-card p-6 h-[316px] flex flex-col">
       <div className="flex items-center gap-3 mb-4">
         <Sparkles className="text-green-500" />
         <div>
@@ -1206,7 +1243,7 @@ function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
           <p className="text-sm text-slate-600">情绪度 / 极端度趋势曲线</p>
         </div>
       </div>
-      <div className="h-64">
+      <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
