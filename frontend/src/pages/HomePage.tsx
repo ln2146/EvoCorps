@@ -89,7 +89,7 @@ export default function HomePage() {
           <img 
             src="/logot.png" 
             alt="EvoCorps Icon" 
-            className="h-24 w-auto drop-shadow-xl"
+            className="h-24 w-auto drop-shadow-xl transition-transform duration-300 hover:scale-110 cursor-pointer"
           />
         </div>
       </div>

@@ -15,7 +15,7 @@ export default function WelcomePage() {
   const modes = [
     {
       id: 'static',
-      title: '静态演示',
+      title: '静态分析',
       description: '查看系统数据和可视化分析',
       icon: BarChart3,
       gradient: 'from-blue-500 to-cyan-500',
@@ -23,7 +23,7 @@ export default function WelcomePage() {
     },
     {
       id: 'dynamic',
-      title: '动态演示',
+      title: '动态面板',
       description: '实时运行模拟和监控系统',
       icon: Activity,
       gradient: 'from-cyan-500 to-green-500',

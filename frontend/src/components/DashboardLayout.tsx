@@ -52,7 +52,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
                   EvoCorps
                 </h1>
-                <p className="text-sm text-slate-500">静态演示</p>
+                <p className="text-sm text-slate-500">静态分析</p>
               </div>
             </div>
           )}
@@ -91,7 +91,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               onClick={() => navigate('/dynamic')}
               className="btn-apple w-full flex items-center justify-center gap-2 text-slate-700 font-medium text-base"
             >
-              <span>进入动态演示</span>
+              <Activity size={18} />
+              <span>动态面板</span>
             </button>
             <button
               onClick={() => navigate('/')}
@@ -107,7 +108,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <button
               onClick={() => navigate('/dynamic')}
               className="btn-apple w-full flex items-center justify-center text-slate-700"
-              title="进入动态演示"
+              title="进入动态面板"
             >
               <span className="text-xs">动态</span>
             </button>

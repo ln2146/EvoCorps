@@ -954,13 +954,18 @@ function HeatLeaderboardCard({
               <button
                 key={id}
                 onClick={() => onSelect(post)}
-                className="w-full text-left bg-white/70 hover:bg-white transition-all rounded-2xl p-4 border border-white/40"
+                className="w-full text-left bg-white/70 hover:bg-white transition-all rounded-2xl p-4 border border-white/40 shadow-lg hover:shadow-xl"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold text-slate-700">#{index + 1} · {id}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-r from-blue-500 to-green-500 text-white text-sm font-bold shadow-md">
+                      {index + 1}
+                    </span>
+                    <span className="text-sm font-bold text-slate-700">{id}</span>
+                  </div>
                   <span className="text-sm font-bold text-orange-500">{score.toFixed(2)}</span>
                 </div>
-                <p className="text-sm text-slate-700 line-clamp-2">{post.excerpt || post.summary}</p>
+                <p className="text-sm text-slate-700 line-clamp-2 font-serif font-normal">{post.excerpt || post.summary}</p>
                 <div className="flex items-center justify-between mt-3 gap-2">
                   <div className="flex items-center gap-2 text-xs text-slate-500 min-w-0">
                     <span className="truncate">{author}</span>
@@ -1027,7 +1032,7 @@ function PostDetailCard({
           <div>
             <h2 className="text-xl font-bold text-slate-800 leading-tight">{post.postId || post.id}</h2>
             <p className="text-sm text-slate-600 mt-1.5">
-              热度 {(post.feedScore || post.heat).toFixed(2)}
+              热度：{(post.feedScore || post.heat).toFixed(2)}
             </p>
             <p className="text-sm text-slate-600 mt-0.5">
               作者：{post.authorId || post.author}
@@ -1049,7 +1054,7 @@ function PostDetailCard({
               {isTracking ? '分析中' : '开始分析'}
             </button>
           )}
-          <button onClick={onBack} className="px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 bg-white/80 border border-white/40 text-slate-700 hover:bg-white transition-all">
+          <button onClick={onBack} className="px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 bg-white/80 border border-slate-200 text-slate-700 hover:bg-white transition-all shadow-md hover:shadow-lg">
             <ArrowLeft size={14} />
             返回榜单
           </button>
@@ -1069,22 +1074,22 @@ function PostDetailCard({
           </p>
         </div>
 
-        <div className="flex items-center justify-center gap-20 text-sm text-slate-500 pt-3 border-t border-slate-200/50">
+        <div className="flex items-center justify-center gap-20 text-sm pt-3 border-t border-slate-200/50">
           {(post.likeCount !== undefined || postDetail?.likeCount !== undefined) && (
-            <div className="flex items-center gap-1.5">
-              <ThumbsUp size={16} className="text-slate-400" />
+            <div className="flex items-center gap-1.5 text-blue-500">
+              <ThumbsUp size={16} />
               <span className="font-medium">{postDetail?.likeCount ?? post.likeCount ?? 0}</span>
             </div>
           )}
           {(post.commentCount !== undefined || postDetail?.commentCount !== undefined) && (
-            <div className="flex items-center gap-1.5">
-              <MessageCircle size={16} className="text-slate-400" />
+            <div className="flex items-center gap-1.5 text-green-600">
+              <MessageCircle size={16} />
               <span className="font-medium">{postDetail?.commentCount ?? post.commentCount ?? 0}</span>
             </div>
           )}
           {(post.shareCount !== undefined || postDetail?.shareCount !== undefined) && (
-            <div className="flex items-center gap-1.5">
-              <Share2 size={16} className="text-slate-400" />
+            <div className="flex items-center gap-1.5 text-purple-500">
+              <Share2 size={16} />
               <span className="font-medium">{postDetail?.shareCount ?? post.shareCount ?? 0}</span>
             </div>
           )}
@@ -1141,7 +1146,7 @@ function CommentsCard({
           </div>
         ) : (
           sorted.map((comment) => (
-            <div key={comment.commentId || comment.id} className="bg-white/70 rounded-2xl p-4 border border-white/40">
+            <div key={comment.commentId || comment.id} className="bg-white/70 rounded-2xl p-4 border border-white/40 shadow-lg hover:shadow-xl transition-all">
               <p className="text-sm text-slate-700">{comment.content}</p>
               <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
                 <span>点赞 {comment.likeCount ?? comment.likes}</span>
@@ -1162,7 +1167,7 @@ function CommentsCard({
 
 function CommentSortTabs({ value, onChange }: { value: 'likes' | 'time'; onChange: (value: 'likes' | 'time') => void }) {
   return (
-    <div className="flex items-center gap-2 bg-white/70 rounded-xl p-1 border border-white/40">
+    <div className="flex items-center gap-2 bg-white/70 rounded-xl p-1 border border-slate-200 shadow-md">
       <button
         className={`px-3 py-1 rounded-lg text-sm ${value === 'likes' ? 'bg-gradient-to-r from-blue-500 to-green-500 text-white' : 'text-slate-600'}`}
         onClick={() => onChange('likes')}
@@ -1612,25 +1617,27 @@ function CommentaryAnalysisPanel({
       {/* 追踪帖子信息 */}
       {trackedPostId && (
         <div className="mt-4 bg-blue-50/70 border border-blue-200/50 rounded-xl p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Activity className="text-blue-600" size={16} />
-            <span className="text-sm text-slate-700">
-              正在追踪：<span className="font-semibold text-blue-700">{trackedPostId}</span>
-            </span>
-          </div>
-          {trackedPostStats && (
-            <div className="flex items-center gap-4 text-xs text-slate-600 ml-6">
-              {trackedPostStats.likeCount !== undefined && (
-                <span>👍 点赞：<span className="font-medium">{trackedPostStats.likeCount}</span></span>
-              )}
-              {trackedPostStats.commentCount !== undefined && (
-                <span>💬 评论：<span className="font-medium">{trackedPostStats.commentCount}</span></span>
-              )}
-              {trackedPostStats.shareCount !== undefined && (
-                <span>🔄 分享：<span className="font-medium">{trackedPostStats.shareCount}</span></span>
-              )}
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Activity className="text-blue-600" size={16} />
+              <span className="text-sm text-slate-700">
+                正在追踪：<span className="font-semibold text-blue-700">{trackedPostId}</span>
+              </span>
             </div>
-          )}
+            {trackedPostStats && (
+              <div className="flex items-center gap-4 text-xs text-slate-600">
+                {trackedPostStats.likeCount !== undefined && (
+                  <span>👍 点赞：<span className="font-medium">{trackedPostStats.likeCount}</span></span>
+                )}
+                {trackedPostStats.commentCount !== undefined && (
+                  <span>💬 评论：<span className="font-medium">{trackedPostStats.commentCount}</span></span>
+                )}
+                {trackedPostStats.shareCount !== undefined && (
+                  <span>🔄 分享：<span className="font-medium">{trackedPostStats.shareCount}</span></span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
