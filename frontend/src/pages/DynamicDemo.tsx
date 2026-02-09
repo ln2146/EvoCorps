@@ -15,7 +15,6 @@ import { getInterventionFlowPanelClassName, getLeaderCommentsContainerClassName 
 import { buildRolePills } from '../lib/interventionFlow/rolePills'
 import { getSummaryCardClassName } from '../lib/interventionFlow/summaryCardStyles'
 import { getSummaryGridClassName } from '../lib/interventionFlow/summaryGridLayout'
-import { formatDemoRunStatus, formatSseStatus, formatTopCount } from '../lib/interventionFlow/uiLabels'
 import { getHeatLeaderboardCardClassName, getHeatLeaderboardListClassName } from '../lib/interventionFlow/heatLeaderboardLayout'
 import { getAnalystCombinedCardClassName, getAnalystCombinedPostBodyClassName, getAnalystCombinedStreamClassName } from '../lib/interventionFlow/analystCombinedLayout'
 import { buildStageStepperModel } from '../lib/interventionFlow/stageStepper'
@@ -306,7 +305,6 @@ export default function DynamicDemo() {
   const navigate = useNavigate()
   const {
     data,
-    isLoading,
     error,
     selectedPost,
     setSelectedPost,
@@ -725,7 +723,6 @@ export default function DynamicDemo() {
             }
           }
         }}
-        sseStatus={sse.status}
       />
 
       <div className={getDynamicDemoGridClassName()}>
@@ -734,7 +731,6 @@ export default function DynamicDemo() {
             <HeatLeaderboardCard
               posts={data.heatPosts}
               onSelect={setSelectedPost}
-              isLoading={isLoading}
               error={error || undefined}
             />
           ) : (
@@ -743,7 +739,6 @@ export default function DynamicDemo() {
                 post={selectedPost}
                 postDetail={postDetail}
                 onBack={() => setSelectedPost(null)}
-                isLoading={isLoading}
                 error={error || undefined}
                 isTracking={postAnalysis.trackedPostId === (selectedPost.postId || selectedPost.id)}
                 onStartTracking={() => postAnalysis.startTracking(selectedPost.postId || selectedPost.id)}
@@ -752,7 +747,6 @@ export default function DynamicDemo() {
                 comments={data.comments}
                 sort={commentSort}
                 onSortChange={setCommentSort}
-                isLoading={isLoading}
                 error={error || undefined}
               />
             </div>
@@ -834,7 +828,6 @@ function DynamicDemoHeader({
   onToggleAttack,
   onToggleAftercare,
   onToggleEvoCorps,
-  sseStatus,
 }: {
   isRunning: boolean
   isStarting?: boolean
@@ -847,7 +840,6 @@ function DynamicDemoHeader({
   onToggleAttack: () => void | Promise<void>
   onToggleAftercare: () => void | Promise<void>
   onToggleEvoCorps: () => void | Promise<void>
-  sseStatus: 'connecting' | 'connected' | 'disconnected'
 }) {
   return (
     <div className="glass-card p-6 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
@@ -858,13 +850,6 @@ function DynamicDemoHeader({
             欢迎使用 EvoCorps
           </h1>
           <p className="text-slate-600">实时监控舆情变化，动态观察指标变化的舆情现状</p>
-          <div className="flex items-center gap-2 mt-2">
-            <StatusBadge label={formatDemoRunStatus(isRunning)} tone={isRunning ? 'success' : 'muted'} />
-            <StatusBadge
-              label={formatSseStatus(sseStatus)}
-              tone={sseStatus === 'connected' ? 'info' : sseStatus === 'connecting' ? 'warning' : 'muted'}
-            />
-          </div>
         </div>
       </div>
 
@@ -921,12 +906,10 @@ function DynamicDemoHeader({
 function HeatLeaderboardCard({
   posts,
   onSelect,
-  isLoading,
   error
 }: {
   posts: HeatPost[]
   onSelect: (post: HeatPost) => void
-  isLoading?: boolean
   error?: Error | null
 }) {
   return (
@@ -939,10 +922,6 @@ function HeatLeaderboardCard({
             <p className="text-sm text-slate-600">实时热度排名</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <StatusBadge label={formatTopCount(posts.length)} tone="info" />
-          {isLoading && <StatusBadge label="加载中" tone="warning" />}
-        </div>
       </div>
 
       {error && (
@@ -952,11 +931,7 @@ function HeatLeaderboardCard({
       )}
 
       <div className={getHeatLeaderboardListClassName()}>
-        {isLoading && posts.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-slate-500">加载中...</p>
-          </div>
-        ) : posts.length === 0 ? (
+        {posts.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-slate-500">暂无数据</p>
           </div>
@@ -993,7 +968,6 @@ function PostDetailCard({
   post,
   postDetail,
   onBack,
-  isLoading,
   error,
   isTracking,
   onStartTracking
@@ -1001,7 +975,6 @@ function PostDetailCard({
   post: HeatPost
   postDetail?: any
   onBack: () => void
-  isLoading?: boolean
   error?: Error | null
   isTracking?: boolean
   onStartTracking?: () => void
@@ -1030,8 +1003,6 @@ function PostDetailCard({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {isLoading && <StatusBadge label="加载中" tone="warning" />}
-          {isTracking && <StatusBadge label="追踪中" tone="success" />}
           {onStartTracking && (
             <button
               onClick={onStartTracking}
@@ -1107,13 +1078,11 @@ function CommentsCard({
   comments,
   sort,
   onSortChange,
-  isLoading,
   error
 }: {
   comments: CommentItem[]
   sort: 'likes' | 'time'
   onSortChange: (value: 'likes' | 'time') => void
-  isLoading?: boolean
   error?: Error | null
 }) {
   const sorted = useMemo(() => {
@@ -1132,7 +1101,6 @@ function CommentsCard({
           <p className="text-sm text-slate-600">展示帖子实时评论流</p>
         </div>
         <div className="flex items-center gap-2">
-          {isLoading && <StatusBadge label="加载中" tone="warning" />}
           <CommentSortTabs value={sort} onChange={onSortChange} />
         </div>
       </div>
@@ -1144,11 +1112,7 @@ function CommentsCard({
       )}
 
       <div className="space-y-3 max-h-[420px] overflow-auto pr-2">
-        {isLoading && comments.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
-            <p className="text-slate-500">加载中...</p>
-          </div>
-        ) : comments.length === 0 ? (
+        {comments.length === 0 ? (
           <div className="flex items-center justify-center py-8">
             <p className="text-slate-500">暂无评论</p>
           </div>
@@ -1616,8 +1580,6 @@ function CommentaryAnalysisPanel({
               </div>
             )}
           </div>
-          {/* 分析状态徽章 */}
-          <AnalysisStatusBadge status={status} />
         </div>
       </div>
 
@@ -1649,19 +1611,6 @@ function CommentaryAnalysisPanel({
       <AnalysisResultView status={status} summary={summary} />
     </div>
   )
-}
-
-// 分析状态徽章组件
-function AnalysisStatusBadge({ status }: { status: 'Idle' | 'Running' | 'Done' | 'Error' }) {
-  const statusConfig: Record<typeof status, { label: string; tone: 'success' | 'warning' | 'danger' | 'info' | 'muted' }> = {
-    Idle: { label: '空闲', tone: 'muted' },
-    Running: { label: '分析中', tone: 'warning' },
-    Done: { label: '已完成', tone: 'success' },
-    Error: { label: '错误', tone: 'danger' }
-  }
-
-  const config = statusConfig[status]
-  return <StatusBadge label={config.label} tone={config.tone} />
 }
 
 /**
@@ -1850,21 +1799,5 @@ function ToggleCard({ icon: Icon, label, enabled, onToggle }: { icon: ElementTyp
       <Icon size={18} />
       <span className="text-sm font-medium">{label}</span>
     </button>
-  )
-}
-
-function StatusBadge({ label, tone }: { label: string; tone: 'success' | 'warning' | 'danger' | 'info' | 'muted' }) {
-  const toneMap: Record<'success' | 'warning' | 'danger' | 'info' | 'muted', string> = {
-    success: 'bg-green-100 text-green-700',
-    warning: 'bg-amber-100 text-amber-700',
-    danger: 'bg-red-100 text-red-700',
-    info: 'bg-blue-100 text-blue-700',
-    muted: 'bg-slate-100 text-slate-600',
-  }
-
-  return (
-    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${toneMap[tone]}`}>
-      {label}
-    </span>
   )
 }
