@@ -790,9 +790,6 @@ export default function DynamicDemo() {
         status={postAnalysis.analysisStatus}
         summary={postAnalysis.summary}
         onOpenConfig={() => setAnalysisOpen(true)}
-        onRun={() => postAnalysis.analyzeNow()}
-        isRunDisabled={!postAnalysis.isTracking}
-        runDisabledReason="请先选择一个帖子并开始分析"
         trackedPostId={postAnalysis.trackedPostId}
         trackedPostStats={
           postAnalysis.isTracking && selectedPost
@@ -1572,9 +1569,6 @@ interface CommentaryAnalysisPanelProps {
   status: 'Idle' | 'Running' | 'Done' | 'Error'
   summary: string | null
   onOpenConfig: () => void
-  onRun: () => void
-  isRunDisabled?: boolean
-  runDisabledReason?: string
   trackedPostId?: string | null
   trackedPostStats?: {
     likeCount?: number
@@ -1587,9 +1581,6 @@ function CommentaryAnalysisPanel({
   status,
   summary,
   onOpenConfig,
-  onRun,
-  isRunDisabled = false,
-  runDisabledReason = '请先选择一个帖子并开始分析',
   trackedPostId = null,
   trackedPostStats = null
 }: CommentaryAnalysisPanelProps) {
@@ -1606,23 +1597,6 @@ function CommentaryAnalysisPanel({
         <div className="flex flex-wrap gap-3">
           {/* 分析配置按钮 */}
           <button className="btn-secondary" onClick={onOpenConfig}>分析配置</button>
-          {/* 立即分析按钮 - 支持禁用状态和提示 */}
-          <div className="relative group">
-            <button
-              className={`btn-primary ${isRunDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-              onClick={isRunDisabled ? undefined : onRun}
-              disabled={isRunDisabled}
-            >
-              立即分析
-            </button>
-            {/* 禁用时显示提示 */}
-            {isRunDisabled && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                {runDisabledReason}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
