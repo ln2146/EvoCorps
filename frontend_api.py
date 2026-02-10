@@ -2521,46 +2521,80 @@ def generate_template_answer(persona_info, user_posts, user_comments, like_count
     name = persona_info.get('name', '用户')
     profession = persona_info.get('profession', '普通用户')
     background = persona_info.get('background', '各种话题')
+    personality = persona_info.get('personality_traits', [])
+    if isinstance(personality, list):
+        personality_str = '、'.join(personality[:2]) if personality else '理性'
+    else:
+        personality_str = str(personality) if personality else '理性'
     
     # 计算活跃度
     total_activity = len(user_posts) + len(user_comments)
     activity_level = "非常活跃" if total_activity > 10 else "活跃" if total_activity > 5 else "新手"
     
+    # 构建用户行为描述
+    behavior_parts = []
+    if user_posts:
+        avg_likes = sum(p[1] or 0 for p in user_posts) / len(user_posts)
+        behavior_parts.append(f"发布了{len(user_posts)}篇内容（平均{avg_likes:.1f}个赞）")
+    if user_comments:
+        behavior_parts.append(f"发表了{len(user_comments)}条评论")
+    if like_count > 0:
+        behavior_parts.append(f"点赞了{like_count}次")
+    if following_count > 0:
+        behavior_parts.append(f"关注了{following_count}人")
+    if follower_count > 0:
+        behavior_parts.append(f"有{follower_count}个粉丝")
+    
+    behavior_summary = "、".join(behavior_parts) if behavior_parts else "刚开始使用平台"
+    
     # 根据问题类型生成回答
-    if any(keyword in question_lower for keyword in ['发帖', '发布', '内容', '分享', '帖子', '发表']):
+    if any(keyword in question_lower for keyword in ['发帖', '发布', '内容', '分享', '帖子', '发表', 'post', 'share', 'publish']):
         if user_posts:
             avg_likes = sum(p[1] or 0 for p in user_posts) / len(user_posts)
-            return f"我在平台上发布了{len(user_posts)}篇内容，平均每篇获得{avg_likes:.1f}个点赞。作为{profession}，我主要分享关于{background}的内容。我觉得通过发帖可以和大家交流想法，也能获得不同的观点。"
+            sample_content = user_posts[0][0][:50] + "..." if user_posts[0][0] else ""
+            return f"关于这个问题，我在平台上{behavior_summary}。作为{profession}，我主要分享关于{background}的内容。比如我最近发布的「{sample_content}」就获得了{user_posts[0][1]}个赞。我觉得通过发帖可以和大家交流想法，也能获得不同的观点。"
         else:
-            return f"我目前还没有发布过内容，主要是在观察和学习。作为{name}，我更倾向于先了解平台氛围再参与。不过我对{background}相关的话题很感兴趣。"
+            return f"关于这个问题，我目前还没有发布过内容，主要是在观察和学习。作为{name}，我更倾向于先了解平台氛围再参与。不过我对{background}相关的话题很感兴趣，未来会考虑分享我的看法。"
     
-    elif any(keyword in question_lower for keyword in ['互动', '评论', '交流', '讨论', '参与']):
+    elif any(keyword in question_lower for keyword in ['互动', '评论', '交流', '讨论', '参与', 'interact', 'comment', 'engage']):
         if user_comments:
-            return f"我比较{activity_level}，发表过{len(user_comments)}条评论。我喜欢与他人真诚地交流想法。作为{profession}，我认为良好的互动能促进相互理解，也能让我学到新东西。"
+            sample_comment = user_comments[0][0][:50] + "..." if user_comments[0][0] else ""
+            return f"针对您的问题，我在平台上比较{activity_level}，{behavior_summary}。我喜欢与他人真诚地交流想法。比如我最近评论说「{sample_comment}」。作为{profession}，我认为良好的互动能促进相互理解，也能让我学到新东西。"
         else:
-            return f"我目前主要是浏览内容，还没有太多评论。不过我会在合适的时候参与讨论，特别是关于{background}的话题。"
+            return f"关于这个问题，我目前主要是浏览内容，还没有太多评论。不过我会在合适的时候参与讨论，特别是关于{background}的话题。我的性格比较{personality_str}，会选择有价值的内容进行互动。"
     
-    elif any(keyword in question_lower for keyword in ['喜欢', '偏好', '点赞', '关注', '兴趣']):
-        if like_count > 0:
-            return f"我点赞了{like_count}个内容，关注了{following_count}个用户，有{follower_count}个粉丝。我比较关注{background}相关的话题。我的兴趣比较广泛，喜欢从不同角度看问题。"
+    elif any(keyword in question_lower for keyword in ['喜欢', '偏好', '点赞', '关注', '兴趣', 'like', 'prefer', 'interest', 'follow']):
+        if like_count > 0 or following_count > 0:
+            return f"关于您问的这个问题，我在平台上{behavior_summary}。我比较关注{background}相关的话题。我的兴趣比较广泛，喜欢从不同角度看问题。作为{profession}，我倾向于关注那些有深度、有见地的内容。"
         else:
-            return f"我还在探索平台，寻找感兴趣的内容。作为{profession}，我对{background}特别感兴趣，希望能找到更多志同道合的人。"
+            return f"针对这个问题，我还在探索平台，寻找感兴趣的内容。作为{profession}，我对{background}特别感兴趣，希望能找到更多志同道合的人。我的性格{personality_str}，所以会比较谨慎地选择关注对象。"
     
-    elif any(keyword in question_lower for keyword in ['看法', '观点', '认为', '想法', '态度', '如何看待']):
+    elif any(keyword in question_lower for keyword in ['看法', '观点', '认为', '想法', '态度', '如何看待', 'opinion', 'view', 'think', 'perspective']):
         behavior_desc = f"发布了{len(user_posts)}篇内容" if user_posts else f"发表了{len(user_comments)}条评论" if user_comments else "还在观察"
-        return f"从我在平台上的表现来看（{behavior_desc}），我倾向于理性地看待问题。我认为需要多角度思考。作为{profession}，我特别关注{background}相关的实际影响。"
+        return f"关于您提出的这个问题，从我在平台上的表现来看（{behavior_desc}），我倾向于{personality_str}地看待问题。我认为需要多角度思考，不能只看表面。作为{profession}，我特别关注{background}相关的实际影响。我的{behavior_summary}也反映了我的这种态度。"
     
-    elif any(keyword in question_lower for keyword in ['经验', '经历', '遇到', '体验', '感受']):
+    elif any(keyword in question_lower for keyword in ['经验', '经历', '遇到', '体验', '感受', 'experience', 'encounter', 'feel']):
         if total_activity > 0:
-            return f"在平台上的{total_activity}次互动中，我学到了很多。{background}的背景让我对这些话题有独特的理解。我觉得这个平台很有价值，能接触到不同的观点。"
+            return f"针对您的这个问题，在平台上的{total_activity}次互动中，我学到了很多。我{behavior_summary}，这些经历让我对很多问题有了新的认识。{background}的背景让我对这些话题有独特的理解。我觉得这个平台很有价值，能接触到不同的观点。"
         else:
-            return f"我刚开始使用平台，还在积累经验。我的{background}背景让我对某些话题特别感兴趣，期待未来有更多交流。"
+            return f"关于这个问题，我刚开始使用平台，还在积累经验。我的{background}背景让我对某些话题特别感兴趣，期待未来有更多交流。虽然我现在{behavior_summary}，但我相信随着时间推移会有更多收获。"
     
-    elif any(keyword in question_lower for keyword in ['建议', '推荐', '应该', '怎么做', '如何']):
-        return f"基于我作为{profession}的经验和{background}的背景，我建议可以从实际情况出发。保持开放的心态很重要，同时也要有自己的判断。"
+    elif any(keyword in question_lower for keyword in ['建议', '推荐', '应该', '怎么做', '如何', 'suggest', 'recommend', 'should', 'how']):
+        return f"关于您问的这个问题，基于我作为{profession}的经验和{background}的背景，我建议可以从实际情况出发。我在平台上{behavior_summary}，这些经历让我认识到保持开放的心态很重要，同时也要有自己的判断。我的性格比较{personality_str}，所以我倾向于理性分析后再做决定。"
+    
+    elif any(keyword in question_lower for keyword in ['为什么', '原因', '理由', 'why', 'reason']):
+        return f"针对您提出的这个问题，我认为原因是多方面的。作为{profession}，我在平台上{behavior_summary}，这让我对这类问题有一些思考。从{background}的角度来看，我觉得需要综合考虑各种因素。我的性格{personality_str}，所以我倾向于深入分析而不是简单下结论。"
+    
+    elif any(keyword in question_lower for keyword in ['最', '最喜欢', '最好', '最差', 'favorite', 'best', 'worst', 'most']):
+        if user_posts and user_posts[0][1] > 0:
+            top_post = max(user_posts, key=lambda x: x[1] or 0)
+            return f"关于您的这个问题，从我的经历来看，我最满意的是我发布的一篇内容获得了{top_post[1]}个赞。作为{profession}，我在平台上{behavior_summary}。我认为{background}相关的内容最能引起共鸣。我的性格{personality_str}，所以我特别重视内容的质量和深度。"
+        else:
+            return f"针对这个问题，我在平台上{behavior_summary}。作为{profession}，我最看重的是真诚的交流和有价值的内容。虽然我的活跃度是{activity_level}，但我相信质量比数量更重要。我对{background}相关的话题最感兴趣。"
     
     else:
-        return f"作为一个{activity_level}的用户（发布{len(user_posts)}篇内容，{len(user_comments)}条评论），我认为这个问题很有意思。我会继续关注相关讨论。我的{profession}背景让我对此有一些独特的看法。"
+        # 默认回答 - 直接针对用户的问题
+        return f"关于「{question}」这个问题，作为一个{activity_level}的用户，我在平台上{behavior_summary}。从我{profession}的角度和{background}的背景来看，我认为这是一个值得深入思考的问题。我的性格比较{personality_str}，所以我倾向于从多个角度来看待这个问题。虽然我可能没有标准答案，但我会继续关注相关讨论，并结合自己的经历形成看法。"
 
 
 @app.route('/api/interview/users/<db_name>', methods=['GET'])
@@ -3922,8 +3956,13 @@ def event_stream():
 
 
 if __name__ == '__main__':
-    print("Starting EvoCorps Frontend API Server...")
-    print("Database directory:", os.path.abspath(DATABASE_DIR))
-    print("Server running at: http://127.0.0.1:5001")
+    print("=" * 60)
+    print("🚀 Starting EvoCorps Frontend API Server...")
+    print("=" * 60)
+    print(f"📁 Database directory: {os.path.abspath(DATABASE_DIR)}")
+    print(f"🌐 Server running at: http://127.0.0.1:5001")
+    print(f"🤖 AI Module Status: {'✅ ENABLED' if AI_AVAILABLE else '⚠️ DISABLED (using template answers)'}")
+    print("=" * 60)
     print("Press Ctrl+C to stop")
+    print()
     app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)
