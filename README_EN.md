@@ -1,20 +1,16 @@
 <div align="center">
 
-  # EvoCorps
-  **An Evolutionary Multi-Agent Framework for Depolarizing Online Discourse**
-
   <div align="center">
-    <img src="assets/logo.png" width="100%" alt="EvoCorps logo"/>
+    <img src="assets/logoheng.svg" width="100%" alt="EvoCorps logo"/>
   </div>
 
-  <p>
-    <img alt="Python Version" src="https://img.shields.io/badge/python-3.9%2B-blue" />
-    <img alt="License" src="https://img.shields.io/badge/license-MIT-green" />
-    <img alt="Multi-Agent" src="https://img.shields.io/badge/agents-multi--agent-8a2be2" />
-  </p>
+  **An Evolutionary Multi-Agent Framework for Depolarizing Online Discourse**
 
-  [简体中文](README.md) | [English](README_EN.md)
+[简体中文](README.md) | [English](README_EN.md)
 
+  [![Paper](https://img.shields.io/badge/Paper-arXiv-red)](https://arxiv.org/abs/2602.08529)
+  ![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)
+  ![License](https://img.shields.io/badge/license-MIT-green)
 
 </div>
 
@@ -72,6 +68,24 @@ We evaluate EvoCorps on the **MOSAIC** social simulation platform under scenario
 </div>
 
 The figure compares sentiment trajectories over time under four settings: Case 1 (only ordinary users; no adversary and no intervention), Case 2 (coordinated malicious amplification; no protection), Case 3 (post-hoc review on top of Case 2), and Case 4 (EvoCorps proactive, role-coordinated in-process intervention on top of Case 2). The dashed line marks when factual clarification starts to be injected (time step 5). Under adversarial amplification, sentiment is harder to recover with no protection or post-hoc intervention only, while EvoCorps stabilizes earlier and trends more steadily.
+
+---
+
+<a id="interface-preview"></a>
+## 📷 Interface Preview
+
+<div align="center">
+<table align="center">
+<tr>
+<td align="center" width="50%"><strong>🏠 Platform Homepage</strong><br><img src="assets/homepage.gif" width="100%" alt="Platform Homepage"><br>Static and dynamic mode selection</td>
+<td align="center" width="50%"><strong>📈 Data Monitoring</strong><br><img src="assets/datadetect.gif" width="100%" alt="Data Monitoring"><br>View detailed information about users and posts</td>
+</tr>
+<tr>
+<td align="center" width="50%"><strong>🕸️ Relationship Graph</strong><br><img src="assets/graph.gif" width="100%" alt="Relationship Graph"><br>Visualize the network of users, posts, and comments</td>
+<td align="center" width="50%"><strong>💬 Interview Feature</strong><br><img src="assets/talking.gif" width="100%" alt="Interview Feature"><br>Send questionnaire questions to simulated users and collect responses</td>
+</tr>
+</table>
+</div>
 
 ---
 
@@ -196,10 +210,10 @@ The frontend interface provides the following features:
 - **Relationship Graph**: Visualize the network of users, posts, and comments
 - **Interview Feature**: Send questionnaires to simulated users and collect responses
 
-
+<a id="ethics"></a>
 
 ## ⚖️ Ethics Statement
-<a id="ethics-statement"></a>
+
 This work investigates mechanisms for online discourse depolarization in a simulated environment, utilizing publicly available datasets and synthetic agent interactions. It does not involve experiments with human subjects and does not collect or process personally identifying information. The primary goal of this research is to advance understanding of coordinated intervention mechanisms for platform governance, rather than to develop or deploy deceptive influence campaigns.
 
 EvoCorps is framed as a governance-assistance approach for online platforms facing coordinated and malicious activities such as disinformation campaigns or adversarial manipulation. In such settings, platform governance actors may themselves require coordinated capabilities and stylistic diversity to respond effectively and proportionately. Our study therefore examines coordination and response diversity as governance mechanisms, not as tools for artificial consensus formation or manipulation.
@@ -207,3 +221,19 @@ EvoCorps is framed as a governance-assistance approach for online platforms faci
 We explicitly oppose the use of deceptive strategies in any real-world deployment. Although our simulations introduce diverse agent personas to explore theoretical boundaries of influence dynamics, any practical application must adhere strictly to principles of transparency and accountability. Automated agents should be clearly identified as AI-based assistants or governance tools, such as certified fact-checking bots, and must not impersonate human users or conceal their artificial nature.
 
 Any deployment of systems inspired by this work should be integrated with existing platform governance processes and subject to platform-specific policies, transparency requirements, and continuous auditing. Such safeguards are necessary to mitigate unintended harms, including disparate impacts, erosion of user trust, or errors arising from automated judgments. The intended use of EvoCorps is to support responsible, transparent, and accountable governance interventions, rather than to mislead users or manufacture false consensus.
+
+## 📄 Citation
+
+If you use this project in your research, please cite our paper:
+
+```bibtex
+@misc{lin2026evocorpsevolutionarymultiagentframework,
+      title={EvoCorps: An Evolutionary Multi-Agent Framework for Depolarizing Online Discourse}, 
+      author={Ning Lin and Haolun Li and Mingshu Liu and Chengyun Ruan and Kaibo Huang and Yukun Wei and Zhongliang Yang and Linna Zhou},
+      year={2026},
+      eprint={2602.08529},
+      archivePrefix={arXiv},
+      primaryClass={cs.MA},
+      url={https://arxiv.org/abs/2602.08529}, 
+}
+```

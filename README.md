@@ -8,11 +8,9 @@
 
 [简体中文](README.md) | [English](README_EN.md)
 
-  <p>
-    <img alt="Python Version" src="https://img.shields.io/badge/python-3.9%2B-blue" />
-    <img alt="License" src="https://img.shields.io/badge/license-MIT-green" />
-    <img alt="Multi-Agent" src="https://img.shields.io/badge/agents-multi--agent-8a2be2" />
-  </p>
+  [![Paper](https://img.shields.io/badge/Paper-arXiv-red)](https://arxiv.org/abs/2602.08529)
+  ![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)
+  ![License](https://img.shields.io/badge/license-MIT-green)
 
 </div>
 
