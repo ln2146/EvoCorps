@@ -144,8 +144,8 @@ EvoCorps/
 
 ```bash
 # 创建 conda 环境
-conda create -n your_conda_name python=3.12
-conda activate your_conda_name
+conda create -n EvoCorps python=3.12
+conda activate EvoCorps
 ```
 
 ### 2. 安装依赖包
