@@ -213,6 +213,7 @@ npm run dev
 
 
 <a id="ethics"></a>
+
 ## ⚖️ 伦理声明
 
 本研究在模拟环境中探讨在线讨论去极化的机制，使用的是公开可获取的数据集以及合成智能体之间的交互过程。研究过程中不涉及任何人类受试者实验，也不收集或处理任何可识别个人身份的信息。本研究的主要目标在于加深对平台治理中协调式干预机制的理解，而非开发或部署具有欺骗性的影响行动。
@@ -223,3 +224,22 @@ EvoCorps 被定位为一种治理辅助方法，旨在帮助在线平台应对�
 
 任何受本研究启发的系统部署，都应当与现有的平台治理流程相结合，并遵循平台特定的政策、透明性要求以及持续审计机制。这些保障措施对于降低潜在的非预期危害至关重要，包括差异化影响、用户信任受损，或由自动化判断引发的错误。本研究中 EvoCorps 的预期用途在于支持负责任、透明且可问责的治理干预，而非误导用户或制造虚假共识。
 
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
+## 📄 引用
+
+如果您在研究中使用了本项目，请引用我们的论文：
+
+```bibtex
+@misc{lin2026evocorpsevolutionarymultiagentframework,
+      title={EvoCorps: An Evolutionary Multi-Agent Framework for Depolarizing Online Discourse}, 
+      author={Ning Lin and Haolun Li and Mingshu Liu and Chengyun Ruan and Kaibo Huang and Yukun Wei and Zhongliang Yang and Linna Zhou},
+      year={2026},
+      eprint={2602.08529},
+      archivePrefix={arXiv},
+      primaryClass={cs.MA},
+      url={https://arxiv.org/abs/2602.08529}, 
+}
+```
