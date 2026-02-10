@@ -94,9 +94,11 @@ The figure compares sentiment trajectories over time under four settings: Case 1
 - [🚀 Quick Start](#-quick-start)
   - [1. Create Environment](#1-create-environment)
   - [2. Install Dependencies](#2-install-dependencies)
-  - [3. Configure API](#3-configure-api)
+  - [3. Configure API & Select Models](#3-configure-api--select-models)
   - [4. System Run Steps](#4-system-run-steps)
-- [⚖️ Ethics Statement](#ethics-statement)
+  - [5. Launch Frontend Visualization Interface](#5-launch-frontend-visualization-interface)
+- [⚖️ Ethics Statement](#ethics)
+- [📄 Citation](#-citation)
 
 ---
 
