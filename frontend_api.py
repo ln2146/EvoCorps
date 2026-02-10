@@ -2164,6 +2164,7 @@ def send_interview_stream():
     database = data.get('database')
     user_ids = data.get('user_ids', [])
     question = data.get('question', '')
+    related_post = data.get('related_post')  # 新增：关联帖子信息
     
     if not database or not user_ids or not question:
         return jsonify({'error': 'Missing required parameters'}), 400
@@ -2196,8 +2197,8 @@ def send_interview_stream():
                 # 发送开始标记
                 yield f"data: {json.dumps({'type': 'start', 'user_id': user_id}, ensure_ascii=False)}\n\n"
                 
-                # 流式生成回答
-                for chunk in generate_interview_answer_stream(user_persona, background, question, user_id, db_path):
+                # 流式生成回答（传入关联帖子信息）
+                for chunk in generate_interview_answer_stream(user_persona, background, question, user_id, db_path, related_post):
                     yield f"data: {json.dumps({'type': 'chunk', 'user_id': user_id, 'content': chunk}, ensure_ascii=False)}\n\n"
                 
                 # 发送完成标记
@@ -2223,7 +2224,7 @@ def send_interview_stream():
     )
 
 
-def generate_interview_answer_stream(persona, background, question, user_id, db_path):
+def generate_interview_answer_stream(persona, background, question, user_id, db_path, related_post=None):
     """流式生成采访回答"""
     import json
     
@@ -2260,7 +2261,7 @@ def generate_interview_answer_stream(persona, background, question, user_id, db_
             persona_info = {'description': str(persona)}
         
         # 生成模板回答并逐字返回
-        answer = generate_template_answer(persona_info, user_posts, user_comments, like_count, following_count, follower_count, question)
+        answer = generate_template_answer(persona_info, user_posts, user_comments, like_count, following_count, follower_count, question, related_post)
         
         # 模拟流式输出，每次返回几个字
         import time
@@ -2323,21 +2324,33 @@ def generate_interview_answer_stream(persona, background, question, user_id, db_
             content = comment[0][:100] + "..." if len(comment[0]) > 100 else comment[0]
             behavior_summary += f"{i}. {content}\n"
     
+    # 如果有关联帖子，添加到上下文中
+    post_context = ""
+    if related_post:
+        post_context = f"""
+
+【关联帖子】
+以下是一篇相关的帖子，请结合这篇帖子的内容来回答问题：
+作者：{related_post.get('author_id', '未知')}
+内容：{related_post.get('content', '')}
+"""
+    
     # 构建提示词
-    system_prompt = """你是一个社交媒体平台的用户，正在接受采访。请根据你的个人背景、性格特征和在平台上的实际行为来回答问题。
+    system_prompt = f"""你是一个社交媒体平台的用户，正在接受采访。请根据你的个人背景、性格特征和在平台上的实际行为来回答问题。
 
 要求：
 1. 回答要自然、真实，符合你的人设和行为模式
 2. 结合你在平台上的实际活动（发帖、评论、点赞等）来回答
-3. 回答长度控制在100-200字之间
-4. 用第一人称回答，展现个性化的语言风格
-5. 如果问题与你的行为相关，要引用具体的数据或例子
-6. 保持回答的多样性，避免千篇一律"""
+3. {'如果提供了关联帖子，请针对该帖子的内容进行回答' if related_post else ''}
+4. 回答长度控制在100-200字之间
+5. 用第一人称回答，展现个性化的语言风格
+6. 如果问题与你的行为相关，要引用具体的数据或例子
+7. 保持回答的多样性，避免千篇一律"""
     
     user_prompt = f"""我的个人信息：
 {json.dumps(persona_info, ensure_ascii=False, indent=2)}
 
-{behavior_summary}
+{behavior_summary}{post_context}
 
 现在请回答这个问题：{question}
 
@@ -2368,7 +2381,7 @@ def generate_interview_answer_stream(persona, background, question, user_id, db_
         traceback.print_exc()
         
         # 回退到模板回答
-        answer = generate_template_answer(persona_info, user_posts, user_comments, like_count, following_count, follower_count, question)
+        answer = generate_template_answer(persona_info, user_posts, user_comments, like_count, following_count, follower_count, question, related_post)
         import time
         for i in range(0, len(answer), 3):
             chunk = answer[i:i+3]
@@ -2513,7 +2526,7 @@ def generate_interview_answer(persona, background, question, user_id, db_path):
         return generate_template_answer(persona_info, user_posts, user_comments, like_count, following_count, follower_count, question)
 
 
-def generate_template_answer(persona_info, user_posts, user_comments, like_count, following_count, follower_count, question):
+def generate_template_answer(persona_info, user_posts, user_comments, like_count, following_count, follower_count, question, related_post=None):
     """生成基于模板的回答（当AI不可用时使用）"""
     question_lower = question.lower()
     
@@ -2546,6 +2559,12 @@ def generate_template_answer(persona_info, user_posts, user_comments, like_count
         behavior_parts.append(f"有{follower_count}个粉丝")
     
     behavior_summary = "、".join(behavior_parts) if behavior_parts else "刚开始使用平台"
+    
+    # 如果有关联帖子，添加相关上下文
+    post_context = ""
+    if related_post:
+        post_content = related_post.get('content', '')[:100]
+        post_context = f"针对这篇帖子「{post_content}...」，"
     
     # 根据问题类型生成回答
     if any(keyword in question_lower for keyword in ['发帖', '发布', '内容', '分享', '帖子', '发表', 'post', 'share', 'publish']):
@@ -2594,7 +2613,7 @@ def generate_template_answer(persona_info, user_posts, user_comments, like_count
     
     else:
         # 默认回答 - 直接针对用户的问题
-        return f"关于「{question}」这个问题，作为一个{activity_level}的用户，我在平台上{behavior_summary}。从我{profession}的角度和{background}的背景来看，我认为这是一个值得深入思考的问题。我的性格比较{personality_str}，所以我倾向于从多个角度来看待这个问题。虽然我可能没有标准答案，但我会继续关注相关讨论，并结合自己的经历形成看法。"
+        return f"{post_context}关于「{question}」这个问题，作为一个{activity_level}的用户，我在平台上{behavior_summary}。从我{profession}的角度和{background}的背景来看，我认为这是一个值得深入思考的问题。我的性格比较{personality_str}，所以我倾向于从多个角度来看待这个问题。虽然我可能没有标准答案，但我会继续关注相关讨论，并结合自己的经历形成看法。"
 
 
 @app.route('/api/interview/users/<db_name>', methods=['GET'])

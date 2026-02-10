@@ -42,6 +42,7 @@ export default function InterviewPage() {
   const [otherUsers, setOtherUsers] = useState<UserInfo[]>([])
   const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set())
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
+  const [selectedPost, setSelectedPost] = useState<PostWithUsers | null>(null)
   const [question, setQuestion] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
@@ -274,7 +275,12 @@ export default function InterviewPage() {
         body: JSON.stringify({
           database: selectedDb,
           user_ids: Array.from(selectedUsers),
-          question: question.trim()
+          question: question.trim(),
+          related_post: selectedPost ? {
+            post_id: selectedPost.post_id,
+            content: selectedPost.content,
+            author_id: selectedPost.author_id
+          } : null
         })
       })
 
@@ -745,6 +751,60 @@ export default function InterviewPage() {
                 <MessageSquare size={20} className="text-green-600" />
                 <h2 className="text-xl font-bold text-slate-800">发送问卷</h2>
               </div>
+              
+              {/* 关联帖子选择（可选） */}
+              <div className="mb-4">
+                <label className="text-sm font-medium text-slate-700 mb-2 block">
+                  关联帖子（可选）
+                </label>
+                {selectedPost ? (
+                  <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-3 border border-blue-200 relative">
+                    <button
+                      onClick={() => setSelectedPost(null)}
+                      className="absolute top-2 right-2 p-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all"
+                      title="取消选择"
+                    >
+                      <X size={14} />
+                    </button>
+                    <p className="text-xs text-blue-600 font-medium mb-1">已选择帖子</p>
+                    <p className="text-sm text-slate-700 line-clamp-2 pr-8">
+                      {selectedPost.content}
+                    </p>
+                    <div className="flex items-center gap-3 mt-2 text-xs text-slate-600">
+                      <span className="flex items-center gap-1">
+                        <ThumbsUp size={10} />
+                        {selectedPost.num_likes}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <MessageCircle size={10} />
+                        {selectedPost.num_comments}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <select
+                      onChange={(e) => {
+                        const post = posts.find(p => p.post_id === e.target.value)
+                        setSelectedPost(post || null)
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                      value=""
+                    >
+                      <option value="">选择一个帖子...</option>
+                      {posts.map((post) => (
+                        <option key={post.post_id} value={post.post_id}>
+                          {post.content.substring(0, 50)}{post.content.length > 50 ? '...' : ''} ({post.num_likes}赞 {post.num_comments}评)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <p className="text-xs text-slate-500 mt-1">
+                  选择帖子后，用户将针对该帖子内容回答问题
+                </p>
+              </div>
+              
               <textarea
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
