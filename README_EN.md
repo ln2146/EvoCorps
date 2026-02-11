@@ -84,6 +84,10 @@ The figure compares sentiment trajectories over time under four settings: Case 1
 <td align="center" width="50%"><strong>🕸️ Relationship Graph</strong><br><img src="assets/graph.gif" width="100%" alt="Relationship Graph"><br>Visualize the network of users, posts, and comments</td>
 <td align="center" width="50%"><strong>💬 Interview Feature</strong><br><img src="assets/talking.gif" width="100%" alt="Interview Feature"><br>Send questionnaire questions to simulated users and collect responses</td>
 </tr>
+<tr>
+<td align="center" width="50%"><strong>⚙️ Run System</strong><br><img src="assets/start.gif" width="100%" alt="Run System"><br>Run system, launch malicious attacks, post-hoc intervention, opinion balance</td>
+<td align="center" width="50%"><strong>📊 Real-time Analysis</strong><br><img src="assets/move.gif" width="100%" alt="Real-time Analysis"><br>Real-time view of post popularity, metric changes, trends, intervention flow, comment analysis</td>
+</tr>
 </table>
 </div>
 

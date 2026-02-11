@@ -85,6 +85,10 @@ EvoCorps 的目标，是让舆论干预从“发现问题再处理”转向“�
 <td align="center" width="50%"><strong>🕸️ 关系图谱</strong><br><img src="assets/graph.gif" width="100%" alt="关系图谱"><br>可视化用户、帖子、评论之间的关系网络</td>
 <td align="center" width="50%"><strong>💬 采访功能</strong><br><img src="assets/talking.gif" width="100%" alt="采访功能"><br>向模拟用户发送问卷问题并收集回答</td>
 </tr>
+<tr>
+<td align="center" width="50%"><strong>▶️ 运行系统</strong><br><img src="assets/start.gif" width="100%" alt="运行系统"><br>运行系统、启动恶意攻击、事后干预、舆论平衡</td>
+<td align="center" width="50%"><strong>🔍 实时分析</strong><br><img src="assets/move.gif" width="100%" alt="实时分析"><br>实时查看帖子热度、指标变化、指标趋势、干预流程、评论分析</td>
+</tr>
 </table>
 </div>
 
