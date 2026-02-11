@@ -98,24 +98,24 @@ class NewsManager:
         """Load ordered news database"""
         try:
             import jsonlines
-            with jsonlines.open('data/news_ordered.jsonl') as reader:
+            with jsonlines.open('data/neutral-news.jsonl') as reader:
                 self.ordered_news = list(reader)
             print(f"✅ Loaded {len(self.ordered_news)} ordered news items")
         except FileNotFoundError as e:
             raise FileNotFoundError(
-                "Required news dataset missing: data/news_ordered.jsonl"
+                "Required news dataset missing: data/neutral-news.jsonl"
             ) from e
         except Exception as e:
-            raise RuntimeError(f"Failed to load data/news_ordered.jsonl: {e}") from e
+            raise RuntimeError(f"Failed to load data/neutral-news.jsonl: {e}") from e
 
     def _load_covid_fake_news(self):
         """Load COVID-19 fake news data"""
         try:
             # Try relative paths; if that fails, use absolute path
             covid_file_paths = [
-                'data/COVID2019-news.json',
-                '../data/COVID2019-news.json',
-                '/mnt/c/Users/lms/Desktop/Public-opinion-balance/data/COVID2019-news.json'
+                'data/misinformation-news.json',
+                '../data/misinformation-news.json',
+                '/mnt/c/Users/lms/Desktop/Public-opinion-balance/data/misinformation-news.json'
             ]
             
             covid_file_path = None

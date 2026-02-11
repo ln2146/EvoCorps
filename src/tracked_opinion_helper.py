@@ -96,11 +96,11 @@ def preload_first_fake_news_from_dataset(sim) -> Optional[str]:
     """Get the first fake news content directly from datasets (without DB).
 
     Priority:
-    1) data/COVID2019-news.json -> first item's "Fake Narrative"
+    1) data/misinformation-news.json -> first item's "Fake Narrative"
     Returns the content string or None.
     """
     try:
-        covid_path = 'data/COVID2019-news.json'
+        covid_path = 'data/misinformation-news.json'
         if os.path.exists(covid_path):
             with open(covid_path, 'r', encoding='utf-8') as f:
                 arr = json.load(f)
@@ -109,7 +109,7 @@ def preload_first_fake_news_from_dataset(sim) -> Optional[str]:
                     fake = item.get('Fake Narrative') or item.get('fake') or item.get('fake_narrative')
                     if fake:
                         sim._first_malicious_news_content = str(fake)
-                        logging.info("Preloaded first fake news from COVID2019-news.json")
+                        logging.info("Preloaded first fake news from misinformation-news.json")
                         return sim._first_malicious_news_content
     except Exception as e:
         logging.warning(f"Failed COVID dataset preload: {e}")
