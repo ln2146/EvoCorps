@@ -364,11 +364,11 @@ class NewsManager:
                     # Real news uses original content
                 else:
                     # If no COVID data, use original content
-                    content = f"[NEWS] {selected_article['title']}: {selected_article['description']} {selected_article['content']}"
+                    content = f"[NEWS] {selected_article['title']}: {selected_article['content']}"
                     real_news = None
             else:
                 # Real news uses original content
-                content = f"[NEWS] {selected_article['title']}: {selected_article['description']} {selected_article['content']}"
+                content = f"[NEWS] {selected_article['title']}: {selected_article['content']}"
                 real_news = None
 
             db_news_type = 'fake' if news_type == 'opinion' else news_type
