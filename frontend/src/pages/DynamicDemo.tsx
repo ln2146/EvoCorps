@@ -772,7 +772,7 @@ export default function DynamicDemo() {
               error={error || undefined}
             />
           ) : (
-            <div className="space-y-5">
+            <div className="space-y-6">
               <PostDetailCard
                 post={selectedPost}
                 postDetail={postDetail}
@@ -780,6 +780,7 @@ export default function DynamicDemo() {
                 error={error || undefined}
                 isTracking={postAnalysis.trackedPostId === (selectedPost.postId || selectedPost.id)}
                 onStartTracking={() => postAnalysis.startTracking(selectedPost.postId || selectedPost.id)}
+                onOpenConfig={() => setAnalysisOpen(true)}
               />
               <CommentsCard
                 comments={data.comments}
@@ -800,7 +801,7 @@ export default function DynamicDemo() {
           {enableEvoCorps ? (
             <InterventionFlowPanel state={flowState} enabled={enableEvoCorps} />
           ) : (
-            <div className="glass-card p-6 min-h-[640px] flex items-center justify-center">
+            <div className="glass-card p-6 h-[645px] flex items-center justify-center">
               <div className="text-center space-y-3">
                 <div className="flex justify-center">
                   <Shield className="text-slate-400" size={32} />
@@ -818,7 +819,6 @@ export default function DynamicDemo() {
       <CommentaryAnalysisPanel
         status={postAnalysis.analysisStatus}
         summary={postAnalysis.summary}
-        onOpenConfig={() => setAnalysisOpen(true)}
         trackedPostId={postAnalysis.trackedPostId}
         trackedPostStats={trackedPostData}
       />
@@ -1046,7 +1046,8 @@ function PostDetailCard({
   onBack,
   error,
   isTracking,
-  onStartTracking
+  onStartTracking,
+  onOpenConfig
 }: {
   post: HeatPost
   postDetail?: any
@@ -1054,6 +1055,7 @@ function PostDetailCard({
   error?: Error | null
   isTracking?: boolean
   onStartTracking?: () => void
+  onOpenConfig?: () => void
 }) {
   // 优先使用 postDetail 的完整内容，否则使用 post 的 summary
   const fullContent = postDetail?.content || post.content || post.summary || post.excerpt || ''
@@ -1063,8 +1065,8 @@ function PostDetailCard({
   const hasNoComments = commentCount === 0
 
   return (
-    <div className="glass-card p-6">
-      <div className="flex items-start justify-between mb-4">
+    <div className="glass-card p-6 h-[300px] flex flex-col">
+      <div className="flex items-start justify-between mb-4 shrink-0">
         <div className="flex items-start gap-3">
           <MessageSquare className="text-blue-500 mt-1" />
           <div>
@@ -1078,48 +1080,62 @@ function PostDetailCard({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {onStartTracking && (
-            <button
-              onClick={onStartTracking}
-              disabled={isTracking || hasNoComments}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 transition-all ${isTracking || hasNoComments
-                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-blue-500 to-green-500 text-white hover:shadow-lg'
-                }`}
-              title={
-                hasNoComments
-                  ? '该帖子没有评论'
-                  : isTracking
-                    ? '已在追踪中'
-                    : '开始分析此帖子'
-              }
-            >
-              <Activity size={14} />
-              {isTracking ? '分析中' : '开始分析'}
+          <div className="flex flex-col gap-2">
+            <button onClick={onBack} className="px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center justify-center gap-1.5 bg-white/80 border border-slate-200 text-slate-700 hover:bg-white transition-all shadow-md hover:shadow-lg w-full">
+              <ArrowLeft size={14} />
+              返回榜单
             </button>
-          )}
-          <button onClick={onBack} className="px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 bg-white/80 border border-slate-200 text-slate-700 hover:bg-white transition-all shadow-md hover:shadow-lg">
-            <ArrowLeft size={14} />
-            返回榜单
-          </button>
+            <div className="flex items-center gap-2">
+              {onStartTracking && (
+                <button
+                  onClick={onStartTracking}
+                  disabled={isTracking || hasNoComments}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center justify-center gap-1.5 transition-all ${isTracking || hasNoComments
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-blue-500 to-green-500 text-white hover:shadow-lg'
+                    }`}
+                  title={
+                    hasNoComments
+                      ? '该帖子没有评论'
+                      : isTracking
+                        ? '已在追踪中'
+                        : '开始分析此帖子'
+                  }
+                >
+                  <Activity size={14} />
+                  {isTracking ? '分析中' : '开始分析'}
+                </button>
+              )}
+              {onOpenConfig && (
+                <button
+                  onClick={onOpenConfig}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-500 to-green-500 text-white hover:shadow-lg transition-all"
+                  title="分析配置"
+                >
+                  <BarChart3 size={14} />
+                  分析配置
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-4">
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-4 shrink-0">
           <p className="text-sm text-red-700">加载失败：{error.message}</p>
           <p className="text-sm text-red-600 mt-1">请检查系统是否运行 (Please check if the system is running)</p>
         </div>
       )}
 
-      <div className="space-y-2 text-sm text-slate-700">
-        <div className="max-h-[120px] overflow-y-auto pr-2">
+      <div className="space-y-2 text-sm text-slate-700 flex-1 min-h-0 flex flex-col">
+        <div className="flex-1 overflow-y-auto pr-2 min-h-0">
           <p className="whitespace-pre-wrap break-words leading-relaxed">
             {fullContent}
           </p>
         </div>
 
-        <div className="flex items-center justify-center gap-20 text-sm pt-3 border-t border-slate-200/50">
+        <div className="flex items-center justify-center gap-20 text-sm pt-3 border-t border-slate-200/50 shrink-0">
           {(post.likeCount !== undefined || postDetail?.likeCount !== undefined) && (
             <div className="flex items-center gap-1.5 text-blue-500">
               <ThumbsUp size={16} />
@@ -1280,12 +1296,18 @@ function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
         index: index + 1, // 从 1 开始计数
       }))
     }
-    // 无数据时返回空数组，横轴刻度通过 ticks 属性指定
-    return []
+    // 无数据时返回占位数据，用于显示横轴刻度
+    return [
+      { index: 1, emotion: null, extremity: null, time: '' },
+      { index: 2, emotion: null, extremity: null, time: '' },
+      { index: 3, emotion: null, extremity: null, time: '' },
+      { index: 4, emotion: null, extremity: null, time: '' },
+      { index: 5, emotion: null, extremity: null, time: '' },
+    ]
   }, [data])
 
   return (
-    <div className="glass-card p-6 h-[316px] flex flex-col">
+    <div className="glass-card p-6 h-[320px] flex flex-col">
       <div className="flex items-center gap-3 mb-4">
         <Sparkles className="text-green-500" />
         <div>
@@ -1300,8 +1322,7 @@ function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
               dataKey="index"
               stroke="#94a3b8"
               axisLine={true}
-              ticks={data.length > 0 ? undefined : [1, 2, 3, 4]}
-              domain={data.length > 0 ? undefined : [1, 4]}
+              interval={0}
             />
             <YAxis
               domain={[0, 1]}
@@ -1319,6 +1340,7 @@ function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
               strokeWidth={2}
               dot={false}
               name="情绪度"
+              connectNulls={false}
             />
             <Line
               type="monotone"
@@ -1327,6 +1349,7 @@ function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
               strokeWidth={2}
               dot={false}
               name="极端度"
+              connectNulls={false}
             />
           </LineChart>
         </ResponsiveContainer>
@@ -1643,7 +1666,6 @@ function RoleDetailSection({
 interface CommentaryAnalysisPanelProps {
   status: 'Idle' | 'Running' | 'Done' | 'Error'
   summary: string | null
-  onOpenConfig: () => void
   trackedPostId?: string | null
   trackedPostStats?: {
     likeCount?: number
@@ -1655,22 +1677,15 @@ interface CommentaryAnalysisPanelProps {
 function CommentaryAnalysisPanel({
   status,
   summary,
-  onOpenConfig,
   trackedPostId = null,
   trackedPostStats = null
 }: CommentaryAnalysisPanelProps) {
   return (
-    <div className="glass-card p-6">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-3">
-          <BarChart3 className="text-purple-500" />
-          <div>
-            <h2 className="text-2xl font-bold text-slate-800">评论区总体状态分析</h2>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          {/* 分析配置按钮 */}
-          <button className="btn-secondary" onClick={onOpenConfig}>分析配置</button>
+    <div className="glass-card p-6 min-h-[230px]">
+      <div className="flex items-center gap-3">
+        <BarChart3 className="text-purple-500" />
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">评论区总体状态分析</h2>
         </div>
       </div>
 

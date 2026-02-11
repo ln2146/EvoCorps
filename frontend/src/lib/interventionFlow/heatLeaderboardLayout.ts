@@ -1,6 +1,6 @@
 export function getHeatLeaderboardCardClassName() {
   // Match the right-side InterventionFlowPanel height so the two columns align.
-  return 'glass-card p-6 h-[640px] flex flex-col min-h-0'
+  return 'glass-card p-6 h-[645px] flex flex-col min-h-0'
 }
 
 export function getHeatLeaderboardListClassName() {
