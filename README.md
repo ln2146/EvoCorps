@@ -11,6 +11,7 @@
   [![Paper](https://img.shields.io/badge/Paper-arXiv-red)](https://arxiv.org/abs/2602.08529)
   ![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)
   ![License](https://img.shields.io/badge/license-MIT-green)
+  ![Multi-Agent](https://img.shields.io/badge/agents-multi--agent-8a2be2)
 
 </div>
 
