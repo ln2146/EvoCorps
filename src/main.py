@@ -313,7 +313,13 @@ def start_control_api_server(host: str = "0.0.0.0", port: int = 8000) -> Optiona
     """
 
     def _run() -> None:
-        config = uvicorn.Config(control_app, host=host, port=port, log_level="info")
+        config = uvicorn.Config(
+            control_app,
+            host=host,
+            port=port,
+            log_level="info",
+            access_log=False,
+        )
         server = uvicorn.Server(config)
         server.run()
 

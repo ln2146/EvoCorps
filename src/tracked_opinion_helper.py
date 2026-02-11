@@ -97,8 +97,6 @@ def preload_first_fake_news_from_dataset(sim) -> Optional[str]:
 
     Priority:
     1) data/COVID2019-news.json -> first item's "Fake Narrative"
-    2) data/fake_news.jsonl -> first line 'content' or 'text' or 'title+content'
-    3) data/controversial_news.jsonl -> first line 'title/description/content' composed
     Returns the content string or None.
     """
     try:
@@ -115,50 +113,6 @@ def preload_first_fake_news_from_dataset(sim) -> Optional[str]:
                         return sim._first_malicious_news_content
     except Exception as e:
         logging.warning(f"Failed COVID dataset preload: {e}")
-
-    # Try fake_news.jsonl
-    try:
-        fake_news_path = 'data/fake_news.jsonl'
-        if os.path.exists(fake_news_path):
-            import jsonlines
-            with jsonlines.open(fake_news_path) as reader:
-                for first in reader:
-                    if not first:
-                        break
-                    content = first.get('content') or first.get('text')
-                    if not content:
-                        title = first.get('title', '')
-                        desc = first.get('description', '')
-                        body = first.get('body', '')
-                        content = f"{title} {desc} {body}".strip()
-                    if content:
-                        sim._first_malicious_news_content = str(content)
-                        logging.info("Preloaded first fake news from fake_news.jsonl")
-                        return sim._first_malicious_news_content
-                    break
-    except Exception as e:
-        logging.warning(f"Failed fake_news.jsonl preload: {e}")
-
-    # Try controversial_news.jsonl (treat as fake/opinion-like)
-    try:
-        cont_path = 'data/controversial_news.jsonl'
-        if os.path.exists(cont_path):
-            import jsonlines
-            with jsonlines.open(cont_path) as reader:
-                for first in reader:
-                    if not first:
-                        break
-                    title = first.get('title', '')
-                    desc = first.get('description', '')
-                    body = first.get('content', '')
-                    content = f"{title}: {desc} {body}".strip()
-                    if content:
-                        sim._first_malicious_news_content = str(content)
-                        logging.info("Preloaded first fake news from controversial_news.jsonl")
-                        return sim._first_malicious_news_content
-                    break
-    except Exception as e:
-        logging.warning(f"Failed controversial_news.jsonl preload: {e}")
 
     return None
 

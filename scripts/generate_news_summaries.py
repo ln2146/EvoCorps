@@ -3,7 +3,6 @@ import os
 from typing import List, Dict
 
 NEWS_FILE = os.path.join("data", "news_ordered.jsonl")
-BACKUP_FILE = os.path.join("data", "news_ordered_original.jsonl")
 MAX_WORDS = 30
 
 
@@ -36,15 +35,18 @@ def main() -> None:
         if summary:
             article["summary"] = summary
 
-    # Backup original file before overwriting
-    if not os.path.exists(BACKUP_FILE):
-        os.rename(NEWS_FILE, BACKUP_FILE)
-    else:
-        os.remove(NEWS_FILE)
-
-    with jsonlines.open(NEWS_FILE, "w") as writer:
-        for article in articles:
-            writer.write(article)
+    tmp_path = f"{NEWS_FILE}.tmp"
+    try:
+        with jsonlines.open(tmp_path, "w") as writer:
+            for article in articles:
+                writer.write(article)
+        os.replace(tmp_path, NEWS_FILE)
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

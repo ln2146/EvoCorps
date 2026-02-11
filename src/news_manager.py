@@ -101,22 +101,12 @@ class NewsManager:
             with jsonlines.open('data/news_ordered.jsonl') as reader:
                 self.ordered_news = list(reader)
             print(f"✅ Loaded {len(self.ordered_news)} ordered news items")
-        except FileNotFoundError:
-            print("⚠️ Ordered news file not found, trying to load raw files")
-            # Fall back to raw files
-            try:
-                with jsonlines.open('data/reliable_news.jsonl') as reader:
-                    reliable_news = list(reader)
-                with jsonlines.open('data/controversial_news.jsonl') as reader:
-                    controversial_news = list(reader)
-                self.ordered_news = reliable_news + controversial_news
-                print(f"✅ Loaded {len(self.ordered_news)} news items (unordered)")
-            except Exception as e:
-                print(f"❌ Failed to load news: {e}")
-                self.ordered_news = []
+        except FileNotFoundError as e:
+            raise FileNotFoundError(
+                "Required news dataset missing: data/news_ordered.jsonl"
+            ) from e
         except Exception as e:
-            print(f"❌ Failed to load ordered news: {e}")
-            self.ordered_news = []
+            raise RuntimeError(f"Failed to load data/news_ordered.jsonl: {e}") from e
 
     def _load_covid_fake_news(self):
         """Load COVID-19 fake news data"""
