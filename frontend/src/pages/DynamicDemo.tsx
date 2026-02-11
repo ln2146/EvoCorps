@@ -326,6 +326,7 @@ export default function DynamicDemo() {
   const [analysisOpen, setAnalysisOpen] = useState(false)
 
   const [isStarting, setIsStarting] = useState(false)
+  const [isStopping, setIsStopping] = useState(false)
   const [isTogglingAttack, setIsTogglingAttack] = useState(false)
   const [isTogglingAftercare, setIsTogglingAftercare] = useState(false)
 
@@ -484,6 +485,7 @@ export default function DynamicDemo() {
       <DynamicDemoHeader
         isRunning={isRunning}
         isStarting={isStarting}
+        isStopping={isStopping}
         onStart={async () => {
           // 设置加载状态
           setIsStarting(true)
@@ -530,10 +532,15 @@ export default function DynamicDemo() {
           }
         }}
         onStop={async () => {
+          // 防止重复点击
+          if (isStopping) return
+
           // 显示确认对话框
           if (!confirm('是否确认关闭模拟？')) {
             return
           }
+
+          setIsStopping(true)
 
           try {
             // 调用后端 API 停止进程
@@ -553,6 +560,9 @@ export default function DynamicDemo() {
 
               // 暂停帖子分析追踪（保留最后的分析结果）
               postAnalysis.pauseTracking()
+
+              // 等待 3 秒确保进程完全停止和文件锁释放
+              await new Promise(resolve => setTimeout(resolve, 3000))
             } else {
               // 失败：显示错误消息
               alert(`停止失败：${data.message || '未知错误'}`)
@@ -562,6 +572,8 @@ export default function DynamicDemo() {
             // 网络错误或其他异常
             alert(`停止失败：${error instanceof Error ? error.message : '网络错误'}`)
             console.error('Error stopping dynamic demo:', error)
+          } finally {
+            setIsStopping(false)
           }
         }}
         onBack={(path) => navigate(path || '/')}
@@ -825,6 +837,7 @@ function DynamicDemoPage({ children }: { children: ReactNode }) {
 function DynamicDemoHeader({
   isRunning,
   isStarting,
+  isStopping,
   onStart,
   onStop,
   onBack,
@@ -837,6 +850,7 @@ function DynamicDemoHeader({
 }: {
   isRunning: boolean
   isStarting?: boolean
+  isStopping?: boolean
   onStart: () => void
   onStop: () => void
   onBack: (path?: string) => void
@@ -865,14 +879,18 @@ function DynamicDemoHeader({
             <button
               className="btn-primary inline-flex items-center justify-center gap-2 flex-1 text-lg font-medium"
               onClick={onStart}
-              disabled={isRunning || isStarting}
+              disabled={isRunning || isStarting || isStopping}
             >
               <Play size={18} />
               {isStarting ? '启动中...' : isRunning ? '运行中' : '开启演示'}
             </button>
-            <button className="btn-secondary inline-flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-rose-500 text-white border-transparent hover:shadow-xl flex-1 text-lg font-medium" onClick={onStop}>
+            <button
+              className="btn-secondary inline-flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-rose-500 text-white border-transparent hover:shadow-xl flex-1 text-lg font-medium"
+              onClick={onStop}
+              disabled={isStopping}
+            >
               <Square size={18} />
-              停止演示
+              {isStopping ? '停止中...' : '停止演示'}
             </button>
           </div>
           <div className="flex flex-wrap gap-3 justify-center">
