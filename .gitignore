@@ -1,7 +1,6 @@
 ﻿# Sensitive data
 # data/
 experiment_outputs/
-human_study/human_study_data.csv
 .vscode/
 .kiro/
 # General
@@ -20,6 +19,7 @@ venv.bak/
 .idea/
 organized_comments_from_jsonl
 /tests
+data/fake_news_truth_mapping.json
 
 *.db
 *.db-shm

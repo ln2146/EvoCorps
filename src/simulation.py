@@ -42,15 +42,9 @@ class Simulation:
         # Generate timestamp for this run
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # Initialize negative news heat tracker
-        self.negative_news_tracker = {}  # {post_id: {'info': {...}, 'history': [...]}}
-        self.negative_news_file = 'negative_news_heat/realtime_negative_news_heat.json'
-        
-        # Ensure the directory exists
-        os.makedirs('negative_news_heat', exist_ok=True)
-        
-        # Initialize the JSON file
-        self._init_negative_news_file()
+        # Track injected fake-news timesteps (used for delayed official explanation attachment)
+        # {post_id: injection_timestep (1-based)}
+        self.fake_news_injection_timesteps = {}
 
         # Initialize database manager
         self.db_manager = DatabaseManager('database/simulation.db', self.reset_db)
@@ -149,68 +143,6 @@ class Simulation:
                 logging.error("🛡️ Pre-bunking system enabled but failed to load prompts.")
                 self.prebunking_enabled = False
     
-    def _init_negative_news_file(self):
-        """Initialize the negative news heat tracking file"""
-        initial_data = {
-            "simulation_timestamp": self.timestamp,
-            "created_at": datetime.now().isoformat(),
-            "last_update": datetime.now().isoformat(),
-            "total_timesteps": 0,
-            "posts": {}
-        }
-        
-        try:
-            with open(self.negative_news_file, 'w', encoding='utf-8') as f:
-                json.dump(initial_data, f, indent=2, ensure_ascii=False)
-            logging.info(f"✅ Negative news heat tracking file initialized: {self.negative_news_file}")
-        except Exception as e:
-            logging.error(f"❌ Failed to initialize negative news tracking file: {e}")
-    
-    def _update_negative_news_heat(self, timestep: int):
-        """Update and save negative news heat data"""
-        if not self.negative_news_tracker:
-            return
-        
-        try:
-            cursor = self.conn.cursor()
-            
-            # Update the heat data for each tracked negative news post
-            for post_id, post_data in self.negative_news_tracker.items():
-                cursor.execute("""
-                    SELECT num_comments, num_likes, num_shares 
-                    FROM posts 
-                    WHERE post_id = ?
-                """, (post_id,))
-                result = cursor.fetchone()
-                
-                if result:
-                    comments, likes, shares = result
-                    
-                    # Append to the history log
-                    post_data['history'].append({
-                        'timestep': timestep,
-                        'comments': comments,
-                        'likes': likes,
-                        'shares': shares
-                    })
-            
-            # Save the results to the JSON file
-            data = {
-                "simulation_timestamp": self.timestamp,
-                "created_at": datetime.now().isoformat(),
-                "last_update": datetime.now().isoformat(),
-                "total_timesteps": timestep,
-                "posts": self.negative_news_tracker
-            }
-            
-            with open(self.negative_news_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-            
-            logging.debug(f"✅ Time step {timestep} negative news heat updated")
-            
-        except Exception as e:
-            logging.error(f"❌ Failed to update negative news heat: {e}")
-
     async def run(self, num_time_steps: int):
         """Run the simulation."""
         new_user_config = self.config.get('new_users', {})
@@ -319,20 +251,11 @@ class Simulation:
                     if news_post_ids:
                         injected_news_posts.extend(news_post_ids)
                         
-                        # Initialize negative news tracking
+                        # Track injected fake/opinion news post injection timestep (1-based)
                         for neg_info in negative_news_info:
-                            post_id = neg_info['post_id']
-                            if post_id not in self.negative_news_tracker:
-                                self.negative_news_tracker[post_id] = {
-                                    'info': {
-                                        'extremism_level': neg_info['extremism_level'],
-                                        'news_type': neg_info['news_type'],
-                                        'bucket': neg_info.get('bucket', 'unknown'),
-                                        'injection_timestep': step + 1
-                                    },
-                                    'history': []
-                                }
-                                print(f"📍 Started tracking negative news: {post_id} (extremism level: {neg_info['extremism_level']})")
+                            post_id = neg_info.get('post_id')
+                            if post_id and post_id not in self.fake_news_injection_timesteps:
+                                self.fake_news_injection_timesteps[post_id] = step + 1
                         
                         new_post_count = self._get_current_post_count()
                         logging.info(f"Time step {step + 1}: injected {len(news_post_ids)} news posts (count: {current_post_count} → {new_post_count})")
@@ -458,27 +381,7 @@ class Simulation:
             # After malicious attacks and opinion balance system triggers, let regular users keep interacting
             # await self._continue_user_activities(step)
 
-            # Update and display negative news heat (comments only)
-            if self.negative_news_tracker:
-                self._update_negative_news_heat(step + 1)
-                
-                print(f"\n📊 Time step {step + 1} negative news heat stats (comments):")
-                print("=" * 60)
-                
-                cursor = self.conn.cursor()
-                for post_id in self.negative_news_tracker.keys():
-                    cursor.execute("""
-                        SELECT num_comments
-                        FROM posts 
-                        WHERE post_id = ?
-                    """, (post_id,))
-                    result = cursor.fetchone()
-                    
-                    if result:
-                        comments = result[0]
-                        print(f"  🔥 {post_id}: comments {comments:3d}")
-                
-                print("=" * 60 + "\n")
+            # Negative news heat tracking removed
             
             # Display current time step post statistics
             current_post_count = self._get_current_post_count()
@@ -1482,12 +1385,7 @@ Latest comments (chronological):"""
 
                 injection_timestep = None
                 try:
-                    # Prefer negative_news_tracker, which explicitly tracks injected negative/fake news
-                    negative_tracker = getattr(self, "negative_news_tracker", None)
-                    if isinstance(negative_tracker, dict):
-                        info = negative_tracker.get(post.post_id, {}).get("info")
-                        if info:
-                            injection_timestep = info.get("injection_timestep")
+                    injection_timestep = getattr(self, "fake_news_injection_timesteps", {}).get(post.post_id)
 
                     # We intentionally avoid falling back to a DB time_step column here,
                     # because some deployments do not have that schema. If the tracker
