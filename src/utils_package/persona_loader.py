@@ -153,8 +153,8 @@ class PersonaLoader:
 persona_loader = PersonaLoader()
 
 
-def load_echo_agent_personas(count: int = 5) -> List[Dict[str, Any]]:
-    """Load positive personas specifically for echo agents."""
+def load_amplifier_agent_personas(count: int = 5) -> List[Dict[str, Any]]:
+    """Load positive personas specifically for amplifier agents."""
     return persona_loader.sample_personas("positive", count)
 
 
@@ -193,8 +193,8 @@ if __name__ == "__main__":
     
     # Test loading functions
     print(f"\n🧪 Test loading personas:")
-    echo_personas = load_echo_agent_personas(3)
-    print(f"   Echo agents: {len(echo_personas)} personas")
+    amplifier_personas = load_amplifier_agent_personas(3)
+    print(f"   amplifier agents: {len(amplifier_personas)} personas")
     
     user_personas = load_regular_user_personas(6)
     print(f"   Regular users: {len(user_personas)} personas")

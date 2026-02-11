@@ -911,7 +911,7 @@ class SimpleStrategistAgent:
                     "core_message": "",
                     "approach": ""
                 }},
-                "echo_plan": {{
+                "amplifier_plan": {{
                     "total_agents": "",
                     "role_distribution": {{
                         "balanced_moderates": "",
@@ -967,7 +967,7 @@ class SimpleStrategistAgent:
                 "success": True,
                 "strategy": strategy,
                 "leader_instruction": strategy["leader_instruction"],
-                "echo_plan": strategy["echo_plan"],
+                "amplifier_plan": strategy["amplifier_plan"],
                 "agent_instructions": agent_instructions
             }
             
@@ -1127,25 +1127,25 @@ Develop an appropriate strategy for this context. Return a JSON response with re
                         "style": "explanatory"
                     }
                 
-                if "echo_plan" not in strategy:
-                    strategy["echo_plan"] = {
+                if "amplifier_plan" not in strategy:
+                    strategy["amplifier_plan"] = {
                         "total_agents": 5,
                         "timing_strategy": "progressive",
                         "coordination_notes": "Use diverse positive personas"
                     }
                 
-                # Ensure echo_plan includes new enhanced fields
-                echo_plan = strategy.get("echo_plan", {})
-                if "role_distribution" not in echo_plan:
-                    echo_plan["role_distribution"] = {
+                # Ensure amplifier_plan includes new enhanced fields
+                amplifier_plan = strategy.get("amplifier_plan", {})
+                if "role_distribution" not in amplifier_plan:
+                    amplifier_plan["role_distribution"] = {
                         "technical_experts": 1,
                         "balanced_moderates": 2,
                         "community_voices": 1,
                         "fact_checkers": 1
                     }
                 
-                if "decision_factors" not in echo_plan:
-                    echo_plan["decision_factors"] = {
+                if "decision_factors" not in amplifier_plan:
+                    amplifier_plan["decision_factors"] = {
                         "urgency_level": "moderate",
                         "controversy_level": "standard"
                     }
@@ -1206,7 +1206,7 @@ Develop an appropriate strategy for this context. Return a JSON response with re
                 "core_message": "Provide balanced perspectives and factual information",
                 "approach": "diplomatic and informative"
             },
-            "echo_plan": {
+            "amplifier_plan": {
                 "total_agents": 5,
                 "role_distribution": {
                     "technical_experts": 1,
@@ -1791,7 +1791,7 @@ Generate 3-5 diverse strategy options as JSON array."""
             risks.append("context_adaptation_uncertainty")
             
             # Scale difference risk
-            historical_agents = historical_strategy.get("echo_plan", {}).get("total_agents", 5)
+            historical_agents = historical_strategy.get("amplifier_plan", {}).get("total_agents", 5)
             if historical_agents > 8:
                 risks.append("high_resource_requirement")
             
@@ -1890,7 +1890,7 @@ Generate 3-5 diverse strategy options as JSON array."""
             if len(successful_patterns) >= 2:
                 # Combine elements from different successful strategies
                 combined_agent_count = int(sum(
-                    s.get("echo_plan", {}).get("total_agents", 5) for s in successful_patterns
+                    s.get("amplifier_plan", {}).get("total_agents", 5) for s in successful_patterns
                 ) / len(successful_patterns) * 1.1)  # Increase by 10%
                 
                 return {
@@ -2239,7 +2239,7 @@ Generate 3-5 diverse strategy options as JSON array."""
                 "tone": "professional" if "authority" in selected_strategy.get("name", "") else "empathetic",
                 "speaking_style": "fact-based" if "expert" in selected_strategy.get("name", "") else "diplomatic"
             },
-            "echo_instructions": self._generate_echo_instructions(selected_strategy),
+            "amplifier_instructions": self._generate_amplifier_instructions(selected_strategy),
             "coordination_strategy": selected_strategy.get("timing", "progressive"),
             "timing_plan": {
                 "strategy": selected_strategy.get("timing", "progressive"),
@@ -2247,8 +2247,8 @@ Generate 3-5 diverse strategy options as JSON array."""
             }
         }
 
-    def _generate_echo_instructions(self, strategy: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Generate specific Echo Agent instructions"""
+    def _generate_amplifier_instructions(self, strategy: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Generate specific amplifier Agent instructions"""
         agent_count = strategy.get("agent_count", 5)
         approach = strategy.get("approach", "balanced")
         
@@ -2344,10 +2344,10 @@ Generate 3-5 diverse strategy options as JSON array."""
             return "Default coordination instructions will be applied."
         
         leader = instructions.get("leader_instructions", {})
-        echo_count = len(instructions.get("echo_instructions", []))
+        amplifier_count = len(instructions.get("amplifier_instructions", []))
         
         return f"Leader approach: {leader.get('approach', 'balanced')}. " + \
-               f"Echo agents: {echo_count} coordinated agents with {instructions.get('coordination_strategy', 'progressive')} timing."
+               f"amplifier agents: {amplifier_count} coordinated agents with {instructions.get('coordination_strategy', 'progressive')} timing."
 
     def _generate_decision_explanation(self, evaluated_options: List[Dict[str, Any]], 
                                      best_option: Dict[str, Any], alert: Dict[str, Any]) -> Dict[str, Any]:
@@ -2612,13 +2612,13 @@ Generate 3-5 diverse strategy options as JSON array."""
             }
 
             # 3. Build execution_details
-            # Includes leader and agent instructions, plus echo plan
+            # Includes leader and agent instructions, plus amplifier plan
             execution_details = {
                 "agent_type": "strategist",
                 "action_phase": action_type,
                 "leader_instruction": strategy_data.get("leader_instruction", {}),
                 "agent_instructions": strategy_data.get("agent_instructions", {}),
-                "echo_plan": strategy_data.get("echo_plan", {})
+                "amplifier_plan": strategy_data.get("amplifier_plan", {})
             }
 
             # 4. Build lessons_learned
@@ -2877,8 +2877,8 @@ Target Content: {cleaned_target}
             return False
 
 
-class SimpleEchoAgent:
-    """Simplified Echo Agent - uses identities from positive_personas.jsonl."""
+class SimpleamplifierAgent:
+    """Simplified amplifier Agent - uses identities from positive_personas.jsonl."""
 
     def __init__(self, agent_id: str, persona_data: Dict[str, Any], coordination_system=None):
         self.agent_id = agent_id
@@ -2903,7 +2903,7 @@ class SimpleEchoAgent:
             sys.path.append('src')
             from multi_model_selector import multi_model_selector, get_random_model
             self.multi_model_selector = multi_model_selector
-            self.selected_model = get_random_model("echo")
+            self.selected_model = get_random_model("amplifier")
 
         except ImportError as e:
             workflow_logger.info(f"⚠️ Multi-model selection system import failed: {e}, using default model")
@@ -2927,20 +2927,20 @@ class SimpleEchoAgent:
                     self.coordination_system._shared_pool_logged = True
             elif self.multi_model_selector:
                 # Use multi-model selector to create independent client
-                self.client, _ = self.multi_model_selector.create_openai_client(self.selected_model, role="echo")
-                workflow_logger.info(f"⚠️ Echo Agent {agent_id} using independent client (shared pool not found)")
+                self.client, _ = self.multi_model_selector.create_openai_client(self.selected_model, role="amplifier")
+                workflow_logger.info(f"⚠️ amplifier Agent {agent_id} using independent client (shared pool not found)")
             else:
                 from multi_model_selector import MultiModelSelector
-                # Unified model selection via MultiModelSelector (echo role)
+                # Unified model selection via MultiModelSelector (amplifier role)
                 selector = MultiModelSelector()
-                self.client, self.selected_model = selector.create_openai_client(role="echo")
-                workflow_logger.info(f"⚠️ Echo Agent {agent_id} using selector fallback client")
+                self.client, self.selected_model = selector.create_openai_client(role="amplifier")
+                workflow_logger.info(f"⚠️ amplifier Agent {agent_id} using selector fallback client")
         except Exception as e:
-            workflow_logger.info(f"⚠️ Echo Agent {agent_id} client creation failed: {e}, using selector fallback")
+            workflow_logger.info(f"⚠️ amplifier Agent {agent_id} client creation failed: {e}, using selector fallback")
             from multi_model_selector import MultiModelSelector
-            # Unified model selection via MultiModelSelector (echo role)
+            # Unified model selection via MultiModelSelector (amplifier role)
             selector = MultiModelSelector()
-            self.client, self.selected_model = selector.create_openai_client(role="echo")
+            self.client, self.selected_model = selector.create_openai_client(role="amplifier")
 
         # Extract key info from persona data
         self.personality_traits = persona_data.get("personality_traits", ["Friendly", "Supportive"])
@@ -3208,7 +3208,7 @@ CRITICAL REQUIREMENTS
   * Or start with a question, observation, or personal experience instead"""
                     }
                 ],
-                        temperature=0.95,  # Increase to 0.95 for more diverse echo responses
+                        temperature=0.95,  # Increase to 0.95 for more diverse amplifier responses
                         frequency_penalty=0.8,  # Reduce repeated content
                         presence_penalty=0.6   # Encourage new topics
                     )
@@ -3252,7 +3252,7 @@ CRITICAL REQUIREMENTS
                 "success": True,
                 "response_generated": True,
                 "response": {
-                    "response_id": f"echo_{self.agent_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    "response_id": f"amplifier_{self.agent_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
                     "comment_id": comment_id,  # Add comment_id
                     "persona_id": self.persona_id,
                     "response_content": content,
@@ -3271,7 +3271,7 @@ CRITICAL REQUIREMENTS
             return {"success": False, "error": str(e)}
 
     def _save_comment_to_database(self, content: str, target_content: str, target_post_id: str = None) -> str:
-        """Save Echo Agent comment to database."""
+        """Save amplifier Agent comment to database."""
         try:
             from utils import Utils
             from datetime import datetime
@@ -3281,55 +3281,55 @@ CRITICAL REQUIREMENTS
                 # Generate comment_id
                 comment_id = Utils.generate_formatted_id("comment")
 
-                # Create Echo Agent user ID (masquerade as a regular user)
+                # Create amplifier Agent user ID (masquerade as a regular user)
                 # Prefer sequential mapping from coordination system user pool for stable one-to-one mapping
-                echo_agent_user_id = None
+                amplifier_agent_user_id = None
                 user_suffix = None
 
-                if self.coordination_system and hasattr(self.coordination_system, "_echo_user_id_pool"):
+                if self.coordination_system and hasattr(self.coordination_system, "_amplifier_user_id_pool"):
                     try:
-                        # self.agent_id looks like "echo_000"
+                        # self.agent_id looks like "amplifier_000"
                         idx = int(str(self.agent_id).split("_")[1])
                     except (IndexError, ValueError):
                         idx = 0
 
                     # Defensive handling: modulo if index is out of pool range
-                    pool = self.coordination_system._echo_user_id_pool
+                    pool = self.coordination_system._amplifier_user_id_pool
                     if pool:
-                        echo_agent_user_id = pool[idx % len(pool)]
+                        amplifier_agent_user_id = pool[idx % len(pool)]
                         # Extract suffix for display name in fake_persona
                         try:
-                            user_suffix = echo_agent_user_id.split("-", 1)[1]
+                            user_suffix = amplifier_agent_user_id.split("-", 1)[1]
                         except (IndexError, ValueError):
-                            user_suffix = echo_agent_user_id
+                            user_suffix = amplifier_agent_user_id
 
                 # Fallback: if coordination system missing or pool abnormal, revert to original hash logic
-                if echo_agent_user_id is None:
+                if amplifier_agent_user_id is None:
                     import hashlib
-                    seed = f"echo_{self.agent_id}_{datetime.now().strftime('%Y%m%d')}"
+                    seed = f"amplifier_{self.agent_id}_{datetime.now().strftime('%Y%m%d')}"
                     hash_obj = hashlib.md5(seed.encode())
                     user_suffix = hash_obj.hexdigest()[:6]
-                    echo_agent_user_id = f"user-{user_suffix}"
+                    amplifier_agent_user_id = f"user-{user_suffix}"
 
-                # Ensure Echo Agent user exists
-                user_result = fetch_one('SELECT user_id FROM users WHERE user_id = ?', (echo_agent_user_id,))
+                # Ensure amplifier Agent user exists
+                user_result = fetch_one('SELECT user_id FROM users WHERE user_id = ?', (amplifier_agent_user_id,))
                 if not user_result:
                     # Create a persona that looks like a regular user
                     fake_persona = {
                         "name": f"User{user_suffix}",
-                        "type": "echo",  # Internal marker
+                        "type": "amplifier",  # Internal marker
                         "profession": "Various",
                         "age_range": "25-40",
                         "personality_traits": ["Supportive", "Agreeable", "Constructive"],
                         "persona_name": self.persona_name,
-                        "agent_role": "echo",
+                        "agent_role": "amplifier",
                         "is_system_agent": True
                     }
                     
                     execute_query('''
                         INSERT INTO users (user_id, persona, creation_time)
                         VALUES (?, ?, ?)
-                    ''', (echo_agent_user_id, json.dumps(fake_persona, ensure_ascii=False), datetime.now().isoformat()))
+                    ''', (amplifier_agent_user_id, json.dumps(fake_persona, ensure_ascii=False), datetime.now().isoformat()))
 
                 # Find target post (prefer provided target_post_id)
                 final_target_post_id = None
@@ -3364,7 +3364,7 @@ CRITICAL REQUIREMENTS
                     if post_result:
                         final_target_post_id = post_result['post_id']
                         # Simplified log record
-                        workflow_logger.info(f"📍 Echo Agent found fallback target post: {final_target_post_id}")
+                        workflow_logger.info(f"📍 amplifier Agent found fallback target post: {final_target_post_id}")
                     else:
                         # Simplified log record
                         workflow_logger.warning(f"❌ No posts found in database")
@@ -3374,7 +3374,7 @@ CRITICAL REQUIREMENTS
                     # Verify post exists before saving (avoid concurrency issues)
                     post_verify = fetch_one("SELECT COUNT(*) as count FROM posts WHERE post_id = ?", (final_target_post_id,))
                     if not post_verify or post_verify['count'] == 0:
-                        workflow_logger.warning(f"    ⚠️  SimpleEcho Agent {self.agent_id}: fallback post {final_target_post_id} no longer exists at save time, re-searching")
+                        workflow_logger.warning(f"    ⚠️  Simpleamplifier Agent {self.agent_id}: fallback post {final_target_post_id} no longer exists at save time, re-searching")
                         # Search fallback post again
                         post_result = fetch_one('''
                             SELECT post_id FROM posts
@@ -3390,9 +3390,9 @@ CRITICAL REQUIREMENTS
                         ''')
                         if post_result:
                             final_target_post_id = post_result['post_id']
-                            workflow_logger.info(f"    📍 Echo Agent {self.agent_id}: re-found fallback post {final_target_post_id}")
+                            workflow_logger.info(f"    📍 amplifier Agent {self.agent_id}: re-found fallback post {final_target_post_id}")
                         else:
-                            workflow_logger.warning(f"    ⚠️  SimpleEcho Agent {self.agent_id}: no posts in database, skip saving comment")
+                            workflow_logger.warning(f"    ⚠️  Simpleamplifier Agent {self.agent_id}: no posts in database, skip saving comment")
                             return None
                     
                     # Insert comment - includes model info
@@ -3404,10 +3404,10 @@ CRITICAL REQUIREMENTS
                             comment_id,
                             content,
                             final_target_post_id,
-                            echo_agent_user_id,
+                            amplifier_agent_user_id,
                             datetime.now().isoformat(),
                             self.selected_model,  # Model selected dynamically
-                            "echo_agent"
+                            "amplifier_agent"
                         ))
                         # Simplify logs: do not record each database operation
                     except Exception as e:
@@ -3422,7 +3422,7 @@ CRITICAL REQUIREMENTS
                                 comment_id,
                                 content,
                                 final_target_post_id,
-                                echo_agent_user_id,
+                                amplifier_agent_user_id,
                                 datetime.now().isoformat()
                             ))
                             # Simplify logs: do not record each database operation
@@ -3445,7 +3445,7 @@ CRITICAL REQUIREMENTS
                             execute_query('''
                                 INSERT OR REPLACE INTO comment_timesteps (comment_id, user_id, post_id, time_step)
                                 VALUES (?, ?, ?, ?)
-                            ''', (comment_id, echo_agent_user_id, final_target_post_id, int(current_step)))
+                            ''', (comment_id, amplifier_agent_user_id, final_target_post_id, int(current_step)))
                     except Exception as e:
                         # Non-fatal: mapping is best-effort
                         workflow_logger.debug(f"Failed to record comment timestep: {e}")
@@ -3469,7 +3469,7 @@ CRITICAL REQUIREMENTS
                     except ImportError:
                         from auto_export_manager import on_comment_created
                     import hashlib
-                    seed = f'echo_{self.agent_id}_{datetime.now().strftime("%Y%m%d")}'
+                    seed = f'amplifier_{self.agent_id}_{datetime.now().strftime("%Y%m%d")}'
                     user_id = f"user-{hashlib.md5(seed.encode()).hexdigest()[:6]}"
                     on_comment_created(result, user_id)
                 except Exception as e:
@@ -3492,7 +3492,7 @@ CRITICAL REQUIREMENTS
                 return None
 
         except Exception as e:
-            workflow_logger.info(f"    ❌ Failed to save Echo comment: {e}")
+            workflow_logger.info(f"    ❌ Failed to save amplifier comment: {e}")
             workflow_logger.info(f"    📊 Detailed error info: {str(e)}")
             import traceback
             workflow_logger.info(f"    📊 Error stack: {traceback.format_exc()}")
@@ -3603,26 +3603,26 @@ class SimpleCoordinationSystem:
         self.strategist = SimpleStrategistAgent()
         self.leader = EnhancedLeaderAgent()  # Use enhanced Leader Agent
 
-        # Delay creating Echo Agents - only create when intervention is needed
-        self.echo_agents = []
-        self._echo_agents_created = False
+        # Delay creating amplifier Agents - only create when intervention is needed
+        self.amplifier_agents = []
+        self._amplifier_agents_created = False
         # Load few-shot example config
         self.few_shot_examples = self._load_few_shot_examples()
         
-        # Fixed pool of 100 echo agent IDs
-        self._echo_agent_id_pool = [f"echo_{i:03d}" for i in range(100)]
-        # Fixed pool of 100 external user-xxxxxx IDs mapped one-to-one with echo agents
-        # Ensures each Echo Agent has stable, traceable external user IDs across runs
-        self._echo_user_id_pool = [f"user-{i:06d}" for i in range(100)]
+        # Fixed pool of 100 amplifier agent IDs
+        self._amplifier_agent_id_pool = [f"amplifier_{i:03d}" for i in range(100)]
+        # Fixed pool of 100 external user-xxxxxx IDs mapped one-to-one with amplifier agents
+        # Ensures each amplifier Agent has stable, traceable external user IDs across runs
+        self._amplifier_user_id_pool = [f"user-{i:06d}" for i in range(100)]
 
         # Leader Agent uses a separate external ID pool
-        # Following Echo Agent design: internally only "Leader1/Leader2" roles,
+        # Following amplifier Agent design: internally only "Leader1/Leader2" roles,
         # externally mapped to the first two user-xxxxxx IDs for stability and traceability.
         self._leader_user_id_pool = [
             f"user-{900000 + i:06d}" for i in range(100)
         ]  # Current logic only uses indices 0/1
         
-        # Initialize shared client pool to speed up Echo Agent creation
+        # Initialize shared client pool to speed up amplifier Agent creation
         self._shared_client_pool = None
         self._initialize_shared_client_pool()
         
@@ -3671,10 +3671,10 @@ class SimpleCoordinationSystem:
         
         workflow_logger.info("✅ Simplified coordination system initialized - using enhanced Leader Agent with USC workflow")
     
-    def _get_fixed_echo_agent_ids(self, count: int) -> List[str]:
+    def _get_fixed_amplifier_agent_ids(self, count: int) -> List[str]:
         """Allocate fixed number of IDs in order from the pool."""
         # Use first N fixed IDs to ensure the same IDs each run
-        selected_ids = self._echo_agent_id_pool[:count]
+        selected_ids = self._amplifier_agent_id_pool[:count]
         
         workflow_logger.info(f"  🔒 Allocated {len(selected_ids)} fixed Amplifier Agent IDs: {selected_ids[:5]}{'...' if len(selected_ids) > 5 else ''}")
         return selected_ids
@@ -3760,21 +3760,21 @@ class SimpleCoordinationSystem:
         }
 
     def _initialize_shared_client_pool(self):
-        """Initialize shared client pool to speed up Echo Agent creation."""
+        """Initialize shared client pool to speed up amplifier Agent creation."""
         try:
             # Try to use multi-model selector
             try:
                 import sys
                 sys.path.append('src')
                 from multi_model_selector import multi_model_selector
-                shared_client, shared_model = multi_model_selector.create_openai_client(role="echo")
+                shared_client, shared_model = multi_model_selector.create_openai_client(role="amplifier")
                 workflow_logger.info("✅ Shared client pool initialized successfully (multi-model selector)")
             except Exception as e:
                 # If multi-model selector fails, use selector fallback
                 from multi_model_selector import MultiModelSelector
-                # Unified model selection via MultiModelSelector (echo role)
+                # Unified model selection via MultiModelSelector (amplifier role)
                 selector = MultiModelSelector()
-                shared_client, shared_model = selector.create_openai_client(role="echo")
+                shared_client, shared_model = selector.create_openai_client(role="amplifier")
                 workflow_logger.info("✅ Shared client pool initialized successfully (selector fallback)")
 
             # Set shared client pool
@@ -3793,15 +3793,15 @@ class SimpleCoordinationSystem:
             workflow_logger.info(f"🔍 Shared pool status: {self._shared_client_pool is not None}")
 
     def get_shared_client(self):
-        """Get shared client for fast Echo Agent creation."""
+        """Get shared client for fast amplifier Agent creation."""
         if self._shared_client_pool:
             return self._shared_client_pool['client'], self._shared_client_pool['model']
         else:
             # If shared pool is unavailable, create a temporary client
             from multi_model_selector import MultiModelSelector
-            # Unified model selection via MultiModelSelector (echo role)
+            # Unified model selection via MultiModelSelector (amplifier role)
             selector = MultiModelSelector()
-            return selector.create_openai_client(role="echo")
+            return selector.create_openai_client(role="amplifier")
     
     def enable_auto_trigger(self, callback_function=None):
         """Enable auto-trigger mechanism.
@@ -4006,8 +4006,8 @@ class SimpleCoordinationSystem:
             self._initialize_learning_system()
         return self.learning_system
 
-    def _create_echo_agents_from_personas(self, max_agents: int = 10) -> List[SimpleEchoAgent]:
-        """Randomly select identities from positive_personas_database.json to create Echo Agents."""
+    def _create_amplifier_agents_from_personas(self, max_agents: int = 10) -> List[SimpleamplifierAgent]:
+        """Randomly select identities from positive_personas_database.json to create amplifier Agents."""
         import json
         import random
         import os
@@ -4029,7 +4029,7 @@ class SimpleCoordinationSystem:
 
             if not personas_file:
                 workflow_logger.info(f"  ⚠️  Cannot find positive_personas_database.json, using default config")
-                return self._create_default_echo_agents(max_agents)
+                return self._create_default_amplifier_agents(max_agents)
 
             # Read JSON database file
             with open(personas_file, 'r', encoding='utf-8') as f:
@@ -4039,39 +4039,39 @@ class SimpleCoordinationSystem:
 
             if not personas:
                 workflow_logger.info(f"  ⚠️  No positive persona data loaded, using default config")
-                return self._create_default_echo_agents(max_agents)
+                return self._create_default_amplifier_agents(max_agents)
 
             # Randomly select specified number of personas
             selected_personas = random.sample(personas, min(max_agents, len(personas)))
             
             # Assign fixed IDs
-            selected_ids = self._get_fixed_echo_agent_ids(len(selected_personas))
+            selected_ids = self._get_fixed_amplifier_agent_ids(len(selected_personas))
 
-            # Create Echo Agents
-            echo_agents = []
+            # Create amplifier Agents
+            amplifier_agents = []
             for i, (persona_data, agent_id) in enumerate(zip(selected_personas, selected_ids)):
                 try:
-                    agent = SimpleEchoAgent(agent_id, persona_data, coordination_system=self)
-                    echo_agents.append(agent)
+                    agent = SimpleamplifierAgent(agent_id, persona_data, coordination_system=self)
+                    amplifier_agents.append(agent)
                     # Simplify logs: do not record each agent creation
                 except Exception as agent_error:
-                    workflow_logger.info(f"    ❌ Failed to create Echo Agent {i+1}: {agent_error}")
+                    workflow_logger.info(f"    ❌ Failed to create amplifier Agent {i+1}: {agent_error}")
                     # Continue creating other agents without stopping the process
 
-            if echo_agents:
-                workflow_logger.info(f"  ✅ Successfully created {len(echo_agents)} Echo Agents (target: {max_agents})")
-                return echo_agents
+            if amplifier_agents:
+                workflow_logger.info(f"  ✅ Successfully created {len(amplifier_agents)} amplifier Agents (target: {max_agents})")
+                return amplifier_agents
             else:
-                workflow_logger.info(f"  ⚠️  All Echo Agent creation failed, using default config")
-                return self._create_default_echo_agents(max_agents)
+                workflow_logger.info(f"  ⚠️  All amplifier Agent creation failed, using default config")
+                return self._create_default_amplifier_agents(max_agents)
 
         except Exception as e:
             workflow_logger.info(f"  ⚠️  Failed to create agents from persona database: {e}")
             workflow_logger.info(f"  🔄 Create agents using default config")
-            return self._create_default_echo_agents(max_agents)
+            return self._create_default_amplifier_agents(max_agents)
 
-    def _create_default_echo_agents(self, max_agents: int) -> List[SimpleEchoAgent]:
-        """Create default Echo Agent configuration."""
+    def _create_default_amplifier_agents(self, max_agents: int) -> List[SimpleamplifierAgent]:
+        """Create default amplifier Agent configuration."""
         try:
             default_personas = [
                 {
@@ -4088,23 +4088,23 @@ class SimpleCoordinationSystem:
             ]
             
             # Assign fixed IDs
-            selected_ids = self._get_fixed_echo_agent_ids(len(default_personas))
+            selected_ids = self._get_fixed_amplifier_agent_ids(len(default_personas))
             
-            echo_agents = []
+            amplifier_agents = []
             for i, (persona_data, agent_id) in enumerate(zip(default_personas, selected_ids)):
                 try:
-                    agent = SimpleEchoAgent(agent_id, persona_data, coordination_system=self)
-                    echo_agents.append(agent)
-                    workflow_logger.info(f"    ✅ Created default Echo Agent {i+1}: {agent.persona_name} (ID: {agent_id})")
+                    agent = SimpleamplifierAgent(agent_id, persona_data, coordination_system=self)
+                    amplifier_agents.append(agent)
+                    workflow_logger.info(f"    ✅ Created default amplifier Agent {i+1}: {agent.persona_name} (ID: {agent_id})")
                 except Exception as agent_error:
-                    workflow_logger.info(f"    ❌ Failed to create default Echo Agent {i+1}: {agent_error}")
+                    workflow_logger.info(f"    ❌ Failed to create default amplifier Agent {i+1}: {agent_error}")
                     continue
             
-            workflow_logger.info(f"  ✅ Successfully created {len(echo_agents)} default Echo Agents")
-            return echo_agents
+            workflow_logger.info(f"  ✅ Successfully created {len(amplifier_agents)} default amplifier Agents")
+            return amplifier_agents
             
         except Exception as e:
-            workflow_logger.info(f"  ❌ Failed to create default Echo Agents as well: {e}")
+            workflow_logger.info(f"  ❌ Failed to create default amplifier Agents as well: {e}")
             return []
 
     def _assign_roles_to_agents(self, agents: List, role_distribution: Dict[str, int]) -> List:
@@ -4175,7 +4175,7 @@ class SimpleCoordinationSystem:
             agent.few_shot_examples = []
             agent.role_description = f"General {role_type} role"
 
-    def _get_timing_strategy(self, echo_plan: Dict[str, Any], agent_count: int) -> Dict[str, Any]:
+    def _get_timing_strategy(self, amplifier_plan: Dict[str, Any], agent_count: int) -> Dict[str, Any]:
         """Get timing strategy configuration."""
         try:
             # Check whether instant consensus strategy is enabled
@@ -4660,18 +4660,18 @@ class SimpleCoordinationSystem:
 
             # Display strategy details
             leader_instructions = agent_instructions.get("leader_instructions", {})
-            echo_instructions = agent_instructions.get("echo_instructions", [])
+            amplifier_instructions = agent_instructions.get("amplifier_instructions", [])
             coordination_strategy = agent_instructions.get("coordination_strategy", "default coordination")
 
-            # Get echo plan config
-            echo_plan = strategy.get('echo_plan', {})
-            planned_agents = echo_plan.get('total_agents', 5)
-            role_distribution = echo_plan.get('role_distribution', {})
+            # Get amplifier plan config
+            amplifier_plan = strategy.get('amplifier_plan', {})
+            planned_agents = amplifier_plan.get('total_agents', 5)
+            role_distribution = amplifier_plan.get('role_distribution', {})
 
             # If role_distribution is empty, get from strategy_result
             if not role_distribution:
-                strategy_echo_plan = strategy_result.get("echo_plan", {})
-                role_distribution = strategy_echo_plan.get('role_distribution', {})
+                strategy_amplifier_plan = strategy_result.get("amplifier_plan", {})
+                role_distribution = strategy_amplifier_plan.get('role_distribution', {})
 
             workflow_logger.info("  📋 Strategy details:")
             workflow_logger.info(f"     🎯 Core argument: {strategy.get('core_counter_argument', 'balanced perspective')}")
@@ -4763,87 +4763,87 @@ class SimpleCoordinationSystem:
                 # Terminal output
                 logging.warning("⚠️ Second leader comment save failed")
 
-            # 4. Echo Agent responses
-            # Activate Echo Agent cluster
+            # 4. amplifier Agent responses
+            # Activate amplifier Agent cluster
             # Log to workflow
             workflow_logger.info("⚖️ Activating Amplifier Agent cluster...")
 
-            # Ensure echo_plan contains required fields
-            if not isinstance(echo_plan, dict):
-                echo_plan = {"total_agents": 5, "role_distribution": {}}
+            # Ensure amplifier_plan contains required fields
+            if not isinstance(amplifier_plan, dict):
+                amplifier_plan = {"total_agents": 5, "role_distribution": {}}
 
             # If role_distribution is missing, use defaults
-            if not echo_plan.get("role_distribution"):
-                echo_plan["role_distribution"] = {}
+            if not amplifier_plan.get("role_distribution"):
+                amplifier_plan["role_distribution"] = {}
 
-            workflow_logger.info(f"  📋 Amplifier plan: total={echo_plan.get('total_agents', 5)}, role distribution={echo_plan.get('role_distribution', {})}")
+            workflow_logger.info(f"  📋 Amplifier plan: total={amplifier_plan.get('total_agents', 5)}, role distribution={amplifier_plan.get('role_distribution', {})}")
 
-            # Enhance echo_plan with concrete instructions
-            enhanced_echo_plan = echo_plan.copy()
-            enhanced_echo_plan["agent_instructions"] = echo_instructions
-            enhanced_echo_plan["coordination_strategy"] = coordination_strategy
-            enhanced_echo_plan["timing_plan"] = agent_instructions.get("timing_plan", {})
+            # Enhance amplifier_plan with concrete instructions
+            enhanced_amplifier_plan = amplifier_plan.copy()
+            enhanced_amplifier_plan["agent_instructions"] = amplifier_instructions
+            enhanced_amplifier_plan["coordination_strategy"] = coordination_strategy
+            enhanced_amplifier_plan["timing_plan"] = agent_instructions.get("timing_plan", {})
 
-            if echo_instructions:
-                workflow_logger.info(f"  📋 Applying strategist echo instructions: {len(echo_instructions)} detailed instructions")
-                workflow_logger.info(f"  🎯 Coordination strategy: {enhanced_echo_plan['coordination_strategy']}")
+            if amplifier_instructions:
+                workflow_logger.info(f"  📋 Applying strategist amplifier instructions: {len(amplifier_instructions)} detailed instructions")
+                workflow_logger.info(f"  🎯 Coordination strategy: {enhanced_amplifier_plan['coordination_strategy']}")
 
             try:
-                # Echo Agents generate responses based on the overall context of two leader comments
-                echo_input_text = final_content_1 if not final_content_2 else f"{final_content_1}\n\n{final_content_2}"
-                echo_responses = await self._coordinate_echo_agents(
-                    echo_input_text,
-                    enhanced_echo_plan,
-                    target_post_id  # Pass target post ID to Echo Agent
+                # amplifier Agents generate responses based on the overall context of two leader comments
+                amplifier_input_text = final_content_1 if not final_content_2 else f"{final_content_1}\n\n{final_content_2}"
+                amplifier_responses = await self._coordinate_amplifier_agents(
+                    amplifier_input_text,
+                    enhanced_amplifier_plan,
+                    target_post_id  # Pass target post ID to amplifier Agent
                 )
-                if echo_responses is None:
-                    echo_responses = []
-                    workflow_logger.warning("  ⚠️ Echo coordination returned None, using empty list")
+                if amplifier_responses is None:
+                    amplifier_responses = []
+                    workflow_logger.warning("  ⚠️ amplifier coordination returned None, using empty list")
             except Exception as e:
-                workflow_logger.warning(f"  ⚠️ Echo coordination failed: {e}")
-                echo_responses = []
+                workflow_logger.warning(f"  ⚠️ amplifier coordination failed: {e}")
+                amplifier_responses = []
             
-            workflow_logger.info(f"  ✅ {len(echo_responses)} amplifier responses generated")
+            workflow_logger.info(f"  ✅ {len(amplifier_responses)} amplifier responses generated")
 
-            # Highlighted echo agent content display
-            for i, response in enumerate(echo_responses):
+            # Highlighted amplifier agent content display
+            for i, response in enumerate(amplifier_responses):
                 if response.get("success") and "response" in response:
                     response_data = response["response"]
                     response_content = response_data.get("response_content", "")
-                    comment_id = response_data.get("comment_id", f"echo-{i+1}")
+                    comment_id = response_data.get("comment_id", f"amplifier-{i+1}")
                     persona_id = response_data.get("persona_id", f"persona-{i+1}")
                     selected_model = response_data.get("selected_model", "unknown")
 
-                    # Highlighted echo agent content display
-                    workflow_logger.info(f"💬 🤖 Echo-{i+1} ({persona_id}) ({selected_model}) commented: {response_content}")
+                    # Highlighted amplifier agent content display
+                    workflow_logger.info(f"💬 🤖 amplifier-{i+1} ({persona_id}) ({selected_model}) commented: {response_content}")
 
-            # Echo Agents like leader comments
-            if leader_comment_id and echo_responses:
-                workflow_logger.info("💖 Echo Agents start liking leader comments...")
-                likes_count = await self._echo_agents_like_leader_comment(leader_comment_id, echo_responses, leader_comment_id_2)
+            # amplifier Agents like leader comments
+            if leader_comment_id and amplifier_responses:
+                workflow_logger.info("💖 amplifier Agents start liking leader comments...")
+                likes_count = await self._amplifier_agents_like_leader_comment(leader_comment_id, amplifier_responses, leader_comment_id_2)
                 if likes_count > 0:
-                    workflow_logger.info(f"  ✅ {likes_count} Echo Agents successfully liked leader comments")
-                    workflow_logger.info(f"💖 {likes_count} Echo Agents liked leader comments")
+                    workflow_logger.info(f"  ✅ {likes_count} amplifier Agents successfully liked leader comments")
+                    workflow_logger.info(f"💖 {likes_count} amplifier Agents liked leader comments")
                     
-                    # Based on echo agent count, add (echo_agent_count * 20) likes to each leader comment
-                    echo_agent_count = len([r for r in echo_responses if r.get("success")])
-                    workflow_logger.info(f"  📊 Prepare bulk likes: echo_agent_count={echo_agent_count}, will add {echo_agent_count * 20} likes")
-                    if echo_agent_count > 0:
+                    # Based on amplifier agent count, add (amplifier_agent_count * 20) likes to each leader comment
+                    amplifier_agent_count = len([r for r in amplifier_responses if r.get("success")])
+                    workflow_logger.info(f"  📊 Prepare bulk likes: amplifier_agent_count={amplifier_agent_count}, will add {amplifier_agent_count * 20} likes")
+                    if amplifier_agent_count > 0:
                         workflow_logger.info("  🔄 Starting bulk like operation...")
-                        self._add_bulk_likes_to_leader_comments(leader_comment_id, leader_comment_id_2, echo_agent_count)
+                        self._add_bulk_likes_to_leader_comments(leader_comment_id, leader_comment_id_2, amplifier_agent_count)
                         workflow_logger.info("  ✅ Bulk like operation completed")
                     else:
-                        workflow_logger.warning("  ⚠️  echo_agent_count is 0, skipping bulk likes")
+                        workflow_logger.warning("  ⚠️  amplifier_agent_count is 0, skipping bulk likes")
                 else:
-                    workflow_logger.info("  ⚠️  Echo Agent likes failed or no valid responses")
+                    workflow_logger.info("  ⚠️  amplifier Agent likes failed or no valid responses")
 
 
             # ===== Calculate base effectiveness score =====
             workflow_logger.info("📊 Calculating base effectiveness score...")
 
             # Calculate base effectiveness score
-            total_responses = len(echo_responses)
-            successful_responses = len([r for r in echo_responses if r.get("success")])
+            total_responses = len(amplifier_responses)
+            successful_responses = len([r for r in amplifier_responses if r.get("success")])
             leader_success = content_result.get("success", False)
 
             # Base score calculation
@@ -4852,7 +4852,7 @@ class SimpleCoordinationSystem:
                 effectiveness_score += 2.0  # Leader post success adds 2 points
             if total_responses > 0:
                 success_rate = successful_responses / total_responses
-                effectiveness_score += success_rate * 3.0  # Echo success rate adds up to 3 points
+                effectiveness_score += success_rate * 3.0  # amplifier success rate adds up to 3 points
 
             # Ensure score is within a reasonable range
             effectiveness_score = max(1.0, min(10.0, effectiveness_score))
@@ -4884,7 +4884,7 @@ class SimpleCoordinationSystem:
                 monitoring_task_id = await self.start_monitoring_and_feedback(
                     action_id=action_id,
                     leader_content=leader_content,
-                    echo_responses=echo_responses,
+                    amplifier_responses=amplifier_responses,
                     monitoring_interval=monitoring_interval,
                     supplementary_plan=strategist_supplementary_plan,  # Pass supplementary plan for later monitoring
                     content_id=content_id,  # Pass content_id for monitoring
@@ -4909,11 +4909,11 @@ class SimpleCoordinationSystem:
                     },
                     "phase_2": {
                         "leader_content": content_result,
-                        "echo_responses": echo_responses
+                        "amplifier_responses": amplifier_responses
                     },
                     "phase_3": {
                         "effectiveness_score": effectiveness_score,
-                        "total_responses": len(echo_responses),
+                        "total_responses": len(amplifier_responses),
                         "monitoring_task_id": monitoring_task_id,
                         "monitoring_active": enable_feedback and monitoring_task_id is not None,
                         "feedback_enabled": enable_feedback,
@@ -4982,7 +4982,7 @@ class SimpleCoordinationSystem:
             analysis_data = phase1_data.get("analysis", {}).get("analysis", {})
             strategy_data = phase1_data.get("strategy", {}).get("strategy", {})
             leader_content = phase2_data.get("leader_content", {})
-            echo_responses = phase2_data.get("echo_responses", [])
+            amplifier_responses = phase2_data.get("amplifier_responses", [])
             
             # Build comprehensive log
             action_log = {
@@ -5010,7 +5010,7 @@ class SimpleCoordinationSystem:
                     "situation_assessment": strategy_data.get("situation_assessment", {}),
                     "core_counter_argument": strategy_data.get("core_counter_argument", ""),
                     "leader_instruction": strategy_data.get("leader_instruction", {}),
-                    "echo_plan": strategy_data.get("echo_plan", {}),
+                    "amplifier_plan": strategy_data.get("amplifier_plan", {}),
                     "expected_outcome": strategy_data.get("expected_outcome", ""),
                     "risk_assessment": strategy_data.get("risk_assessment", "")
                 },
@@ -5020,13 +5020,13 @@ class SimpleCoordinationSystem:
                         "generated": leader_content.get("content_generated", False),
                         "content_length": len(str(leader_content.get("content", {}).get("final_content", ""))) if leader_content.get("content") else 0
                     },
-                    "echo_responses": {
-                        "total_planned": strategy_data.get("echo_plan", {}).get("total_agents", 0),
-                        "successfully_generated": len([r for r in echo_responses if r.get("success")]),
-                        "failed_generations": len([r for r in echo_responses if not r.get("success")]),
-                        "role_distribution": strategy_data.get("echo_plan", {}).get("role_distribution", {}),
-                        "models_used": list(set([r.get("selected_model") for r in echo_responses if r.get("selected_model")])),
-                        "response_quality_scores": [r.get("response", {}).get("quality_score", 0.8) for r in echo_responses if r.get("success")]
+                    "amplifier_responses": {
+                        "total_planned": strategy_data.get("amplifier_plan", {}).get("total_agents", 0),
+                        "successfully_generated": len([r for r in amplifier_responses if r.get("success")]),
+                        "failed_generations": len([r for r in amplifier_responses if not r.get("success")]),
+                        "role_distribution": strategy_data.get("amplifier_plan", {}).get("role_distribution", {}),
+                        "models_used": list(set([r.get("selected_model") for r in amplifier_responses if r.get("selected_model")])),
+                        "response_quality_scores": [r.get("response", {}).get("quality_score", 0.8) for r in amplifier_responses if r.get("success")]
                     }
                 },
                 
@@ -5043,12 +5043,12 @@ class SimpleCoordinationSystem:
                         "workflow_completed": action_result.get("success", False),
                         "strategy_executed": bool(strategy_data),
                         "content_generated": leader_content.get("content_generated", False),
-                        "echo_agents_activated": len(echo_responses) > 0,
+                        "amplifier_agents_activated": len(amplifier_responses) > 0,
                         "monitoring_initiated": phase3_data.get("monitoring_active", False)
                     },
                     "performance_metrics": {
                         "execution_efficiency": 1.0 if action_result.get("execution_time", 0) < 60 else 0.8,
-                        "content_quality": sum(r.get("response", {}).get("authenticity_score", 0) for r in echo_responses if r.get("success")) / max(len(echo_responses), 1),
+                        "content_quality": sum(r.get("response", {}).get("authenticity_score", 0) for r in amplifier_responses if r.get("success")) / max(len(amplifier_responses), 1),
                         "strategic_coherence": 0.9 if strategy_data.get("situation_assessment") else 0.5
                     }
                 },
@@ -5090,16 +5090,16 @@ class SimpleCoordinationSystem:
                 
                 # Strategist phase lessons
                 strategy_data = phases.get("phase_1", {}).get("strategy", {}).get("strategy", {})
-                if strategy_data.get("echo_plan", {}).get("role_distribution"):
+                if strategy_data.get("amplifier_plan", {}).get("role_distribution"):
                     lessons.append("Intelligent agent role distribution strategy applied")
                 
                 # Execution phase lessons
-                echo_responses = phases.get("phase_2", {}).get("echo_responses", [])
-                success_rate = len([r for r in echo_responses if r.get("success")]) / max(len(echo_responses), 1)
+                amplifier_responses = phases.get("phase_2", {}).get("amplifier_responses", [])
+                success_rate = len([r for r in amplifier_responses if r.get("success")]) / max(len(amplifier_responses), 1)
                 if success_rate > 0.8:
-                    lessons.append(f"High echo agent success rate achieved: {success_rate:.1%}")
+                    lessons.append(f"High amplifier agent success rate achieved: {success_rate:.1%}")
                 elif success_rate < 0.5:
-                    lessons.append(f"Low echo agent success rate needs investigation: {success_rate:.1%}")
+                    lessons.append(f"Low amplifier agent success rate needs investigation: {success_rate:.1%}")
                 
                 # Monitoring phase lessons
                 if phases.get("phase_3", {}).get("monitoring_active"):
@@ -5118,16 +5118,16 @@ class SimpleCoordinationSystem:
         
         try:
             phases = action_result.get("phases", {})
-            echo_responses = phases.get("phase_2", {}).get("echo_responses", [])
+            amplifier_responses = phases.get("phase_2", {}).get("amplifier_responses", [])
             
             # Suggest improvements based on performance metrics
-            if echo_responses:
-                failed_responses = [r for r in echo_responses if not r.get("success")]
-                if len(failed_responses) > len(echo_responses) * 0.2:  # Failure rate exceeds 20%
-                    improvements.append("Consider improving echo agent error handling and retry mechanisms")
+            if amplifier_responses:
+                failed_responses = [r for r in amplifier_responses if not r.get("success")]
+                if len(failed_responses) > len(amplifier_responses) * 0.2:  # Failure rate exceeds 20%
+                    improvements.append("Consider improving amplifier agent error handling and retry mechanisms")
                 
                 # Analyze model usage
-                models_used = [r.get("selected_model") for r in echo_responses if r.get("selected_model")]
+                models_used = [r.get("selected_model") for r in amplifier_responses if r.get("selected_model")]
                 if len(set(models_used)) < 2:
                     improvements.append("Consider using more diverse models for better response variety")
             
@@ -5158,7 +5158,7 @@ class SimpleCoordinationSystem:
                 
                 "strategy_effectiveness": {
                     "chosen_approach": action_log.get("strategic_decision", {}).get("core_counter_argument", ""),
-                    "agent_allocation": action_log.get("strategic_decision", {}).get("echo_plan", {}).get("role_distribution", {}),
+                    "agent_allocation": action_log.get("strategic_decision", {}).get("amplifier_plan", {}).get("role_distribution", {}),
                     "outcome_score": action_log.get("effectiveness_results", {}).get("overall_score", 0)
                 },
                 
@@ -5368,55 +5368,55 @@ class SimpleCoordinationSystem:
         
         workflow_logger.info(f"   📋 Action ID: {action_id} archive complete")
     
-    async def _coordinate_echo_agents(self, target_content: str, echo_plan: Dict[str, Any], target_post_id: str = None) -> List[Dict[str, Any]]:
-        """Coordinate Echo Agent cluster - select agents based on strategic plan, supports target post"""
+    async def _coordinate_amplifier_agents(self, target_content: str, amplifier_plan: Dict[str, Any], target_post_id: str = None) -> List[Dict[str, Any]]:
+        """Coordinate amplifier Agent cluster - select agents based on strategic plan, supports target post"""
 
-        # Get configuration from echo_plan and ensure correct type
-        total_agents_raw = echo_plan.get("total_agents", 5)
+        # Get configuration from amplifier_plan and ensure correct type
+        total_agents_raw = amplifier_plan.get("total_agents", 5)
         try:
             total_agents = int(total_agents_raw) if total_agents_raw is not None else 5
         except (ValueError, TypeError):
             workflow_logger.warning(f"  ⚠️ Invalid total_agents value '{total_agents_raw}', using default 5")
             total_agents = 5
 
-        role_distribution = echo_plan.get("role_distribution", {})
+        role_distribution = amplifier_plan.get("role_distribution", {})
 
-        # If Echo Agents are not created yet, create now
-        if not self._echo_agents_created:
-            workflow_logger.info("  🎭 First intervention needed, creating Echo Agents...")
+        # If amplifier Agents are not created yet, create now
+        if not self._amplifier_agents_created:
+            workflow_logger.info("  🎭 First intervention needed, creating amplifier Agents...")
             # Create the required number of agents by role distribution
             try:
-                self.echo_agents = self._create_echo_agents_from_personas(total_agents)
-                if self.echo_agents:
-                    workflow_logger.info(f"  ✅ Successfully created {len(self.echo_agents)} Echo Agents")
-                    self._echo_agents_created = True
+                self.amplifier_agents = self._create_amplifier_agents_from_personas(total_agents)
+                if self.amplifier_agents:
+                    workflow_logger.info(f"  ✅ Successfully created {len(self.amplifier_agents)} amplifier Agents")
+                    self._amplifier_agents_created = True
                 else:
-                    workflow_logger.info("  ❌ Echo Agent creation failed - returning empty list")
+                    workflow_logger.info("  ❌ amplifier Agent creation failed - returning empty list")
                     return []
             except Exception as e:
-                workflow_logger.info(f"  ❌ Echo Agent creation error: {e}")
+                workflow_logger.info(f"  ❌ amplifier Agent creation error: {e}")
                 import traceback
                 workflow_logger.info(f"  📊 Error details: {traceback.format_exc()}")
                 return []
         else:
-            # If counts mismatch, rely entirely on Echo plan count and recreate
-            if len(self.echo_agents) != total_agents:
-                workflow_logger.info(f"  🔄 Agent count mismatch, relying on Echo plan count (current: {len(self.echo_agents)}, need: {total_agents})")
+            # If counts mismatch, rely entirely on amplifier plan count and recreate
+            if len(self.amplifier_agents) != total_agents:
+                workflow_logger.info(f"  🔄 Agent count mismatch, relying on amplifier plan count (current: {len(self.amplifier_agents)}, need: {total_agents})")
                 # Recreate required number of agents
                 try:
-                    self.echo_agents = self._create_echo_agents_from_personas(total_agents)
-                    if self.echo_agents:
-                        workflow_logger.info(f"  ✅ Recreated {len(self.echo_agents)} Echo Agents")
+                    self.amplifier_agents = self._create_amplifier_agents_from_personas(total_agents)
+                    if self.amplifier_agents:
+                        workflow_logger.info(f"  ✅ Recreated {len(self.amplifier_agents)} amplifier Agents")
                     else:
-                        workflow_logger.info("  ❌ Echo Agent recreation failed - returning empty list")
+                        workflow_logger.info("  ❌ amplifier Agent recreation failed - returning empty list")
                         return []
                 except Exception as e:
-                    workflow_logger.info(f"  ❌ Echo Agent recreation error: {e}")
+                    workflow_logger.info(f"  ❌ amplifier Agent recreation error: {e}")
                     return []
 
         # Use all created agents and assign roles
         try:
-            selected_agents = self._assign_roles_to_agents(self.echo_agents, role_distribution)
+            selected_agents = self._assign_roles_to_agents(self.amplifier_agents, role_distribution)
             # Simplified logging: only record overall allocation
             workflow_logger.info(f"🎯 Agent role assignment complete: {len(selected_agents)} agents assigned roles")
         except Exception as e:
@@ -5425,21 +5425,21 @@ class SimpleCoordinationSystem:
             workflow_logger.info(f"  📊 Error details: {traceback.format_exc()}")
             return []
 
-        workflow_logger.info(f"  ✅ Selected {len(selected_agents)} Echo Agents for execution")
+        workflow_logger.info(f"  ✅ Selected {len(selected_agents)} amplifier Agents for execution")
 
         if not selected_agents:
-            workflow_logger.info("  ⚠️  Warning: no available Echo Agents!")
+            workflow_logger.info("  ⚠️  Warning: no available amplifier Agents!")
             return []
 
         # Get strategist instructions
-        agent_instructions = echo_plan.get("agent_instructions", [])
-        coordination_strategy = echo_plan.get("coordination_strategy", "default coordination")
-        timing_plan = echo_plan.get("timing_plan", {})
+        agent_instructions = amplifier_plan.get("agent_instructions", [])
+        coordination_strategy = amplifier_plan.get("coordination_strategy", "default coordination")
+        timing_plan = amplifier_plan.get("timing_plan", {})
 
 
 
         # Implement instant consensus timing strategy
-        timing_strategy = self._get_timing_strategy(echo_plan, len(selected_agents))
+        timing_strategy = self._get_timing_strategy(amplifier_plan, len(selected_agents))
 
         # # Execute in groups based on timing strategy
         # if timing_strategy.get("strategy_type") == "instant_consensus":
@@ -5453,7 +5453,7 @@ class SimpleCoordinationSystem:
         return self._process_parallel_results(results)
 
     async def start_monitoring_and_feedback(self, action_id: str, leader_content: Dict[str, Any],
-                                          echo_responses: List[Dict[str, Any]],
+                                          amplifier_responses: List[Dict[str, Any]],
                                           monitoring_interval: int = 30,
                                           supplementary_plan: Dict[str, Any] = None,
                                           content_id: str = None,
@@ -5508,7 +5508,7 @@ class SimpleCoordinationSystem:
             "action_id": action_id,
             "target_post_id": target_post_id,  # Add target post ID
             "leader_content": leader_content,
-            "echo_responses": echo_responses,
+            "amplifier_responses": amplifier_responses,
             "start_time": datetime.now(),
             "monitoring_interval": monitoring_interval,
             "feedback_reports": [],
@@ -5613,20 +5613,20 @@ class SimpleCoordinationSystem:
         
         workflow_logger.info(f"  📋 Monitoring task completed, {monitoring_count} rounds executed")
 
-    async def _update_task_baseline_after_intervention(self, task: Dict[str, Any], leader_content: Dict[str, Any], echo_responses: List[Dict[str, Any]]):
+    async def _update_task_baseline_after_intervention(self, task: Dict[str, Any], leader_content: Dict[str, Any], amplifier_responses: List[Dict[str, Any]]):
         """Update task baseline data after intervention for later monitoring iterations
         
         Args:
             task: Monitoring task
             leader_content: Leader content
-            echo_responses: Echo response list
+            amplifier_responses: amplifier response list
         """
         try:
             # Update baseline data in task, including latest intervention results
             updated_baseline = {
                 "intervention_timestamp": datetime.now(),
                 "leader_content": leader_content,
-                "echo_responses": echo_responses,
+                "amplifier_responses": amplifier_responses,
                 "intervention_count": task.get("intervention_count", 0) + 1
             }
             
@@ -5771,18 +5771,18 @@ class SimpleCoordinationSystem:
             
             # Display strategy details
             leader_instructions = agent_instructions.get("leader_instructions", {})
-            echo_instructions = agent_instructions.get("echo_instructions", [])
+            amplifier_instructions = agent_instructions.get("amplifier_instructions", [])
             coordination_strategy = agent_instructions.get("coordination_strategy", "default coordination")
             
-            # Get Echo plan configuration
-            echo_plan = strategy.get('echo_plan', {})
-            planned_agents = echo_plan.get('total_agents', 5)
-            role_distribution = echo_plan.get('role_distribution', {})
+            # Get amplifier plan configuration
+            amplifier_plan = strategy.get('amplifier_plan', {})
+            planned_agents = amplifier_plan.get('total_agents', 5)
+            role_distribution = amplifier_plan.get('role_distribution', {})
             
             # If role_distribution is empty, get from strategy_result
             if not role_distribution:
-                strategy_echo_plan = strategy_result.get("echo_plan", {})
-                role_distribution = strategy_echo_plan.get('role_distribution', {})
+                strategy_amplifier_plan = strategy_result.get("amplifier_plan", {})
+                role_distribution = strategy_amplifier_plan.get('role_distribution', {})
             
             workflow_logger.info("  📋 Strategy details:")
             workflow_logger.info(f"     🎯 Core argument: {strategy.get('core_counter_argument', 'balanced perspective')}")
@@ -5855,91 +5855,91 @@ class SimpleCoordinationSystem:
             else:
                 workflow_logger.warning("⚠️ Second leader comment save failed")
             
-            # 3. Echo Agent responses - reuse execute_workflow logic
+            # 3. amplifier Agent responses - reuse execute_workflow logic
             workflow_logger.info("⚖️ Activating Amplifier Agent cluster...")
             
-            # Ensure echo_plan contains required fields
-            if not isinstance(echo_plan, dict):
-                echo_plan = {"total_agents": 5, "role_distribution": {}}
+            # Ensure amplifier_plan contains required fields
+            if not isinstance(amplifier_plan, dict):
+                amplifier_plan = {"total_agents": 5, "role_distribution": {}}
             
             # If role_distribution is missing, use defaults
-            if not echo_plan.get("role_distribution"):
-                echo_plan["role_distribution"] = {}
+            if not amplifier_plan.get("role_distribution"):
+                amplifier_plan["role_distribution"] = {}
             
-            workflow_logger.info(f"  📋 Amplifier plan: total={echo_plan.get('total_agents', 5)}, role distribution={echo_plan.get('role_distribution', {})}")
+            workflow_logger.info(f"  📋 Amplifier plan: total={amplifier_plan.get('total_agents', 5)}, role distribution={amplifier_plan.get('role_distribution', {})}")
             
-            # Enhance echo_plan with concrete instructions
-            enhanced_echo_plan = echo_plan.copy()
-            enhanced_echo_plan["agent_instructions"] = echo_instructions
-            enhanced_echo_plan["coordination_strategy"] = coordination_strategy
-            enhanced_echo_plan["timing_plan"] = agent_instructions.get("timing_plan", {})
+            # Enhance amplifier_plan with concrete instructions
+            enhanced_amplifier_plan = amplifier_plan.copy()
+            enhanced_amplifier_plan["agent_instructions"] = amplifier_instructions
+            enhanced_amplifier_plan["coordination_strategy"] = coordination_strategy
+            enhanced_amplifier_plan["timing_plan"] = agent_instructions.get("timing_plan", {})
             
-            if echo_instructions:
-                workflow_logger.info(f"  📋 Applying strategist echo instructions: {len(echo_instructions)} detailed instructions")
-                workflow_logger.info(f"  🎯 Coordination strategy: {enhanced_echo_plan['coordination_strategy']}")
+            if amplifier_instructions:
+                workflow_logger.info(f"  📋 Applying strategist amplifier instructions: {len(amplifier_instructions)} detailed instructions")
+                workflow_logger.info(f"  🎯 Coordination strategy: {enhanced_amplifier_plan['coordination_strategy']}")
             
-            # Reuse echo coordination logic from execute_workflow
+            # Reuse amplifier coordination logic from execute_workflow
             try:
-                # Use combined leader comments as echo agent input context
-                echo_input_text = final_content_1 if not final_content_2 else f"{final_content_1}\n\n{final_content_2}"
-                echo_responses = await self._coordinate_echo_agents(
-                    echo_input_text,
-                    enhanced_echo_plan,
-                    target_post_id_clean  # Pass target post ID to Echo Agent
+                # Use combined leader comments as amplifier agent input context
+                amplifier_input_text = final_content_1 if not final_content_2 else f"{final_content_1}\n\n{final_content_2}"
+                amplifier_responses = await self._coordinate_amplifier_agents(
+                    amplifier_input_text,
+                    enhanced_amplifier_plan,
+                    target_post_id_clean  # Pass target post ID to amplifier Agent
                 )
-                if echo_responses is None:
-                    echo_responses = []
-                    workflow_logger.warning("  ⚠️ Echo coordination returned None, using empty list")
+                if amplifier_responses is None:
+                    amplifier_responses = []
+                    workflow_logger.warning("  ⚠️ amplifier coordination returned None, using empty list")
             except Exception as e:
-                workflow_logger.warning(f"  ⚠️ Echo coordination failed: {e}")
-                echo_responses = []
+                workflow_logger.warning(f"  ⚠️ amplifier coordination failed: {e}")
+                amplifier_responses = []
             
-            workflow_logger.info(f"  ✅ {len(echo_responses)} amplifier responses generated")
+            workflow_logger.info(f"  ✅ {len(amplifier_responses)} amplifier responses generated")
             
-            # Highlighted echo agent content display
-            for i, response in enumerate(echo_responses):
+            # Highlighted amplifier agent content display
+            for i, response in enumerate(amplifier_responses):
                 if response.get("success") and "response" in response:
                     response_data = response["response"]
                     response_content = response_data.get("response_content", "")
-                    comment_id = response_data.get("comment_id", f"echo-{i+1}")
+                    comment_id = response_data.get("comment_id", f"amplifier-{i+1}")
                     persona_id = response_data.get("persona_id", f"persona-{i+1}")
                     selected_model = response_data.get("selected_model", "unknown")
                     
-                    # Highlighted echo agent content display
-                    workflow_logger.info(f"💬 🤖 Echo-{i+1} ({persona_id}) ({selected_model}) commented: {response_content}")
+                    # Highlighted amplifier agent content display
+                    workflow_logger.info(f"💬 🤖 amplifier-{i+1} ({persona_id}) ({selected_model}) commented: {response_content}")
             
-            # Echo Agents like leader comments
-            if leader_comment_id and echo_responses:
-                workflow_logger.info("💖 Echo Agents start liking leader comments...")
-                likes_count = await self._echo_agents_like_leader_comment(leader_comment_id, echo_responses, leader_comment_id_2)
+            # amplifier Agents like leader comments
+            if leader_comment_id and amplifier_responses:
+                workflow_logger.info("💖 amplifier Agents start liking leader comments...")
+                likes_count = await self._amplifier_agents_like_leader_comment(leader_comment_id, amplifier_responses, leader_comment_id_2)
                 if likes_count > 0:
-                    workflow_logger.info(f"  ✅ {likes_count} Echo Agents successfully liked leader comments")
-                    workflow_logger.info(f"💖 {likes_count} Echo Agents liked leader comments")
+                    workflow_logger.info(f"  ✅ {likes_count} amplifier Agents successfully liked leader comments")
+                    workflow_logger.info(f"💖 {likes_count} amplifier Agents liked leader comments")
                     
-                    # Based on echo agent count, add (echo_agent_count * 20) likes to each leader comment
-                    echo_agent_count = len([r for r in echo_responses if r.get("success")])
-                    workflow_logger.info(f"  📊 Prepare bulk likes: echo_agent_count={echo_agent_count}, will add {echo_agent_count * 20} likes")
-                    if echo_agent_count > 0:
+                    # Based on amplifier agent count, add (amplifier_agent_count * 20) likes to each leader comment
+                    amplifier_agent_count = len([r for r in amplifier_responses if r.get("success")])
+                    workflow_logger.info(f"  📊 Prepare bulk likes: amplifier_agent_count={amplifier_agent_count}, will add {amplifier_agent_count * 20} likes")
+                    if amplifier_agent_count > 0:
                         workflow_logger.info("  🔄 Starting bulk like operation...")
-                        self._add_bulk_likes_to_leader_comments(leader_comment_id, leader_comment_id_2, echo_agent_count)
+                        self._add_bulk_likes_to_leader_comments(leader_comment_id, leader_comment_id_2, amplifier_agent_count)
                         workflow_logger.info("  ✅ Bulk like operation completed")
                     else:
-                        workflow_logger.warning("  ⚠️  echo_agent_count is 0, skipping bulk likes")
+                        workflow_logger.warning("  ⚠️  amplifier_agent_count is 0, skipping bulk likes")
                 else:
-                    workflow_logger.info("  ⚠️  Echo Agent likes failed or no valid responses")
+                    workflow_logger.info("  ⚠️  amplifier Agent likes failed or no valid responses")
             
             # Update task baseline data for later monitoring iterations
             combined_leader_content = {
-                "final_content": echo_input_text
+                "final_content": amplifier_input_text
             }
-            await self._update_task_baseline_after_intervention(task, combined_leader_content, echo_responses)
+            await self._update_task_baseline_after_intervention(task, combined_leader_content, amplifier_responses)
             
             return {
                 "success": True,
                 "action_id": action_id,
                 "strategy_result": strategy_result,
                 "leader_content": combined_leader_content,
-                "echo_responses": echo_responses,
+                "amplifier_responses": amplifier_responses,
                 "intervention_triggered": True
             }
             
@@ -6673,7 +6673,7 @@ class SimpleCoordinationSystem:
         Input: Receives analyst effectiveness report.
         Flow: Evaluate whether current strategy is working based on latest report.
         If unexpected negative commentary appears, immediately create a supplementary action plan
-        (e.g., activate a new batch of Echo Agents to clarify, or have the leader post a follow-up).
+        (e.g., activate a new batch of amplifier Agents to clarify, or have the leader post a follow-up).
         Output: Dynamic adjustment instructions, or a "keep observing" decision.
         """
 
@@ -6922,7 +6922,7 @@ class SimpleCoordinationSystem:
         try:
             # Use global database manager, cursor no longer needed
 
-            # Get all posts related to this action (including leader posts and echo responses)
+            # Get all posts related to this action (including leader posts and amplifier responses)
             result = fetch_one("""
                 SELECT SUM(num_likes), SUM(num_comments), SUM(num_shares), SUM(num_flags), COUNT(*)
                 FROM posts
@@ -7798,7 +7798,7 @@ Your ratings:"""
         # Base recommendations from effectiveness score
         if effectiveness_score < 3:
             recommendations.extend([
-                f"Low effectiveness score ({effectiveness_score:.1f}/10); consider activating more echo agents",
+                f"Low effectiveness score ({effectiveness_score:.1f}/10); consider activating more amplifier agents",
                 "Reassess target audience fit for the messaging strategy",
                 "Consider increasing interaction frequency with community responses"
             ])
@@ -7989,17 +7989,17 @@ Please return the decision in JSON format:
             workflow_logger.info(f"    🚀 Executing strategist agent decision: {decision_type}")
             
             if decision_type == "activate_agents":
-                # Activate a new batch of Echo Agents to clarify
-                result = await self._activate_additional_echo_agents(monitoring_task)
+                # Activate a new batch of amplifier Agents to clarify
+                result = await self._activate_additional_amplifier_agents(monitoring_task)
                 adjustment_type = "activate_additional_agents"
             elif decision_type == "leader_clarification":
                 # Have leader post a supplementary comment
                 result = await self._generate_leader_clarification(monitoring_task)
                 adjustment_type = "leader_clarification"
             elif decision_type == "increase_activity":
-                # Increase current Echo Agent activity
-                result = await self._increase_echo_activity(monitoring_task)
-                adjustment_type = "increase_echo_activity"
+                # Increase current amplifier Agent activity
+                result = await self._increase_amplifier_activity(monitoring_task)
+                adjustment_type = "increase_amplifier_activity"
             elif decision_type == "maintain_observation":
                 # Maintain observation, no adjustment
                 result = {"message": "Strategist recommends maintaining observation; no adjustment needed", "actions_taken": 0}
@@ -8046,14 +8046,14 @@ Please return the decision in JSON format:
             try:
                 # Execute corresponding operation based on action type
                 if "agent" in action_type.lower():
-                    result = await self._activate_additional_echo_agents(monitoring_task)
+                    result = await self._activate_additional_amplifier_agents(monitoring_task)
                 elif "leader" in action_type.lower():
                     result = await self._generate_leader_clarification(monitoring_task)
                 elif "activity" in action_type.lower():
-                    result = await self._increase_echo_activity(monitoring_task)
+                    result = await self._increase_amplifier_activity(monitoring_task)
                 else:
                     # Generic handling: increase activity
-                    result = await self._increase_echo_activity(monitoring_task)
+                    result = await self._increase_amplifier_activity(monitoring_task)
                 
                 executed_actions.append({
                     "action": action_type,
@@ -8108,17 +8108,17 @@ Please return the decision in JSON format:
             adjustment_type = "unknown"
 
             if effectiveness_score < 3:
-                # Poor effectiveness, activate additional Echo Agents
+                # Poor effectiveness, activate additional amplifier Agents
                 adjustment_type = "activate_additional_agents"
-                result = await self._activate_additional_echo_agents(monitoring_task)
+                result = await self._activate_additional_amplifier_agents(monitoring_task)
             elif sentiment_change == "declined":
                 # Sentiment worsened, have leader release clarification
                 adjustment_type = "leader_clarification"
                 result = await self._generate_leader_clarification(monitoring_task)
             else:
-                # Minor adjustment, increase Echo Agent activity
-                adjustment_type = "increase_echo_activity"
-                result = await self._increase_echo_activity(monitoring_task)
+                # Minor adjustment, increase amplifier Agent activity
+                adjustment_type = "increase_amplifier_activity"
+                result = await self._increase_amplifier_activity(monitoring_task)
 
             return {
                 "success": True,
@@ -8136,14 +8136,14 @@ Please return the decision in JSON format:
                 "timestamp": datetime.now()
             }
 
-    async def _activate_additional_echo_agents(self, monitoring_task: Dict[str, Any]) -> Dict[str, Any]:
-        """Activate additional Echo Agents"""
+    async def _activate_additional_amplifier_agents(self, monitoring_task: Dict[str, Any]) -> Dict[str, Any]:
+        """Activate additional amplifier Agents"""
 
-        workflow_logger.info("    🚀 Activating additional Echo Agents...")
+        workflow_logger.info("    🚀 Activating additional amplifier Agents...")
 
-        # Use remaining Echo Agents to generate extra responses
-        used_agents = len(monitoring_task.get("echo_responses", []))
-        remaining_agents = self.echo_agents[used_agents:]
+        # Use remaining amplifier Agents to generate extra responses
+        used_agents = len(monitoring_task.get("amplifier_responses", []))
+        remaining_agents = self.amplifier_agents[used_agents:]
 
         if not remaining_agents:
             return {"message": "No additional agents available"}
@@ -8224,16 +8224,16 @@ Please return the decision in JSON format:
                 "error": str(e)
             }
 
-    async def _increase_echo_activity(self, monitoring_task: Dict[str, Any]) -> Dict[str, Any]:
-        """Increase Echo Agent activity"""
+    async def _increase_amplifier_activity(self, monitoring_task: Dict[str, Any]) -> Dict[str, Any]:
+        """Increase amplifier Agent activity"""
 
-        workflow_logger.info("    📈 Increasing Echo Agent activity...")
+        workflow_logger.info("    📈 Increasing amplifier Agent activity...")
 
         # Simulate increased activity (in real app this may include more replies, likes, etc.)
         return {
             "activity_increased": True,
             "actions_taken": ["increased_response_frequency", "enhanced_engagement"],
-            "message": "Echo agent activity has been increased"
+            "message": "amplifier agent activity has been increased"
         }
 
     async def stop_monitoring(self, monitoring_task_id: str = None):
@@ -8281,7 +8281,7 @@ Please return the decision in JSON format:
                 "analyst": "active",
                 "strategist": "active", 
                 "leader": "active",
-                "echo_agents": len(self.echo_agents)
+                "amplifier_agents": len(self.amplifier_agents)
             },
             "recent_performance": self._calculate_performance()
         }
@@ -8306,7 +8306,7 @@ Please return the decision in JSON format:
             "total_recent_actions": len(recent_actions)
         }
 
-    def _calculate_effectiveness_score(self, original_content: str, echo_responses: list,
+    def _calculate_effectiveness_score(self, original_content: str, amplifier_responses: list,
                                      strategy_result: dict, analysis_result: dict) -> float:
         """Calculate effectiveness score with heuristics"""
         import random
@@ -8316,7 +8316,7 @@ Please return the decision in JSON format:
         base_score = 5.0
 
         # 1. Response count bonus (max +2)
-        response_bonus = min(2.0, len(echo_responses) * 0.3)
+        response_bonus = min(2.0, len(amplifier_responses) * 0.3)
 
         # 2. Extremism impact (higher extremism means harder intervention, higher bonus if successful)
         # Fix: access analysis result data structure correctly
@@ -8341,7 +8341,7 @@ Please return the decision in JSON format:
 
         # 4. Content quality evaluation (based on AI semantics)
         quality_score = 0
-        for response in echo_responses:
+        for response in amplifier_responses:
             if response.get("success", False):
                 response_data = response.get("response", {})
                 content = response_data.get("response_content", "")
@@ -8435,7 +8435,7 @@ You are an experienced public-opinion balancing strategist. You need to evaluate
 [Execution Results]
 - Effectiveness score: {effectiveness_score}/10
 - Leader response: {'success' if execution_success.get('leader_success') else 'failed'}
-- Echo responses: {execution_success.get('successful_responses', 0)}/{execution_success.get('total_responses', 0)} (success rate: {execution_success.get('success_rate', 0)*100:.0f}%)
+- amplifier responses: {execution_success.get('successful_responses', 0)}/{execution_success.get('total_responses', 0)} (success rate: {execution_success.get('success_rate', 0)*100:.0f}%)
 - Critical issues: {', '.join(critical_issues) if critical_issues else 'none'}
 
 [Evaluation Requirements]
@@ -8513,8 +8513,8 @@ Please return the evaluation result in JSON format:
                 workflow_logger.info(f"      {i+1}. Execute {action_type} (priority: {priority})")
                 
                 if action_type == "additional_response":
-                    # Generate additional Echo response
-                    additional_response = await self._generate_additional_echo_response(
+                    # Generate additional amplifier response
+                    additional_response = await self._generate_additional_amplifier_response(
                         action, content_text, action_id
                     )
                     executed_actions.append(additional_response)
@@ -8547,14 +8547,14 @@ Please return the evaluation result in JSON format:
             workflow_logger.info(f"    ❌ Failed to execute supplementary plan: {e}")
             return []
 
-    async def _generate_additional_echo_response(self, action: Dict[str, Any], content_text: str, action_id: str) -> Dict[str, Any]:
-        """Generate additional Echo response"""
+    async def _generate_additional_amplifier_response(self, action: Dict[str, Any], content_text: str, action_id: str) -> Dict[str, Any]:
+        """Generate additional amplifier response"""
         try:
-            workflow_logger.info("        🔊 Generating additional Echo response...")
+            workflow_logger.info("        🔊 Generating additional amplifier response...")
             
             # Build instructions
-            echo_instruction = {
-                "type": "supplementary_echo",
+            amplifier_instruction = {
+                "type": "supplementary_amplifier",
                 "message_type": action.get("description", "additional supportive response"),
                 "target_audience": action.get("target_audience", "general"),
                 "tone": "supportive",
@@ -8562,22 +8562,22 @@ Please return the evaluation result in JSON format:
                 "context": "supplementary_intervention"
             }
             
-            # Select an Echo Agent
-            selected_echo = self.echo_agents[0] if self.echo_agents else None
-            if not selected_echo:
-                return {"success": False, "error": "No echo agents available"}
+            # Select an amplifier Agent
+            selected_amplifier = self.amplifier_agents[0] if self.amplifier_agents else None
+            if not selected_amplifier:
+                return {"success": False, "error": "No amplifier agents available"}
             
             # Generate response
-            response = await selected_echo.generate_content(echo_instruction, content_text)
+            response = await selected_amplifier.generate_content(amplifier_instruction, content_text)
             
             if response.get("success"):
                 # Save to database
-                comment_id = self._save_echo_comment_to_database(
+                comment_id = self._save_amplifier_comment_to_database(
                     response.get("content", {}).get("final_content", ""),
                     action_id,
                     None  # Use default latest-post strategy during strategic adjustment
                 )
-                workflow_logger.info(f"          ✅ Additional Echo response generated and saved: {comment_id}")
+                workflow_logger.info(f"          ✅ Additional amplifier response generated and saved: {comment_id}")
                 return {
                     "success": True,
                     "action_type": "additional_response",
@@ -8585,11 +8585,11 @@ Please return the evaluation result in JSON format:
                     "content": response.get("content", {})
                 }
             else:
-                workflow_logger.info("          ❌ Additional Echo response generation failed")
+                workflow_logger.info("          ❌ Additional amplifier response generation failed")
                 return {"success": False, "error": response.get("error")}
                 
         except Exception as e:
-            workflow_logger.info(f"        ❌ Failed to generate additional Echo response: {e}")
+            workflow_logger.info(f"        ❌ Failed to generate additional amplifier response: {e}")
             return {"success": False, "error": str(e)}
 
     async def _generate_leader_clarification(self, action: Dict[str, Any], content_text: str, action_id: str) -> Dict[str, Any]:
@@ -8663,15 +8663,15 @@ Please return the evaluation result in JSON format:
             workflow_logger.info(f"        ❌ Strategy adjustment failed: {e}")
             return {"success": False, "error": str(e)}
 
-    def _save_echo_comment_to_database(self, content: str, action_id: str, target_post_id: str = None) -> Optional[str]:
-        """Save Echo comment to database - supports target post"""
+    def _save_amplifier_comment_to_database(self, content: str, action_id: str, target_post_id: str = None) -> Optional[str]:
+        """Save amplifier comment to database - supports target post"""
         try:
             from utils import Utils
             from datetime import datetime
             import json
             import hashlib
             
-            def save_echo_comment_operation():
+            def save_amplifier_comment_operation():
                 # Generate comment ID
                 comment_id = Utils.generate_formatted_id("comment")
 
@@ -8680,7 +8680,7 @@ Please return the evaluation result in JSON format:
                     # Validate target post exists
                     result = fetch_one("SELECT COUNT(*) as count FROM posts WHERE post_id = ?", (target_post_id,))
                     if not result or result['count'] == 0:
-                        workflow_logger.info(f"          ⚠️  Echo Agent: target post {target_post_id} not found, using latest post")
+                        workflow_logger.info(f"          ⚠️  amplifier Agent: target post {target_post_id} not found, using latest post")
                         target_post_id = None
                     else:
                         # Simplified logging: do not log each database operation
@@ -8690,41 +8690,41 @@ Please return the evaluation result in JSON format:
                     # Fallback: get latest post as target
                     result = fetch_one("SELECT post_id FROM posts ORDER BY created_at DESC LIMIT 1")
                     if not result:
-                        workflow_logger.info("          ❌ Echo Agent: no posts found in database")
+                        workflow_logger.info("          ❌ amplifier Agent: no posts found in database")
                         return None
                     target_post_id = result['post_id']
-                    workflow_logger.info(f"          📍 Echo Agent: using latest post as target {target_post_id}")
+                    workflow_logger.info(f"          📍 amplifier Agent: using latest post as target {target_post_id}")
 
-                # Create Echo Agent user ID (masquerade as normal user)
-                seed = f"echo_agent_{action_id}_{datetime.now().strftime('%Y%m%d')}"
+                # Create amplifier Agent user ID (masquerade as normal user)
+                seed = f"amplifier_agent_{action_id}_{datetime.now().strftime('%Y%m%d')}"
                 hash_obj = hashlib.md5(seed.encode())
                 user_suffix = hash_obj.hexdigest()[:6]
-                echo_user_id = f"user-{user_suffix}"
+                amplifier_user_id = f"user-{user_suffix}"
 
                 # Check and create user if needed
-                user_result = fetch_one("SELECT COUNT(*) as count FROM users WHERE user_id = ?", (echo_user_id,))
+                user_result = fetch_one("SELECT COUNT(*) as count FROM users WHERE user_id = ?", (amplifier_user_id,))
                 if not user_result or user_result['count'] == 0:
                     # Create a persona that looks like a normal user
                     fake_persona = {
                         "name": f"User{user_suffix}",
-                        "type": "echo",  # Internal marker
+                        "type": "amplifier",  # Internal marker
                         "profession": "Various",
                         "age_range": "25-40",
                         "personality_traits": ["Supportive", "Agreeable", "Constructive"],
-                        "agent_role": "echo",
+                        "agent_role": "amplifier",
                         "is_system_agent": True
                     }
 
                     execute_query('''
                         INSERT INTO users (user_id, username, user_type, agent_role, created_at, persona)
                         VALUES (?, ?, ?, ?, datetime('now'), ?)
-                    ''', (echo_user_id, f"User{user_suffix}", "agent", "echo", json.dumps(fake_persona, ensure_ascii=False)))
+                    ''', (amplifier_user_id, f"User{user_suffix}", "agent", "amplifier", json.dumps(fake_persona, ensure_ascii=False)))
 
                 # Insert comment
                 execute_query('''
                     INSERT INTO comments (comment_id, post_id, content, author_id, created_at, is_agent_response)
                     VALUES (?, ?, ?, ?, datetime('now'), 1)
-                ''', (comment_id, target_post_id, content, echo_user_id))
+                ''', (comment_id, target_post_id, content, amplifier_user_id))
 
                 # Record comment -> timestep mapping
                 try:
@@ -8735,19 +8735,19 @@ Please return the evaluation result in JSON format:
                         execute_query('''
                             INSERT OR REPLACE INTO comment_timesteps (comment_id, user_id, post_id, time_step)
                             VALUES (?, ?, ?, ?)
-                        ''', (comment_id, echo_user_id, target_post_id, int(current_step)))
+                        ''', (comment_id, amplifier_user_id, target_post_id, int(current_step)))
                 except Exception as e:
                     # Non-fatal: mapping is best-effort
-                    workflow_logger.debug(f"Failed to record echo comment timestep: {e}")
+                    workflow_logger.debug(f"Failed to record amplifier comment timestep: {e}")
 
                 # Database manager automatically handles transaction commits
                 return comment_id
 
             # Use database manager to execute operation
-            return save_echo_comment_operation()
+            return save_amplifier_comment_operation()
 
         except Exception as e:
-            workflow_logger.info(f"          ❌ Failed to save Echo comment: {e}")
+            workflow_logger.info(f"          ❌ Failed to save amplifier comment: {e}")
             return None
 
     def _update_monitoring_with_supplementary_plan(self, monitoring_task_id: str, supplementary_plan: Dict[str, Any]):
@@ -8801,7 +8801,7 @@ Please return the evaluation result in JSON format:
                 leader_user_id = None
                 user_suffix = None
 
-                # Prefer leader ID pool in coordination system (similar to Echo logic):
+                # Prefer leader ID pool in coordination system (similar to amplifier logic):
                 # - Leader 1: always use index 0
                 # - Leader 2: always use index 1 (action_id ends with "_leader2")
                 if hasattr(self, "_leader_user_id_pool") and self._leader_user_id_pool:
@@ -8922,8 +8922,8 @@ Please return the evaluation result in JSON format:
             workflow_logger.info(f"Error details: {traceback.format_exc()}")
             return None
 
-    async def _echo_agents_like_leader_comment(self, leader_comment_id: str, echo_responses: List[Dict[str, Any]], leader_comment_id_2: Optional[str] = None) -> int:
-        """Echo agents like leader comments (like both leader comments)"""
+    async def _amplifier_agents_like_leader_comment(self, leader_comment_id: str, amplifier_responses: List[Dict[str, Any]], leader_comment_id_2: Optional[str] = None) -> int:
+        """amplifier agents like leader comments (like both leader comments)"""
         try:
             from datetime import datetime
             import hashlib
@@ -8944,8 +8944,8 @@ Please return the evaluation result in JSON format:
                         workflow_logger.info("  💡 Possible reason: comment saved to fallback post, but query used original post ID")
                     return 0
 
-                # For each successful echo response, increment likes on both leader comments
-                for i, response in enumerate(echo_responses):
+                # For each successful amplifier response, increment likes on both leader comments
+                for i, response in enumerate(amplifier_responses):
                     if response.get("success") and "response" in response:
                         try:
                             # Like the first leader comment
@@ -8966,7 +8966,7 @@ Please return the evaluation result in JSON format:
                             successful_likes += 1
 
                         except Exception as e:
-                            workflow_logger.info(f"    ⚠️  Echo Agent {i+1} like failed: {e}")
+                            workflow_logger.info(f"    ⚠️  amplifier Agent {i+1} like failed: {e}")
                             continue
 
                 # Database manager automatically handles transaction commits
@@ -8984,7 +8984,7 @@ Please return the evaluation result in JSON format:
             return result or 0
 
         except Exception as e:
-            workflow_logger.info(f"❌ Echo Agent like operation failed: {e}")
+            workflow_logger.info(f"❌ amplifier Agent like operation failed: {e}")
             return 0
 
     def _verify_leader_comment_likes(self, leader_comment_id: str, expected_likes: int):
@@ -9009,17 +9009,17 @@ Please return the evaluation result in JSON format:
             workflow_logger.info(f"  ❌ Failed to verify like count: {e}")
             return 0
 
-    def _add_bulk_likes_to_leader_comments(self, leader_comment_id_1: Optional[str], leader_comment_id_2: Optional[str], echo_agent_count: int):
-        """Add bulk likes to both leader comments based on echo agent count (count * 20)"""
+    def _add_bulk_likes_to_leader_comments(self, leader_comment_id_1: Optional[str], leader_comment_id_2: Optional[str], amplifier_agent_count: int):
+        """Add bulk likes to both leader comments based on amplifier agent count (count * 20)"""
         try:
-            workflow_logger.info(f"  🔍 Bulk like method called: leader_comment_id_1={leader_comment_id_1}, leader_comment_id_2={leader_comment_id_2}, echo_agent_count={echo_agent_count}")
+            workflow_logger.info(f"  🔍 Bulk like method called: leader_comment_id_1={leader_comment_id_1}, leader_comment_id_2={leader_comment_id_2}, amplifier_agent_count={amplifier_agent_count}")
             
-            if echo_agent_count <= 0:
-                workflow_logger.warning("  ⚠️ echo_agent_count <= 0, skipping bulk likes")
+            if amplifier_agent_count <= 0:
+                workflow_logger.warning("  ⚠️ amplifier_agent_count <= 0, skipping bulk likes")
                 return
             
-            additional_likes = echo_agent_count * 20
-            workflow_logger.info(f"  📊 Calculated bulk likes: {echo_agent_count} * 20 = {additional_likes}")
+            additional_likes = amplifier_agent_count * 20
+            workflow_logger.info(f"  📊 Calculated bulk likes: {amplifier_agent_count} * 20 = {additional_likes}")
             
             def add_bulk_likes_operation():
                 likes_added = 0
@@ -9055,7 +9055,7 @@ Please return the evaluation result in JSON format:
                             workflow_logger.warning(f"  ⚠️ Like increment mismatch! Expected: {additional_likes}, actual: {actual_increment}")
                         else:
                             likes_added += 1
-                            workflow_logger.info(f"  ✅ Added {additional_likes} likes to first leader comment {leader_comment_id_1} (echo_agent_count: {echo_agent_count})")
+                            workflow_logger.info(f"  ✅ Added {additional_likes} likes to first leader comment {leader_comment_id_1} (amplifier_agent_count: {amplifier_agent_count})")
                     except Exception as e:
                         workflow_logger.warning(f"  ⚠️ Failed to add likes to first leader comment: {e}")
                         import traceback
@@ -9094,7 +9094,7 @@ Please return the evaluation result in JSON format:
                             workflow_logger.warning(f"  ⚠️ Like increment mismatch! Expected: {additional_likes}, actual: {actual_increment}")
                         else:
                             likes_added += 1
-                            workflow_logger.info(f"  ✅ Added {additional_likes} likes to second leader comment {leader_comment_id_2} (echo_agent_count: {echo_agent_count})")
+                            workflow_logger.info(f"  ✅ Added {additional_likes} likes to second leader comment {leader_comment_id_2} (amplifier_agent_count: {amplifier_agent_count})")
                     except Exception as e:
                         workflow_logger.warning(f"  ⚠️ Failed to add likes to second leader comment: {e}")
                         import traceback
@@ -9807,27 +9807,27 @@ Please return the evaluation result in JSON format:
                 if secondary_comment_id:
                     workflow_logger.info(f"    💬 Secondary intervention comment ID: {secondary_comment_id}")
                     
-                    # Execute secondary Echo Agent responses
-                    echo_plan = strategy.get('echo_plan', {})
-                    enhanced_echo_plan = echo_plan.copy()
-                    enhanced_echo_plan["agent_instructions"] = agent_instructions.get("echo_instructions", [])
-                    enhanced_echo_plan["coordination_strategy"] = agent_instructions.get("coordination_strategy", "secondary_coordination")
+                    # Execute secondary amplifier Agent responses
+                    amplifier_plan = strategy.get('amplifier_plan', {})
+                    enhanced_amplifier_plan = amplifier_plan.copy()
+                    enhanced_amplifier_plan["agent_instructions"] = agent_instructions.get("amplifier_instructions", [])
+                    enhanced_amplifier_plan["coordination_strategy"] = agent_instructions.get("coordination_strategy", "secondary_coordination")
                     
-                    workflow_logger.info("    🤖 Launching secondary Echo Agent cluster...")
-                    secondary_echo_responses = await self._coordinate_echo_agents(
+                    workflow_logger.info("    🤖 Launching secondary amplifier Agent cluster...")
+                    secondary_amplifier_responses = await self._coordinate_amplifier_agents(
                         final_content,
-                        enhanced_echo_plan,
+                        enhanced_amplifier_plan,
                         target_post_id
                     )
                     
-                    workflow_logger.info(f"    ✅ Secondary echo responses completed: {len(secondary_echo_responses)} responses")
+                    workflow_logger.info(f"    ✅ Secondary amplifier responses completed: {len(secondary_amplifier_responses)} responses")
                     
-                    # Secondary Echo Agents like secondary leader comment
-                    if secondary_echo_responses:
-                        workflow_logger.info("    💖 Secondary Echo Agents like secondary leader comment...")
-                        likes_count = await self._echo_agents_like_leader_comment(secondary_comment_id, secondary_echo_responses)
+                    # Secondary amplifier Agents like secondary leader comment
+                    if secondary_amplifier_responses:
+                        workflow_logger.info("    💖 Secondary amplifier Agents like secondary leader comment...")
+                        likes_count = await self._amplifier_agents_like_leader_comment(secondary_comment_id, secondary_amplifier_responses)
                         if likes_count > 0:
-                            workflow_logger.info(f"    ✅ {likes_count} secondary Echo Agents successfully liked")
+                            workflow_logger.info(f"    ✅ {likes_count} secondary amplifier Agents successfully liked")
                     
                     workflow_logger.info("    🎉 Secondary intervention strategy executed")
                 else:

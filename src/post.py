@@ -79,7 +79,7 @@ class Post:
             "tech_rational": "🔬 Tech Rational",
             "moderate_neutral": "⚖️ Moderate Neutral",
             "concerned_citizen": "👥 Concerned Citizens",
-            "echo": "🔄 Echo Response"
+            "amplifier": "🔄 amplifier Response"
         }
         
         return role_display.get(self.agent_role, f"🤖 {self.agent_role}")
@@ -90,9 +90,9 @@ class Post:
         return self.is_agent_response and self.agent_response_type == "leader"
     
     @property
-    def is_echo_response(self) -> bool:
-        """Returns True if this is an echo response."""
-        return self.is_agent_response and self.agent_response_type == "echo"
+    def is_amplifier_response(self) -> bool:
+        """Returns True if this is an amplifier response."""
+        return self.is_agent_response and self.agent_response_type == "amplifier"
 
     def to_dict(self) -> dict:
         """Convert post to dictionary for serialization."""

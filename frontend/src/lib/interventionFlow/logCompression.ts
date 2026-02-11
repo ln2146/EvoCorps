@@ -21,7 +21,7 @@ export function compressLogLine(line: string) {
   }
 
   // Amplifier per-agent comment: collapse.
-  if (/^💬\s*🤖\s*(?:Echo|Amplifier)-\d+\b/i.test(s) && /\bcommented:/i.test(s)) {
+  if (/^💬\s*🤖\s*Amplifier-\d+\b/i.test(s) && /\bcommented:/i.test(s)) {
     return '💬 🤖 Amplifier commented'
   }
 

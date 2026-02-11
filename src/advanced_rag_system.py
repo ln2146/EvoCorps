@@ -854,7 +854,7 @@ class AdvancedRAGSystem:
             logger.error(f"❌ Incremental update of query_text FAISS index failed: {type(e).__name__}: {e}")
 
     def _parse_strategic_decision(self, strategic_decision: str) -> str:
-        """Parse key content in strategic_decision: core_counter_argument, leader_instruction, echo_plan"""
+        """Parse key content in strategic_decision: core_counter_argument, leader_instruction, amplifier_plan"""
         try:
             if not strategic_decision or not isinstance(strategic_decision, str):
                 return ""
@@ -892,28 +892,28 @@ class AdvancedRAGSystem:
                     if leader_parts:
                         parsed_parts.append(f"Leader guidance: {'; '.join(leader_parts)}")
                 
-                # 3. echo_plan
-                if "echo_plan" in decision_data:
-                    echo_plan = decision_data["echo_plan"]
-                    echo_parts = []
+                # 3. amplifier_plan
+                if "amplifier_plan" in decision_data:
+                    amplifier_plan = decision_data["amplifier_plan"]
+                    amplifier_parts = []
                     
-                    if "total_agents" in echo_plan:
-                        echo_parts.append(f"Total agents: {echo_plan['total_agents']}")
-                    if "role_distribution" in echo_plan:
-                        role_dist = echo_plan["role_distribution"]
+                    if "total_agents" in amplifier_plan:
+                        amplifier_parts.append(f"Total agents: {amplifier_plan['total_agents']}")
+                    if "role_distribution" in amplifier_plan:
+                        role_dist = amplifier_plan["role_distribution"]
                         role_parts = [f"{k}: {v}" for k, v in role_dist.items()]
-                        echo_parts.append(f"Role distribution: {', '.join(role_parts)}")
-                    if "timing_strategy" in echo_plan:
-                        echo_parts.append(f"Timing strategy: {echo_plan['timing_strategy']}")
-                    if "coordination_notes" in echo_plan:
-                        echo_parts.append(f"Coordination notes: {echo_plan['coordination_notes']}")
-                    if "decision_factors" in echo_plan:
-                        decision_factors = echo_plan["decision_factors"]
+                        amplifier_parts.append(f"Role distribution: {', '.join(role_parts)}")
+                    if "timing_strategy" in amplifier_plan:
+                        amplifier_parts.append(f"Timing strategy: {amplifier_plan['timing_strategy']}")
+                    if "coordination_notes" in amplifier_plan:
+                        amplifier_parts.append(f"Coordination notes: {amplifier_plan['coordination_notes']}")
+                    if "decision_factors" in amplifier_plan:
+                        decision_factors = amplifier_plan["decision_factors"]
                         factor_parts = [f"{k}: {v}" for k, v in decision_factors.items()]
-                        echo_parts.append(f"Decision factors: {', '.join(factor_parts)}")
+                        amplifier_parts.append(f"Decision factors: {', '.join(factor_parts)}")
                     
-                    if echo_parts:
-                        parsed_parts.append(f"Amplifier plan: {'; '.join(echo_parts)}")
+                    if amplifier_parts:
+                        parsed_parts.append(f"Amplifier plan: {'; '.join(amplifier_parts)}")
                 
                 # 4. expected_outcome
                 if "expected_outcome" in decision_data:

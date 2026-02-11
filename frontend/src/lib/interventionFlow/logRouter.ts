@@ -68,7 +68,7 @@ const ROLE_BEFORE_COPY: Record<Role, string> = {
   Analyst: '监测舆情信号，判断是否触发干预',
   Strategist: '生成可执行的平衡策略与投放指令',
   Leader: '生成并发布主导评论，定调讨论方向',
-  Amplifier: '组织回声集群扩散，提升优质观点权重',
+  Amplifier: '组织扩音器集群扩散，提升优质观点权重',
 }
 
 // Option B: 4 fixed rows per role (stable layout; values update as logs arrive).
@@ -109,7 +109,7 @@ const leaderAnchors = [
 ]
 
 const amplifierAnchors = [
-  /Activating (?:Echo|Amplifier) Agent cluster/i,
+  /Activating Amplifier Agent cluster/i,
   /Start parallel execution/i,
   /Bulk like/i,
 ]
@@ -188,10 +188,10 @@ function mapLineToStageIndex(role: Role, cleanLine: string): number | null {
     }
     case 'Amplifier': {
       // 启动集群 -> 生成回应 -> 点赞扩散（点赞扩散与完成信息合并展示）
-      if (/Activating (?:Echo|Amplifier) Agent cluster/i.test(cleanLine) || /(?:Echo|Amplifier) plan:\s*total=/i.test(cleanLine)) return 0
-      if (/Start parallel execution/i.test(cleanLine) || /\d+\s+(?:echo|amplifier) responses generated/i.test(cleanLine) || /(?:Echo|Amplifier) Agent results:/i.test(cleanLine)) return 1
-      if (/(?:Echo|Amplifier)\s+Agents\s+start\s+liking\s+leader comments/i.test(cleanLine)) return 2
-      if (/^\s*💖\s*\d+\s+(?:Echo|Amplifier)\s+Agents\s+liked\s+leader comments/i.test(cleanLine)) return 2
+      if (/Activating Amplifier Agent cluster/i.test(cleanLine) || /Amplifier plan:\s*total=/i.test(cleanLine)) return 0
+      if (/Start parallel execution/i.test(cleanLine) || /\d+\s+amplifier responses generated/i.test(cleanLine) || /Amplifier Agent results:/i.test(cleanLine)) return 1
+      if (/Amplifier\s+Agents\s+start\s+liking\s+leader comments/i.test(cleanLine)) return 2
+      if (/^\s*💖\s*\d+\s+Amplifier\s+Agents\s+liked\s+leader comments/i.test(cleanLine)) return 2
       if (/Workflow completed\s*-\s*effectiveness score:/i.test(cleanLine) || /Base effectiveness score:/i.test(cleanLine)) return 2
       return null
     }
@@ -351,10 +351,10 @@ function applySummaryUpdates(prevRoles: FlowState['roles'], cleanLine: string): 
 
   // Amplifier: echo size + likes + effectiveness.
   {
-    const mTotal = cleanLine.match(/(?:Echo|Amplifier) plan:\s*total=(\d+)/i)
+    const mTotal = cleanLine.match(/Amplifier plan:\s*total=(\d+)/i)
     if (mTotal) update('Amplifier', 0, `Amplifier: ${mTotal[1]}`)
 
-    const mResp = cleanLine.match(/(\d+)\s+(?:echo|amplifier) responses generated/i)
+    const mResp = cleanLine.match(/(\d+)\s+amplifier responses generated/i)
     if (mResp) update('Amplifier', 1, `回应：${mResp[1]}`)
 
     // Like-boosting is not surfaced in the UI (keeps the panel focused on amplification outcome).
@@ -376,7 +376,7 @@ function compressDisplayLine(cleanLine: string) {
   // Suppress placeholder Leader keyword lines; they are misleading and we hide the keyword pill when unknown.
   if (/^Keyword:\s*unknown\s*$/i.test(trimmed)) return ''
   // Suppress internal like-boosting steps in the Amplifier panel.
-  if (/(?:Echo|Amplifier)\s+Agents\s+start\s+liking\s+leader comments/i.test(trimmed)) return ''
+  if (/Amplifier\s+Agents\s+start\s+liking\s+leader comments/i.test(trimmed)) return ''
   if (/successfully liked leader comments/i.test(trimmed)) return ''
   if (/\(total:\s*\d+\s+likes\)/i.test(trimmed)) return ''
 
@@ -393,11 +393,11 @@ function compressDisplayLine(cleanLine: string) {
   if (/^🔍\s*Bulk like method called:/i.test(trimmed)) return ''
   if (/^🔄\s*Adding\s+\d+\s+likes\s+to\s+(?:first|second)\s+leader comment\b/i.test(trimmed)) return ''
 
-  // Normalize "Successfully created N Echo/Amplifier Agents" variants to a single stable UI line.
+  // Normalize "Successfully created N Amplifier Agents" variants to a single stable UI line.
   // Backends may emit both "… (target: N)" and plain variants; we keep only the normalized form.
   {
     const m = trimmed.match(
-      /^✅\s*Successfully created\s+(\d+)\s+(?:Echo|Amplifier)\s+Agents(?:\s*\(target:\s*\d+\))?\s*$/i,
+      /^✅\s*Successfully created\s+(\d+)\s+Amplifier\s+Agents(?:\s*\(target:\s*\d+\))?\s*$/i,
     )
     if (m) return `✅ Successfully created ${m[1]} Amplifier Agents`
   }
@@ -424,24 +424,12 @@ function compressDisplayLine(cleanLine: string) {
     }
   }
 
-  // Normalize older "Echo Agents" phrasing to "Amplifier Agents" in the UI.
-  if (/\bEcho Agents\b/i.test(trimmed)) {
-    return trimmed.replace(/\bEcho Agents\b/gi, 'Amplifier Agents')
-  }
-
-  // Normalize per-agent Echo IDs to Amplifier IDs for the UI.
-  // Example:
-  //   "🤖 Agent echo_007 started" -> "🤖 Agent amplifier_007 started"
-  if (/\bAgent\s+echo_\d+\b/i.test(trimmed)) {
-    return trimmed.replace(/\bAgent\s+echo_(\d+)\b/gi, 'Agent amplifier_$1')
-  }
-
   // Amplifier per-agent comment: keep the body, but normalize the label and hide model name.
   // Example:
-  //   "💬 🤖 Echo-3 (positive_john_133) (gemini-2.0-flash) commented: ..."
+  //   "💬 🤖 Amplifier-3 (positive_john_133) (gemini-2.0-flash) commented: ..."
   // ->"💬 🤖 Amplifier-3 (positive_john_133) commented: ..."
-  if (/^💬\s*🤖\s*(?:Echo|Amplifier)-\d+\b/i.test(trimmed) && /\bcommented:/i.test(trimmed)) {
-    const normalized = trimmed.replace(/^💬\s*🤖\s*(?:Echo|Amplifier)-(\d+)\b/i, '💬 🤖 Amplifier-$1')
+  if (/^💬\s*🤖\s*Amplifier-\d+\b/i.test(trimmed) && /\bcommented:/i.test(trimmed)) {
+    const normalized = trimmed.replace(/^💬\s*🤖\s*Amplifier-(\d+)\b/i, '💬 🤖 Amplifier-$1')
     const withoutModel = normalized.replace(
       /^(💬\s*🤖\s*Amplifier-\d+\s+\([^)]*\))\s+\([^)]*\)\s+commented:/i,
       '$1 commented:',
@@ -459,8 +447,8 @@ function compressDisplayLine(cleanLine: string) {
   if (/^🔄\s*Feedback iteration:/i.test(cleanLine)) return ''
   if (/^✅\s*Post exists:/i.test(cleanLine)) return ''
   if (/^🚨⚖️\s*Start opinion balance intervention system/i.test(cleanLine)) return ''
-  // Suppress fixed echo agent id allocation details (they are internal plumbing; the UI shows count instead).
-  if (/^(?:🔒\s*)?Allocated\s+\d+\s+fixed\s+(?:Echo|Amplifier)\s+Agent\s+IDs:/i.test(cleanLine)) return ''
+  // Suppress fixed agent id allocation details (they are internal plumbing; the UI shows count instead).
+  if (/^(?:🔒\s*)?Allocated\s+\d+\s+fixed\s+Amplifier\s+Agent\s+IDs:/i.test(cleanLine)) return ''
 
   const milestone = toUserMilestone(cleanLine)
   if (milestone) {
@@ -690,7 +678,7 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
     }
     return {
       ...stateAfterStage,
-      amplifierSticky: amplifierSticky || matchesAny(cleanLine, [/Activating (?:Echo|Amplifier) Agent cluster/i]),
+      amplifierSticky: amplifierSticky || matchesAny(cleanLine, [/Activating Amplifier Agent cluster/i]),
       activeRole: nextRole,
       roles: nextRoles,
     }
@@ -711,7 +699,7 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
   if (nextRole === activeRole) {
     const nextRoles = { ...stateAfterStage.roles }
     nextRoles[activeRole] = appendDuringWithCap(nextRoles[activeRole], displayLine, maxDuringLines(activeRole))
-    const nextSticky = amplifierSticky || matchesAny(cleanLine, [/Activating (?:Echo|Amplifier) Agent cluster/i])
+    const nextSticky = amplifierSticky || matchesAny(cleanLine, [/Activating Amplifier Agent cluster/i])
     return { ...stateAfterStage, amplifierSticky: nextSticky, roles: nextRoles }
   }
 
@@ -724,7 +712,7 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
     maxDuringLines(nextRole),
   )
 
-  const nextSticky = amplifierSticky || matchesAny(cleanLine, [/Activating (?:Echo|Amplifier) Agent cluster/i])
+  const nextSticky = amplifierSticky || matchesAny(cleanLine, [/Activating Amplifier Agent cluster/i])
   return {
     ...stateAfterStage,
     activeRole: nextRole,

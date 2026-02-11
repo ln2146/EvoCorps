@@ -155,7 +155,7 @@ class Simulation:
         
         # Get the monitoring interval from the configuration to align with user selection
         opinion_balance_config = self.config.get('opinion_balance_system', {})
-        monitoring_interval_minutes = opinion_balance_config.get('monitoring_interval', 30)
+        monitoring_interval_minutes = opinion_balance_config['monitoring_interval_minutes']
         self.opinion_balance_interval = monitoring_interval_minutes * 60  # Convert to seconds
 
         # Save a copy of the experiment configuration
@@ -650,7 +650,7 @@ class Simulation:
             logging.error(f"Error while waiting for monitor completion: {e}")
 
     async def _parallel_content_generation(self):
-        """Parallel content generation for regular users, malicious bots, and echo agents"""
+        """Parallel content generation for regular users, malicious bots, and amplifier agents"""
         import asyncio
 
         print(f"\n🚀 Launching the parallel content generation system")
@@ -694,17 +694,17 @@ class Simulation:
             malicious_tasks = self._create_malicious_tasks(available_posts)
             tasks.extend(malicious_tasks)
 
-        # 3. Echo agent tasks (if the opinion balance system is enabled)
+        # 3. amplifier agent tasks (if the opinion balance system is enabled)
         if self.opinion_balance_manager and self.opinion_balance_manager.enabled:
-            echo_tasks = self._create_echo_tasks(available_posts)
-            tasks.extend(echo_tasks)
+            amplifier_tasks = self._create_amplifier_tasks(available_posts)
+            tasks.extend(amplifier_tasks)
 
         print(f"📊 Total parallel tasks: {len(tasks)}")
         print(f"   👥 Regular user tasks: {len(normal_user_tasks)}")
         if self.malicious_bot_manager and self.malicious_bot_manager.enabled:
             print(f"   🔥 Malicious bot tasks: {len([t for t in tasks if 'malicious' in str(t)])}")
         if self.opinion_balance_manager and self.opinion_balance_manager.enabled:
-            print(f"   🔄 Echo agent tasks: {len([t for t in tasks if 'echo' in str(t)])}")
+            print(f"   🔄 amplifier agent tasks: {len([t for t in tasks if 'amplifier' in str(t)])}")
 
         # Execute all tasks in parallel
         if tasks:
@@ -858,7 +858,7 @@ class Simulation:
         print(f"   📊 Live attack mechanism deprecated; now execute batch attacks at the end of each timestep")
         return tasks
 
-    def _create_echo_tasks(self, available_posts):
+    def _create_amplifier_tasks(self, available_posts):
         """Opinion balance system - real-time intervention disabled, only scheduled monitoring remains"""
         tasks = []
 

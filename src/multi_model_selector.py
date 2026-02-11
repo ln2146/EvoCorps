@@ -47,7 +47,7 @@ class MultiModelSelector:
         "analyst": DEFAULT_POOL,
         "strategist": DEFAULT_POOL,
         "leader": DEFAULT_POOL,
-        "echo": DEFAULT_POOL,
+        "amplifier": DEFAULT_POOL,
         # System roles
         "memory": DEFAULT_POOL,
         "fact_checker": DEFAULT_POOL,
@@ -61,9 +61,9 @@ class MultiModelSelector:
 
     # Backwards-compatible aliases used elsewhere in this repo.
     AVAILABLE_MODELS = ROLE_MODEL_POOLS["regular"]
-    MALICIOUS_ECHO_MODELS = ROLE_MODEL_POOLS["malicious"]
+    MALICIOUS_amplifier_MODELS = ROLE_MODEL_POOLS["malicious"]
     FALLBACK_PRIORITY = ROLE_MODEL_POOLS["regular"]
-    MALICIOUS_ECHO_FALLBACK = ROLE_MODEL_POOLS["malicious"]
+    MALICIOUS_amplifier_FALLBACK = ROLE_MODEL_POOLS["malicious"]
     
     def __init__(self):
         self.usage_stats = {model: 0 for model in self.ALL_MODELS}
@@ -277,10 +277,10 @@ class MultiModelSelector:
         self.usage_stats[selected] += 1
         return selected
 
-    def select_malicious_echo_model(self) -> str:
-        """为恶意水军和echo_groupselect模型"""
+    def select_malicious_amplifier_model(self) -> str:
+        """为恶意水军和amplifier_groupselect模型"""
         # get健康的恶意水军专用模型
-        pool = self.get_model_pool("echo")
+        pool = self.get_model_pool("amplifier")
         healthy_malicious_models = [model for model in pool if self.is_model_healthy(model)]
 
         if not healthy_malicious_models:

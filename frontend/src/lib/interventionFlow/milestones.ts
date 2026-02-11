@@ -259,30 +259,30 @@ export function toUserMilestone(cleanLine: string): string | null {
   }
 
   // Amplifier
-  if (/Activating (?:Echo|Amplifier) Agent cluster/i.test(s)) return '扩音器：启动回声集群'
+  if (/Activating Amplifier Agent cluster/i.test(s)) return '扩音器：启动集群'
   {
     const m = s.match(/Start parallel execution of\s+(\d+)\s+agent tasks/i)
     if (m) return `扩音器：并行执行（${m[1]}）`
   }
   {
-    const m = s.match(/(?:Echo|Amplifier) Agent results:\s*(\d+)\s+succeeded,\s*(\d+)\s+failed/i)
+    const m = s.match(/Amplifier Agent results:\s*(\d+)\s+succeeded,\s*(\d+)\s+failed/i)
     if (m) return `扩音器：执行结果（成功 ${m[1]} / 失败 ${m[2]}）`
   }
   {
-    const m = s.match(/(?:Echo|Amplifier) plan:\s*total=(\d+)/i)
+    const m = s.match(/Amplifier plan:\s*total=(\d+)/i)
     if (m) return `扩音器：集群规模（${m[1]}）`
   }
   {
-    const m = s.match(/(\d+)\s+(?:echo|amplifier) responses generated/i)
+    const m = s.match(/(\d+)\s+amplifier responses generated/i)
     if (m) return `扩音器：生成回应（${m[1]}）`
   }
   {
     // Platform "like boosting" is internal plumbing and should not be shown in the UI.
     if (/\(total:\s*\d+\s+likes\)/i.test(s)) return null
-    if (/(?:Echo|Amplifier)\s+Agents\s+start\s+liking\s+leader comments/i.test(s)) return null
+    if (/Amplifier\s+Agents\s+start\s+liking\s+leader comments/i.test(s)) return null
     if (/successfully liked leader comments/i.test(s)) return null
     {
-      const m = s.match(/^\s*💖\s*(\d+)\s+(?:Echo|Amplifier)\s+Agents\s+liked\s+leader comments/i)
+      const m = s.match(/^\s*💖\s*(\d+)\s+Amplifier\s+Agents\s+liked\s+leader comments/i)
       if (m) return `扩音器：点赞扩散（${m[1]}）`
     }
   }

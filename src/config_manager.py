@@ -56,7 +56,7 @@ class ConfigManager:
                 "auto_adjustment_enabled": True,
                 "adjustment_sensitivity": "medium"
             },
-            "echo_agents": {
+            "amplifier_agents": {
                 "count": 5,
                 "persona_source": "positive_personas_database.json",
                 "diversity_mode": "random",
