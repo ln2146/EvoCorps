@@ -769,24 +769,24 @@ class IntelligentLearningSystem:
                             "target_audience": leader_inst.get("target_audience", "general")
                         })
             
-            # Extract actions from echo_plan
-            if "echo_plan" in decision_data:
-                echo_plan = decision_data["echo_plan"]
-                if "role_distribution" in echo_plan:
-                    role_dist = echo_plan["role_distribution"]
+            # Extract actions from amplifier_plan
+            if "amplifier_plan" in decision_data:
+                amplifier_plan = decision_data["amplifier_plan"]
+                if "role_distribution" in amplifier_plan:
+                    role_dist = amplifier_plan["role_distribution"]
                     for role, count in role_dist.items():
                         actions.append({
-                            "type": "echo_agent",
+                            "type": "amplifier_agent",
                             "description": f"Deploy {count} {role} agents",
                             "role": role,
                             "count": count,
-                            "timing_strategy": echo_plan.get("timing_strategy", "immediate")
+                            "timing_strategy": amplifier_plan.get("timing_strategy", "immediate")
                         })
                 
-                if "coordination_notes" in echo_plan:
+                if "coordination_notes" in amplifier_plan:
                     actions.append({
                         "type": "coordination",
-                        "description": echo_plan["coordination_notes"],
+                        "description": amplifier_plan["coordination_notes"],
                         "category": "coordination"
                     })
             
@@ -832,7 +832,7 @@ class IntelligentLearningSystem:
             "recommended_actions": [
                 {"type": "analyze_content", "description": "Analyze content sentiment and extremity"},
                 {"type": "generate_balanced_response", "description": "Generate a balanced response"},
-                {"type": "deploy_echo_agents", "description": "Deploy echo agents"}
+                {"type": "deploy_amplifier_agents", "description": "Deploy amplifier agents"}
             ],
             "expected_success_rate": 0.6,
             "confidence": 0.5,

@@ -264,8 +264,8 @@ class OpinionBalanceManager:
             if leader_content and leader_content.get("success", False):
                 leader_post_id = leader_content.get("comment_id") or None
 
-            echo_responses = phase2.get("echo_responses", [])
-            successful_responses = [r for r in echo_responses if r.get("success")]
+            amplifier_responses = phase2.get("amplifier_responses", [])
+            successful_responses = [r for r in amplifier_responses if r.get("success")]
 
             effectiveness_score = phase3.get("effectiveness_score", 0)
 
@@ -283,7 +283,7 @@ class OpinionBalanceManager:
                 "success": True,
                 "intervention_id": intervention_id,
                 "leader_post_id": leader_post_id,
-                "echo_responses_count": len(successful_responses),
+                "amplifier_responses_count": len(successful_responses),
                 "total_responses": len(successful_responses) + (1 if leader_post_id else 0),
                 "effectiveness_score": effectiveness_score,
                 "coordination_system": "SimpleCoordinationSystem"
@@ -294,7 +294,7 @@ class OpinionBalanceManager:
             return {"success": False, "error": str(e)}
 
     
-    def _create_agent_post(self, content: str, agent_role: str, original_post_id: int, response_type: str = "echo") -> Optional[int]:
+    def _create_agent_post(self, content: str, agent_role: str, original_post_id: int, response_type: str = "amplifier") -> Optional[int]:
         """Create a post that represents an agent response."""
         try:
             cursor = self.conn.cursor()
@@ -489,7 +489,7 @@ class OpinionBalanceManager:
 
         # Use a user- prefix to masquerade as a regular user
         import hashlib
-        seed = f"echo_{agent_role}_{datetime.now().strftime('%Y%m%d')}"
+        seed = f"amplifier_{agent_role}_{datetime.now().strftime('%Y%m%d')}"
         hash_obj = hashlib.md5(seed.encode())
         user_suffix = hash_obj.hexdigest()[:6]
         agent_user_id = f"user-{user_suffix}"
@@ -553,11 +553,11 @@ class OpinionBalanceManager:
             else:
                 print(f"      ❌ Leader response failed: +0.0 points")
             
-            # 2. Echo Agent response count (0-4 points)
-            echo_count = len(successful_responses)
-            echo_score = min(4.0, echo_count * 0.8)  # 0.8 points per successful response, max 4 points
-            score += echo_score
-            print(f"      📊 Echo responses ({echo_count}): +{echo_score:.1f} points")
+            # 2. amplifier Agent response count (0-4 points)
+            amplifier_count = len(successful_responses)
+            amplifier_score = min(4.0, amplifier_count * 0.8)  # 0.8 points per successful response, max 4 points
+            score += amplifier_score
+            print(f"      📊 amplifier responses ({amplifier_count}): +{amplifier_score:.1f} points")
             
             # 3. Content quality evaluation (0-2 points)
             quality_score = 0.0
@@ -574,7 +574,7 @@ class OpinionBalanceManager:
             print(f"      📝 Content quality: +{quality_score:.1f} points")
             
             # 4. System integrity (0-1 point)
-            system_score = 1.0 if (leader_post_id or echo_count > 0) else 0.0
+            system_score = 1.0 if (leader_post_id or amplifier_count > 0) else 0.0
             score += system_score
             print(f"      ⚙️ System integrity: +{system_score:.1f} points")
             

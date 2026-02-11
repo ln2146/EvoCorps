@@ -17,14 +17,19 @@ describe('compressLogLine', () => {
     expect(compressLogLine(raw)).toBe('💬 👑 Leader comment posted (1)')
   })
 
-  it('shortens echo per-agent comments into a single category line', () => {
-    const raw = "💬 🤖 Echo-12 (positive_david_180) (deepseek-chat) commented: That's a thoughtful analysis..."
+  it('shortens Amplifier per-agent comments into a single category line', () => {
+    const raw = "💬 🤖 Amplifier-12 (positive_david_180) (deepseek-chat) commented: That's a thoughtful analysis..."
     expect(compressLogLine(raw)).toBe('💬 🤖 Amplifier commented')
+  })
+
+  it('does not collapse Echo per-agent comments when they appear', () => {
+    const raw = "💬 🤖 Echo-12 (positive_david_180) commented: That's a thoughtful analysis..."
+    expect(compressLogLine(raw)).toBe(raw)
   })
 })
 
 describe('pushCompressedLine', () => {
-  it('aggregates consecutive echo comments and caps at 10 lines', () => {
+  it('aggregates consecutive Amplifier comments and caps at 10 lines', () => {
     const lines: string[] = []
     let next = lines
     for (let i = 0; i < 12; i++) {

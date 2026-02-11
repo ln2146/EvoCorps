@@ -149,8 +149,8 @@ class ScenarioExportManager:
                 selected_model = db_model
             else:
                 # If the comments table lacks agent_type info, infer from the author_id pattern
-                if author_id.startswith("echo_"):
-                    agent_type = "echo_agent"
+                if author_id.startswith("amplifier_"):
+                    agent_type = "amplifier_agent"
                     selected_model = default_model
                 elif author_id.startswith("leader_agent") or "leader_agent" in author_id:
                     agent_type = "leader_agent"
@@ -364,7 +364,7 @@ class ScenarioExportManager:
                         'exported_at': datetime.now().isoformat()
                     })
             else:
-                # Handle regular comments or agent echo responses
+                # Handle regular comments or agent amplifier responses
                 cursor.execute("""
                     SELECT c.*, p.content as post_content, p.author_id as post_author_id
                     FROM comments c

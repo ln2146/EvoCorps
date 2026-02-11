@@ -23,7 +23,7 @@ class AutoExportManager:
 
         # Export file path config - unify under exported_content/data
         self.export_files = {
-            'echo_agents': 'exported_content/data/echo_agents_content.jsonl',
+            'amplifier_agents': 'exported_content/data/amplifier_agents_content.jsonl',
             'integrated': 'exported_content/data/output.jsonl'
         }
 
@@ -52,9 +52,9 @@ class AutoExportManager:
         try:
             cursor = self.conn.cursor()
 
-            # Check Echo Agent
-            if author_id.startswith("echo_"):
-                agent_type = "echo_agent"
+            # Check amplifier Agent
+            if author_id.startswith("amplifier_"):
+                agent_type = "amplifier_agent"
                 # Try to get actual model used from comments
                 cursor.execute("""
                     SELECT selected_model FROM comments
@@ -129,7 +129,7 @@ class AutoExportManager:
         """Load exported record IDs"""
         try:
             # Read exported IDs from existing files
-            for file_path in [self.export_files['echo_agents']]:
+            for file_path in [self.export_files['amplifier_agents']]:
                 if os.path.exists(file_path):
                     with open(file_path, 'r', encoding='utf-8') as f:
                         for line in f:
@@ -196,7 +196,7 @@ class AutoExportManager:
             new_entries_count = 0
             with open(self.export_files['integrated'], 'a', encoding='utf-8') as output_file:
                 # Read and merge new content from all source files
-                for source_file in [self.export_files['echo_agents']]:
+                for source_file in [self.export_files['amplifier_agents']]:
                     if os.path.exists(source_file):
                         with open(source_file, 'r', encoding='utf-8') as f:
                             for line in f:
@@ -224,7 +224,7 @@ class AutoExportManager:
 
         try:
             # Export new content
-            self._export_new_echo_agent_content()
+            self._export_new_amplifier_agent_content()
 
             # Integrate all files into output.jsonl
             self._integrate_all_files()
@@ -234,16 +234,16 @@ class AutoExportManager:
         except Exception as e:
             print(f"⚠️  Auto export failed: {e}")
 
-    def _export_new_echo_agent_content(self):
-        """Export new echo agent content"""
+    def _export_new_amplifier_agent_content(self):
+        """Export new amplifier agent content"""
         # Export new comments
-        new_comments = self._get_new_echo_agent_comments()
+        new_comments = self._get_new_amplifier_agent_comments()
         for comment in new_comments:
-            self._append_to_jsonl(self.export_files['echo_agents'], comment)
+            self._append_to_jsonl(self.export_files['amplifier_agents'], comment)
             self.exported_comments.add(comment['comment_id'])
 
         # Export new posts
-        new_posts = self._get_new_echo_agent_posts()
+        new_posts = self._get_new_amplifier_agent_posts()
         for post in new_posts:
             # Get agent type and model info
             agent_type, selected_model = self._get_agent_info(post['author_id'])
@@ -260,7 +260,7 @@ class AutoExportManager:
                 'selected_model': selected_model,
                 'exported_at': datetime.now().isoformat()
             }
-            self._append_to_jsonl(self.export_files['echo_agents'], post_as_comment)
+            self._append_to_jsonl(self.export_files['amplifier_agents'], post_as_comment)
             self.exported_posts.add(post['post_id'])
 
     def _get_new_normal_user_posts(self) -> List[Dict[str, Any]]:
@@ -270,7 +270,7 @@ class AutoExportManager:
             SELECT post_id, content, author_id, created_at, num_likes, num_shares, num_flags, num_comments, original_post_id, is_news, news_type, status, takedown_timestamp, takedown_reason, fact_check_status, fact_checked_at, is_agent_response, agent_role, agent_response_type, intervention_id, selected_model, agent_type FROM posts
             WHERE is_agent_response = 0 AND is_news = 0
             AND author_id NOT LIKE '%malicious_agent%'
-            AND author_id NOT LIKE '%echo_%'
+            AND author_id NOT LIKE '%amplifier_%'
             AND author_id != 'agentverse_news'
             ORDER BY created_at DESC
         """)
@@ -285,7 +285,7 @@ class AutoExportManager:
             SELECT c.*, p.content as post_content
             FROM comments c LEFT JOIN posts p ON c.post_id = p.post_id
             WHERE c.author_id NOT LIKE '%malicious_agent%'
-            AND c.author_id NOT LIKE '%echo_%'
+            AND c.author_id NOT LIKE '%amplifier_%'
             AND c.comment_id NOT IN (
                 SELECT comment_id FROM malicious_comments WHERE comment_id IS NOT NULL
             )
@@ -390,25 +390,25 @@ class AutoExportManager:
                 new_comments.append(formatted_comment)
         return new_comments
 
-    def _get_new_echo_agent_posts(self) -> List[Dict[str, Any]]:
-        """Get new echo agent posts (not exported)"""
+    def _get_new_amplifier_agent_posts(self) -> List[Dict[str, Any]]:
+        """Get new amplifier agent posts (not exported)"""
         cursor = self.conn.cursor()
         cursor.execute("""
             SELECT post_id, content, author_id, created_at, num_likes, num_shares, num_flags, num_comments, original_post_id, is_news, news_type, status, takedown_timestamp, takedown_reason, fact_check_status, fact_checked_at, is_agent_response, agent_role, agent_response_type, intervention_id, selected_model, agent_type FROM posts
-            WHERE author_id LIKE '%echo_%'
+            WHERE author_id LIKE '%amplifier_%'
             ORDER BY created_at DESC
         """)
         all_posts = [dict(row) for row in cursor.fetchall()]
         # Return only unexported posts
         return [post for post in all_posts if post['post_id'] not in self.exported_posts]
 
-    def _get_new_echo_agent_comments(self) -> List[Dict[str, Any]]:
-        """Get new echo agent comments (not exported)"""
+    def _get_new_amplifier_agent_comments(self) -> List[Dict[str, Any]]:
+        """Get new amplifier agent comments (not exported)"""
         cursor = self.conn.cursor()
         cursor.execute("""
             SELECT c.*, p.content as post_content
             FROM comments c LEFT JOIN posts p ON c.post_id = p.post_id
-            WHERE c.author_id LIKE '%echo_%'
+            WHERE c.author_id LIKE '%amplifier_%'
             ORDER BY c.created_at DESC
         """)
         all_comments = [dict(row) for row in cursor.fetchall()]
@@ -467,7 +467,7 @@ class AutoExportManager:
             SELECT c.*, p.content as post_content
             FROM comments c LEFT JOIN posts p ON c.post_id = p.post_id
             WHERE c.author_id NOT LIKE '%malicious_agent%'
-            AND c.author_id NOT LIKE '%echo_%'
+            AND c.author_id NOT LIKE '%amplifier_%'
             AND c.comment_id NOT IN (
                 SELECT comment_id FROM malicious_comments WHERE comment_id IS NOT NULL
             )
@@ -505,8 +505,8 @@ class AutoExportManager:
         
         return malicious_comments
     
-    def _get_echo_agent_posts(self) -> List[Dict[str, Any]]:
-        """Get echo group posts"""
+    def _get_amplifier_agent_posts(self) -> List[Dict[str, Any]]:
+        """Get amplifier group posts"""
         cursor = self.conn.cursor()
         cursor.execute("""
             SELECT post_id, content, author_id, created_at, num_likes, num_shares, num_flags, num_comments, original_post_id, is_news, news_type, status, takedown_timestamp, takedown_reason, fact_check_status, fact_checked_at, is_agent_response, agent_role, agent_response_type, intervention_id, selected_model, agent_type FROM posts
@@ -516,13 +516,13 @@ class AutoExportManager:
         """)
         return [dict(row) for row in cursor.fetchall()]
     
-    def _get_echo_agent_comments(self) -> List[Dict[str, Any]]:
-        """Get echo group comments"""
+    def _get_amplifier_agent_comments(self) -> List[Dict[str, Any]]:
+        """Get amplifier group comments"""
         cursor = self.conn.cursor()
         cursor.execute("""
             SELECT c.*, p.content as post_content
             FROM comments c LEFT JOIN posts p ON c.post_id = p.post_id
-            WHERE c.author_id LIKE '%echo_%'
+            WHERE c.author_id LIKE '%amplifier_%'
             ORDER BY c.created_at DESC
         """)
         return [dict(row) for row in cursor.fetchall()]
@@ -602,7 +602,7 @@ class AutoExportManager:
                     logging.error(f"Error processing malicious comment data: {e}, data: {dict(malicious_row)}")
                     return
             else:
-                # Normal comment or echo agent comment
+                # Normal comment or amplifier agent comment
                 cursor.execute("""
                     SELECT c.*, p.content as post_content, p.author_id as post_author_id
                     FROM comments c
@@ -642,8 +642,8 @@ class AutoExportManager:
                 }
 
                 # Determine type based on author_id
-                if 'echo_' in comment["author_id"]:
-                    self._append_to_jsonl(self.export_files['echo_agents'], formatted_comment)
+                if 'amplifier_' in comment["author_id"]:
+                    self._append_to_jsonl(self.export_files['amplifier_agents'], formatted_comment)
 
             # Record exported
             self.exported_comments.add(comment_id)

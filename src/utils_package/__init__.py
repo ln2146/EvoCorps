@@ -10,7 +10,7 @@ try:
     from .persona_loader import (
         PersonaLoader,
         persona_loader,
-        load_echo_agent_personas,
+        load_amplifier_agent_personas,
         load_regular_user_personas,
         load_malicious_agent_personas
     )
@@ -37,7 +37,7 @@ if PERSONA_LOADER_AVAILABLE:
     __all__.extend([
         'PersonaLoader',
         'persona_loader',
-        'load_echo_agent_personas',
+        'load_amplifier_agent_personas',
         'load_regular_user_personas',
         'load_malicious_agent_personas'
     ])

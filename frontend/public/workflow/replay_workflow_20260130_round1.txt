@@ -116,16 +116,16 @@ Please analyze the opinion tendency of this post and whether intervention is nee
 2026-01-30 23:22:30,766 - INFO - 🎯 Target post: post-f053ef
 2026-01-30 23:22:30,923 - INFO - 💬 Second leader comment ID: comment-0cd2c7
 2026-01-30 23:22:30,923 - INFO - 🎯 Target post: post-f053ef
-2026-01-30 23:22:30,924 - INFO - ⚖️ Activating Echo Agent cluster...
-2026-01-30 23:22:30,924 - INFO -   📋 Echo plan: total=12, role distribution={'balanced_moderates': '4', 'technical_experts': '3', 'community_voices': '3', 'fact_checkers': '2'}
-2026-01-30 23:22:30,924 - INFO -   📋 Applying strategist echo instructions: 7 detailed instructions
+2026-01-30 23:22:30,924 - INFO - ⚖️ Activating amplifier Agent cluster...
+2026-01-30 23:22:30,924 - INFO -   📋 amplifier plan: total=12, role distribution={'balanced_moderates': '4', 'technical_experts': '3', 'community_voices': '3', 'fact_checkers': '2'}
+2026-01-30 23:22:30,924 - INFO -   📋 Applying strategist amplifier instructions: 7 detailed instructions
 2026-01-30 23:22:30,924 - INFO -   🎯 Coordination strategy: Measured
-2026-01-30 23:22:30,924 - INFO -   🎭 First intervention needed, creating Echo Agents...
+2026-01-30 23:22:30,924 - INFO -   🎭 First intervention needed, creating amplifier Agents...
 2026-01-30 23:22:30,931 - INFO -   📋 Successfully read 200 positive roles
-2026-01-30 23:22:30,931 - INFO -   🔒 Allocated 12 fixed Echo Agent IDs: ['echo_000', 'echo_001', 'echo_002', 'echo_003', 'echo_004']...
+2026-01-30 23:22:30,931 - INFO -   🔒 Allocated 12 fixed amplifier Agent IDs: ['amplifier_000', 'amplifier_001', 'amplifier_002', 'amplifier_003', 'amplifier_004']...
 2026-01-30 23:22:30,932 - INFO - ✅ Shared client pool initialized, model: gemini-2.0-flash
-2026-01-30 23:22:30,932 - INFO -   ✅ Successfully created 12 Echo Agents (target: 12)
-2026-01-30 23:22:30,932 - INFO -   ✅ Successfully created 12 Echo Agents
+2026-01-30 23:22:30,932 - INFO -   ✅ Successfully created 12 amplifier Agents (target: 12)
+2026-01-30 23:22:30,932 - INFO -   ✅ Successfully created 12 amplifier Agents
 2026-01-30 23:22:30,932 - INFO -   🧠 Use role allocation strategy: {'balanced_moderates': '4', 'technical_experts': '3', 'community_voices': '3', 'fact_checkers': '2'}
 2026-01-30 23:22:30,932 - INFO - 📚 Few-shot examples assigned to all agents
 2026-01-30 23:22:30,932 - INFO -      - balanced_moderates: assigned 4 agents
@@ -133,65 +133,65 @@ Please analyze the opinion tendency of this post and whether intervention is nee
 2026-01-30 23:22:30,933 - INFO -      - community_voices: assigned 3 agents
 2026-01-30 23:22:30,933 - INFO -      - fact_checkers: assigned 2 agents
 2026-01-30 23:22:30,933 - INFO - 🎯 Agent role assignment complete: 12 agents assigned roles
-2026-01-30 23:22:30,933 - INFO -   ✅ Selected 12 Echo Agents for execution
+2026-01-30 23:22:30,933 - INFO -   ✅ Selected 12 amplifier Agents for execution
 2026-01-30 23:22:30,933 - INFO -   ⏱️ Using traditional parallel execution strategy
 2026-01-30 23:22:30,933 - INFO -   🚀 Start parallel execution of 12 agent tasks...
-2026-01-30 23:22:30,933 - INFO - 🤖 Agent echo_000 (74 Researcher) start generating response - enhanced format, instruction: diplomatic discussion
-2026-01-30 23:22:33,067 - INFO - 🤖 Agent echo_001 (54 engineering_technologist_or_technician) start generating response - enhanced format, instruction: general support
-2026-01-30 23:22:34,734 - INFO - 🤖 Agent echo_002 (70 not_in_workforce) start generating response - enhanced format, instruction: general support
-2026-01-30 23:22:36,169 - INFO - 🤖 Agent echo_003 (63 helper_production_worker) start generating response - enhanced format, instruction: general support
-2026-01-30 23:22:39,410 - INFO - 🤖 Agent echo_004 (29 construction_laborer) start generating response - enhanced format, instruction: general support
-2026-01-30 23:22:40,577 - INFO - 🤖 Agent echo_005 (22 personal_financial_advisor) start generating response - enhanced format, instruction: general support
-2026-01-30 23:22:42,259 - INFO - 🤖 Agent echo_006 (92 Police Officer) start generating response - enhanced format, instruction: general support
-2026-01-30 23:22:45,442 - INFO - 🤖 Agent echo_007 (57 miscellaneous_agricultural_worker) start generating response - enhanced format, instruction: general support
-2026-01-30 23:22:47,304 - INFO - 🤖 Agent echo_008 (63 Nurse) start generating response - enhanced format, instruction: general support
-2026-01-30 23:22:48,442 - INFO - 🤖 Agent echo_009 (39 laborer_or_freight_stock_or_material_mover) start generating response - enhanced format, instruction: general support
-2026-01-30 23:22:49,580 - INFO - 🤖 Agent echo_010 (20 Nurse) start generating response - enhanced format, instruction: general support
-2026-01-30 23:22:50,806 - INFO - 🤖 Agent echo_011 (42 Psychologist) start generating response - enhanced format, instruction: general support
-2026-01-30 23:22:52,350 - INFO - 📊 Echo Agent results: 12 succeeded, 0 failed
-2026-01-30 23:22:52,350 - INFO - 📊 Echo Agent results: 12 succeeded, 0 failed
-2026-01-30 23:22:52,350 - INFO -   ✅ 12 echo responses generated
-2026-01-30 23:22:52,351 - INFO - 💬 🤖 Echo-1 (positive_pamela_050) (gemini-2.0-flash) commented: Well said. Respected folks in town see it as protecting health, not invading privacy. Let's keep the focus on facts.
+2026-01-30 23:22:30,933 - INFO - 🤖 Agent amplifier_000 (74 Researcher) start generating response - enhanced format, instruction: diplomatic discussion
+2026-01-30 23:22:33,067 - INFO - 🤖 Agent amplifier_001 (54 engineering_technologist_or_technician) start generating response - enhanced format, instruction: general support
+2026-01-30 23:22:34,734 - INFO - 🤖 Agent amplifier_002 (70 not_in_workforce) start generating response - enhanced format, instruction: general support
+2026-01-30 23:22:36,169 - INFO - 🤖 Agent amplifier_003 (63 helper_production_worker) start generating response - enhanced format, instruction: general support
+2026-01-30 23:22:39,410 - INFO - 🤖 Agent amplifier_004 (29 construction_laborer) start generating response - enhanced format, instruction: general support
+2026-01-30 23:22:40,577 - INFO - 🤖 Agent amplifier_005 (22 personal_financial_advisor) start generating response - enhanced format, instruction: general support
+2026-01-30 23:22:42,259 - INFO - 🤖 Agent amplifier_006 (92 Police Officer) start generating response - enhanced format, instruction: general support
+2026-01-30 23:22:45,442 - INFO - 🤖 Agent amplifier_007 (57 miscellaneous_agricultural_worker) start generating response - enhanced format, instruction: general support
+2026-01-30 23:22:47,304 - INFO - 🤖 Agent amplifier_008 (63 Nurse) start generating response - enhanced format, instruction: general support
+2026-01-30 23:22:48,442 - INFO - 🤖 Agent amplifier_009 (39 laborer_or_freight_stock_or_material_mover) start generating response - enhanced format, instruction: general support
+2026-01-30 23:22:49,580 - INFO - 🤖 Agent amplifier_010 (20 Nurse) start generating response - enhanced format, instruction: general support
+2026-01-30 23:22:50,806 - INFO - 🤖 Agent amplifier_011 (42 Psychologist) start generating response - enhanced format, instruction: general support
+2026-01-30 23:22:52,350 - INFO - 📊 amplifier Agent results: 12 succeeded, 0 failed
+2026-01-30 23:22:52,350 - INFO - 📊 amplifier Agent results: 12 succeeded, 0 failed
+2026-01-30 23:22:52,350 - INFO -   ✅ 12 amplifier responses generated
+2026-01-30 23:22:52,351 - INFO - 💬 🤖 amplifier-1 (positive_pamela_050) (gemini-2.0-flash) commented: Well said. Respected folks in town see it as protecting health, not invading privacy. Let's keep the focus on facts.
 
-2026-01-30 23:22:52,351 - INFO - 💬 🤖 Echo-2 (positive_jason_128) (gemini-2.0-flash) commented: That makes sense. A balanced perspective, focusing on evidence, is always worthwhile. 👍
+2026-01-30 23:22:52,351 - INFO - 💬 🤖 amplifier-2 (positive_jason_128) (gemini-2.0-flash) commented: That makes sense. A balanced perspective, focusing on evidence, is always worthwhile. 👍
 
-2026-01-30 23:22:52,351 - INFO - 💬 🤖 Echo-3 (positive_john_133) (gemini-2.0-flash) commented: That makes sense. Worth considering the practical side and less dramatic options first. The goal is a healthy community!
+2026-01-30 23:22:52,351 - INFO - 💬 🤖 amplifier-3 (positive_john_133) (gemini-2.0-flash) commented: That makes sense. Worth considering the practical side and less dramatic options first. The goal is a healthy community!
 
-2026-01-30 23:22:52,351 - INFO - 💬 🤖 Echo-4 (positive_a_reserved_182) (gemini-2.0-flash) commented: That makes sense. Mass surveillance seems a bit extreme without solid proof. Worth considering the intent behind health checks, too.
+2026-01-30 23:22:52,351 - INFO - 💬 🤖 amplifier-4 (positive_a_reserved_182) (gemini-2.0-flash) commented: That makes sense. Mass surveillance seems a bit extreme without solid proof. Worth considering the intent behind health checks, too.
 
-2026-01-30 23:22:52,351 - INFO - 💬 🤖 Echo-5 (positive_andre_122) (gemini-2.0-flash) commented: Worth considering... Plus, easier ways to snoop, right? 😉 I'm with ya, gotta see proof before jumping to conclusions.
+2026-01-30 23:22:52,351 - INFO - 💬 🤖 amplifier-5 (positive_andre_122) (gemini-2.0-flash) commented: Worth considering... Plus, easier ways to snoop, right? 😉 I'm with ya, gotta see proof before jumping to conclusions.
 
-2026-01-30 23:22:52,351 - INFO - 💬 🤖 Echo-6 (positive_phillip_160) (gemini-2.0-flash) commented: That makes sense. A measured perspective is definitely worth considering. Focusing on verifiable facts is key. 👍
+2026-01-30 23:22:52,351 - INFO - 💬 🤖 amplifier-6 (positive_phillip_160) (gemini-2.0-flash) commented: That makes sense. A measured perspective is definitely worth considering. Focusing on verifiable facts is key. 👍
 
-2026-01-30 23:22:52,351 - INFO - 💬 🤖 Echo-7 (positive_joshua_038) (gemini-2.0-flash) commented: I agree. Worth considering the real purpose, and looking at the facts. Hopefully, it's for the community's benefit.
+2026-01-30 23:22:52,351 - INFO - 💬 🤖 amplifier-7 (positive_joshua_038) (gemini-2.0-flash) commented: I agree. Worth considering the real purpose, and looking at the facts. Hopefully, it's for the community's benefit.
 
-2026-01-30 23:22:52,351 - INFO - 💬 🤖 Echo-8 (positive_janiqua_136) (gemini-2.0-flash) commented: That makes sense. Seems like folks are jumping to conclusions without all the facts.
+2026-01-30 23:22:52,351 - INFO - 💬 🤖 amplifier-8 (positive_janiqua_136) (gemini-2.0-flash) commented: That makes sense. Seems like folks are jumping to conclusions without all the facts.
 
-2026-01-30 23:22:52,352 - INFO - 💬 🤖 Echo-9 (positive_tania_044) (gemini-2.0-flash) commented: That makes sense. Early detection would be a blessing. Worth considering the intent behind the health checks.
+2026-01-30 23:22:52,352 - INFO - 💬 🤖 amplifier-9 (positive_tania_044) (gemini-2.0-flash) commented: That makes sense. Early detection would be a blessing. Worth considering the intent behind the health checks.
 
-2026-01-30 23:22:52,352 - INFO - 💬 🤖 Echo-10 (positive_alison_166) (gemini-2.0-flash) commented: That makes sense. Weighing the benefits vs. the fear is key. Early detection could really help our community.
+2026-01-30 23:22:52,352 - INFO - 💬 🤖 amplifier-10 (positive_alison_166) (gemini-2.0-flash) commented: That makes sense. Weighing the benefits vs. the fear is key. Early detection could really help our community.
 
-2026-01-30 23:22:52,352 - INFO - 💬 🤖 Echo-11 (positive_anna_nicole_019) (gemini-2.0-flash) commented: I agree. That makes sense to me. A secret DNA database seems like a big leap without solid proof.
+2026-01-30 23:22:52,352 - INFO - 💬 🤖 amplifier-11 (positive_anna_nicole_019) (gemini-2.0-flash) commented: I agree. That makes sense to me. A secret DNA database seems like a big leap without solid proof.
 
-2026-01-30 23:22:52,352 - INFO - 💬 🤖 Echo-12 (positive_ronald_018) (gemini-2.0-flash) commented: That makes sense. It's worth considering the practical side and looking for verifiable evidence.
+2026-01-30 23:22:52,352 - INFO - 💬 🤖 amplifier-12 (positive_ronald_018) (gemini-2.0-flash) commented: That makes sense. It's worth considering the practical side and looking for verifiable evidence.
 
-2026-01-30 23:22:52,352 - INFO - 💖 Echo Agents start liking leader comments...
+2026-01-30 23:22:52,352 - INFO - 💖 amplifier Agents start liking leader comments...
 2026-01-30 23:22:53,209 - INFO -   📊 Leader comment comment-606ac9 current likes: 12
-2026-01-30 23:22:53,210 - INFO -   ✅ 12 Echo Agents successfully liked leader comments
-2026-01-30 23:22:53,210 - INFO - 💖 12 Echo Agents liked leader comments
-2026-01-30 23:22:53,210 - INFO -   📊 Prepare bulk likes: echo_agent_count=12, will add 240 likes
+2026-01-30 23:22:53,210 - INFO -   ✅ 12 amplifier Agents successfully liked leader comments
+2026-01-30 23:22:53,210 - INFO - 💖 12 amplifier Agents liked leader comments
+2026-01-30 23:22:53,210 - INFO -   📊 Prepare bulk likes: amplifier_agent_count=12, will add 240 likes
 2026-01-30 23:22:53,210 - INFO -   🔄 Starting bulk like operation...
-2026-01-30 23:22:53,210 - INFO -   🔍 Bulk like method called: leader_comment_id_1=comment-606ac9, leader_comment_id_2=comment-0cd2c7, echo_agent_count=12
+2026-01-30 23:22:53,210 - INFO -   🔍 Bulk like method called: leader_comment_id_1=comment-606ac9, leader_comment_id_2=comment-0cd2c7, amplifier_agent_count=12
 2026-01-30 23:22:53,210 - INFO -   📊 Calculated bulk likes: 12 * 20 = 240
 2026-01-30 23:22:53,210 - INFO -   🔄 Starting bulk like database operation...
 2026-01-30 23:22:53,210 - INFO -   🔄 Adding 240 likes to first leader comment comment-606ac9...
 2026-01-30 23:22:53,239 - INFO -   📊 First leader comment likes before: 12
 2026-01-30 23:22:53,304 - INFO -   📊 First leader comment likes after: 252 (added 240)
-2026-01-30 23:22:53,305 - INFO -   ✅ Added 240 likes to first leader comment comment-606ac9 (echo_agent_count: 12)
+2026-01-30 23:22:53,305 - INFO -   ✅ Added 240 likes to first leader comment comment-606ac9 (amplifier_agent_count: 12)
 2026-01-30 23:22:53,306 - INFO -   🔄 Adding 240 likes to second leader comment comment-0cd2c7...
 2026-01-30 23:22:53,336 - INFO -   📊 Second leader comment likes before: 12
 2026-01-30 23:22:53,392 - INFO -   📊 Second leader comment likes after: 252 (added 240)
-2026-01-30 23:22:53,393 - INFO -   ✅ Added 240 likes to second leader comment comment-0cd2c7 (echo_agent_count: 12)
+2026-01-30 23:22:53,393 - INFO -   ✅ Added 240 likes to second leader comment comment-0cd2c7 (amplifier_agent_count: 12)
 2026-01-30 23:22:53,393 - INFO -   📊 Bulk like operation result: 2
 2026-01-30 23:22:53,393 - INFO -   💖 Successfully added 240 likes to each of 2 leader comments (total: 480 likes)
 2026-01-30 23:22:53,393 - INFO -   ✅ Bulk like operation completed
