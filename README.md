@@ -162,39 +162,19 @@ pip install -r requirements.txt
 ```
 
 ### 3. 配置 API 与选择模型
+
 在 `src/keys.py`文件中根据提示填写对应的 API-KEY 与 BASE-URL。并在`src/multi_model_selector.py`中配置相应的模型。
 （示例：在`src/keys.py`配置deepseek的API-KEY 与 BASE-URL，那么在`src/multi_model_selector.py`中模型可选择DEFAULT_POOL = ["deepseek-chat"]；在`src/keys.py`配置gemini的API-KEY 与 BASE-URL，那么在`src/multi_model_selector.py`中模型可选择DEFAULT_POOL = ["gemini-2.0-flash"]；embedding模型可选择OpenAI的text-embedding-3-large、智谱的embedding-3等）
 
-### 4. 系统运行步骤
-- 开启数据库服务
-```bash
-# 新建终端
-python src/start_database_service.py
-```
-
-- 启动主程序，按照终端提示信息选择运行场景
-```bash
-# 新建终端
-python src/main.py
-```
-
-- 如果需要使用舆论平衡系统,可按照提示执行以下操作
-```bash
-# 新建终端
-python src/opinion_balance_launcher.py
-# 输入start，启动监控
-start
-# 输入auto-status，实时打印行动的日志
-auto-status
-```
-
-### 5. 启动前端可视化界面
+### 4. 启动后端API
 
 - 启动后端API服务
 ```bash
 # 新建终端
 python frontend_api.py
 ```
+
+### 5. 启动前端可视化界面
 
 - 启动前端开发服务器
 ```bash
