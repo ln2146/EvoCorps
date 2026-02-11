@@ -1294,7 +1294,7 @@ function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
       </div>
       <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={displayData} margin={{ top: 5, right: 20, left: 5, bottom: 5 }}>
+          <LineChart data={displayData} margin={{ top: 5, right: 20, left: 3, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
             <XAxis
               dataKey="index"
