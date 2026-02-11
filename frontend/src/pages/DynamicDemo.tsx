@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ElementType, type ReactNode } from 'react'
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, ArrowLeft, ChevronDown, ChevronUp, ThumbsUp, Share2, MessageCircle, BarChart3 } from 'lucide-react'
+import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, ArrowLeft, ThumbsUp, Share2, MessageCircle, BarChart3 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { createInitialFlowState, routeLogLine, stripLogPrefix, type FlowState, type Role } from '../lib/interventionFlow/logRouter'
 import { createEventSourceLogStream, createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
@@ -195,21 +195,24 @@ function useDynamicDemoApi() {
 
   // 合并加载状态和错误状态
   const isLoading = leaderboardLoading || (selectedPost ? (postDetailLoading || commentsLoading) : false)
-  const error = leaderboardError || postDetailError || commentsError
+  // 过滤掉 404 和 500 错误（数据库不存在或未就绪时的正常状态）
+  const error = (() => {
+    const err = leaderboardError || postDetailError || commentsError
+    if (err && err.message) {
+      // 404: 数据库文件不存在
+      // 500: 数据库正在创建或未就绪
+      if (err.message.includes('404') || err.message.includes('500')) {
+        return null // 不显示这些错误
+      }
+    }
+    return err
+  })()
 
   const data = useMemo<DynamicDemoData>(() => {
     return {
       heatPosts,
       comments: commentItems,
-      metricsSeries: [
-        { time: '10:00', emotion: 0.5, extremity: 0.5 },
-        { time: '10:05', emotion: 0.5, extremity: 0.5 },
-        { time: '10:10', emotion: 0.5, extremity: 0.5 },
-        { time: '10:15', emotion: 0.5, extremity: 0.5 },
-        { time: '10:20', emotion: 0.5, extremity: 0.5 },
-        { time: '10:25', emotion: 0.5, extremity: 0.5 },
-        { time: '10:30', emotion: 0.5, extremity: 0.5 },
-      ],
+      metricsSeries: [], // 移除默认数据，初始为空数组
       agentLogs: {
         Analyst: [
           { id: 'a_01', ts: '10:20:12', message: '识别到热点话题 A 的情绪指数快速升高。' },
@@ -475,10 +478,10 @@ export default function DynamicDemo() {
     ? { emotion: postAnalysis.currentMetrics.sentiment, extremity: postAnalysis.currentMetrics.extremeness }
     : defaultMetrics
 
-  // 使用 postAnalysis Hook 的趋势数据，如果没有追踪则使用默认数据
+  // 使用 postAnalysis Hook 的趋势数据，如果没有追踪或数据为空则使用空数组
   const metricsSeries = postAnalysis.isTracking && postAnalysis.metricsSeries.length > 0
     ? postAnalysis.metricsSeries
-    : data.metricsSeries
+    : []
 
   return (
     <DynamicDemoPage>
@@ -755,7 +758,7 @@ export default function DynamicDemo() {
               error={error || undefined}
             />
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-5">
               <PostDetailCard
                 post={selectedPost}
                 postDetail={postDetail}
@@ -1145,13 +1148,12 @@ function CommentsCard({
   }, [comments, sort])
 
   return (
-    <div className="glass-card p-6 flex flex-col h-full">
+    <div className="glass-card p-6 flex flex-col h-[320px]">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <MessageCircle className="text-blue-500" />
           <div>
             <h3 className="text-2xl font-bold text-slate-800">评论区</h3>
-            <p className="text-sm text-slate-600">展示帖子实时评论流</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -1166,7 +1168,7 @@ function CommentsCard({
         </div>
       )}
 
-      <div className="space-y-3 max-h-[240px] overflow-auto pr-2 flex-1">
+      <div className="space-y-3 overflow-auto pr-2 flex-1 min-h-0">
         {comments.length === 0 ? (
           <div className="flex items-center justify-center py-8">
             <p className="text-slate-500">暂无评论</p>
@@ -1214,11 +1216,10 @@ function CommentSortTabs({ value, onChange }: { value: 'likes' | 'time'; onChang
 function MetricsBarsCard({ emotion, extremity }: { emotion: number; extremity: number }) {
   return (
     <div className="glass-card p-6 h-[300px] flex flex-col">
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 mb-0">
         <Activity className="text-blue-500" />
         <div>
           <h2 className="text-2xl font-bold text-slate-800">指标变化</h2>
-          <p className="text-sm text-slate-600">情绪度与极端度实时变化</p>
         </div>
       </div>
       <div className="space-y-6 flex-1 flex flex-col justify-center">
@@ -1258,19 +1259,31 @@ function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
         <Sparkles className="text-green-500" />
         <div>
           <h2 className="text-2xl font-bold text-slate-800">指标趋势</h2>
-          <p className="text-sm text-slate-600">情绪度 / 极端度趋势曲线</p>
         </div>
       </div>
       <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey="time" stroke="#94a3b8" />
-            <YAxis domain={[0, 1]} stroke="#94a3b8" />
+            <XAxis
+              dataKey="time"
+              stroke="#94a3b8"
+              tick={data.length > 0 ? undefined : false}
+            />
+            <YAxis
+              domain={[0, 1]}
+              ticks={[0, 0.25, 0.5, 0.75, 1]}
+              stroke="#94a3b8"
+            />
             <Tooltip />
             <Legend />
-            <Line type="monotone" dataKey="emotion" stroke="#3b82f6" strokeWidth={2} dot={false} name="情绪度" />
-            <Line type="monotone" dataKey="extremity" stroke="#ef4444" strokeWidth={2} dot={false} name="极端度" />
+            {/* 只在有数据时渲染数据线 */}
+            {data.length > 0 && (
+              <>
+                <Line type="monotone" dataKey="emotion" stroke="#3b82f6" strokeWidth={2} dot={false} name="情绪度" />
+                <Line type="monotone" dataKey="extremity" stroke="#ef4444" strokeWidth={2} dot={false} name="极端度" />
+              </>
+            )}
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -1609,7 +1622,6 @@ function CommentaryAnalysisPanel({
           <BarChart3 className="text-purple-500" />
           <div>
             <h2 className="text-2xl font-bold text-slate-800">评论区总体状态分析</h2>
-            <p className="text-sm text-slate-600">大模型周期性分析评论情绪与极化趋势</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-3">
