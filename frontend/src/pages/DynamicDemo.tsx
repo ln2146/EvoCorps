@@ -1052,6 +1052,10 @@ function PostDetailCard({
   // 优先使用 postDetail 的完整内容，否则使用 post 的 summary
   const fullContent = postDetail?.content || post.content || post.summary || post.excerpt || ''
 
+  // 获取评论数量
+  const commentCount = postDetail?.commentCount ?? post.commentCount ?? 0
+  const hasNoComments = commentCount === 0
+
   return (
     <div className="glass-card p-6">
       <div className="flex items-start justify-between mb-4">
@@ -1071,12 +1075,18 @@ function PostDetailCard({
           {onStartTracking && (
             <button
               onClick={onStartTracking}
-              disabled={isTracking}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 transition-all ${isTracking
+              disabled={isTracking || hasNoComments}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 transition-all ${isTracking || hasNoComments
                 ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                 : 'bg-gradient-to-r from-blue-500 to-green-500 text-white hover:shadow-lg'
                 }`}
-              title={isTracking ? '已在追踪中' : '开始分析此帖子'}
+              title={
+                hasNoComments
+                  ? '该帖子没有评论'
+                  : isTracking
+                    ? '已在追踪中'
+                    : '开始分析此帖子'
+              }
             >
               <Activity size={14} />
               {isTracking ? '分析中' : '开始分析'}
@@ -1255,10 +1265,14 @@ function MetricBar({ label, value }: { label: string; value: number }) {
 function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
   // 为数据添加序号（分析次数）
   const displayData = useMemo(() => {
-    return data.map((point, index) => ({
-      ...point,
-      index: index + 1, // 从 1 开始计数
-    }))
+    if (data.length > 0) {
+      return data.map((point, index) => ({
+        ...point,
+        index: index + 1, // 从 1 开始计数
+      }))
+    }
+    // 无数据时返回空数组，横轴刻度通过 ticks 属性指定
+    return []
   }, [data])
 
   return (
@@ -1271,18 +1285,20 @@ function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
       </div>
       <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={displayData}>
+          <LineChart data={displayData} margin={{ top: 5, right: 20, left: 5, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
             <XAxis
               dataKey="index"
               stroke="#94a3b8"
-              tick={data.length > 0 ? undefined : false}
               axisLine={true}
+              ticks={data.length > 0 ? undefined : [1, 2, 3, 4]}
+              domain={data.length > 0 ? undefined : [1, 4]}
             />
             <YAxis
               domain={[0, 1]}
               ticks={[0, 0.25, 0.5, 0.75, 1]}
               stroke="#94a3b8"
+              width={40}
             />
             <Tooltip />
             <Legend />
