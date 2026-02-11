@@ -1219,7 +1219,7 @@ function MetricsBarsCard({ emotion, extremity }: { emotion: number; extremity: n
       <div className="flex items-center gap-3 mb-0">
         <Activity className="text-blue-500" />
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">指标变化</h2>
+          <h2 className="text-2xl font-bold text-slate-800">实时指标概览</h2>
         </div>
       </div>
       <div className="space-y-6 flex-1 flex flex-col justify-center">
@@ -1253,22 +1253,31 @@ function MetricBar({ label, value }: { label: string; value: number }) {
 }
 
 function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
+  // 为数据添加序号（分析次数）
+  const displayData = useMemo(() => {
+    return data.map((point, index) => ({
+      ...point,
+      index: index + 1, // 从 1 开始计数
+    }))
+  }, [data])
+
   return (
     <div className="glass-card p-6 h-[316px] flex flex-col">
       <div className="flex items-center gap-3 mb-4">
         <Sparkles className="text-green-500" />
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">指标趋势</h2>
+          <h2 className="text-2xl font-bold text-slate-800">历史指标曲线</h2>
         </div>
       </div>
       <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
+          <LineChart data={displayData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
             <XAxis
-              dataKey="time"
+              dataKey="index"
               stroke="#94a3b8"
               tick={data.length > 0 ? undefined : false}
+              axisLine={true}
             />
             <YAxis
               domain={[0, 1]}
@@ -1277,13 +1286,23 @@ function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
             />
             <Tooltip />
             <Legend />
-            {/* 只在有数据时渲染数据线 */}
-            {data.length > 0 && (
-              <>
-                <Line type="monotone" dataKey="emotion" stroke="#3b82f6" strokeWidth={2} dot={false} name="情绪度" />
-                <Line type="monotone" dataKey="extremity" stroke="#ef4444" strokeWidth={2} dot={false} name="极端度" />
-              </>
-            )}
+            {/* 始终渲染 Line 组件以显示彩色图例 */}
+            <Line
+              type="monotone"
+              dataKey="emotion"
+              stroke="#3b82f6"
+              strokeWidth={2}
+              dot={false}
+              name="情绪度"
+            />
+            <Line
+              type="monotone"
+              dataKey="extremity"
+              stroke="#ef4444"
+              strokeWidth={2}
+              dot={false}
+              name="极端度"
+            />
           </LineChart>
         </ResponsiveContainer>
       </div>
