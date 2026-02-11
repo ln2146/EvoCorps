@@ -155,7 +155,7 @@ class Simulation:
         
         # Get the monitoring interval from the configuration to align with user selection
         opinion_balance_config = self.config.get('opinion_balance_system', {})
-        monitoring_interval_minutes = opinion_balance_config.get('monitoring_interval', 30)
+        monitoring_interval_minutes = opinion_balance_config['monitoring_interval_minutes']
         self.opinion_balance_interval = monitoring_interval_minutes * 60  # Convert to seconds
 
         # Save a copy of the experiment configuration

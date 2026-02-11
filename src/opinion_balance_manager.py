@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 import sqlite3
 
 from agents.simple_coordination_system import SimpleCoordinationSystem, workflow_logger
-from config_manager import config_manager
 
 
 class OpinionBalanceManager:

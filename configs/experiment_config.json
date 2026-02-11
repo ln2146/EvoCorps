@@ -48,6 +48,7 @@
         "trending_posts_scan_interval": 5,
         "feedback_monitoring_interval": 30,
         "standalone_mode": true,
+        "monitoring_interval_minutes": 30,
         "monitoring_interval": 30
     },
     "malicious_bot_system": {
@@ -60,6 +61,5 @@
     },
     "prebunking_system": {
         "enabled": false
-    },
-    "engine": "gemini-2.0-flash"
+    }
 }

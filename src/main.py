@@ -24,16 +24,6 @@ from keys import OPENAI_API_KEY, OPENAI_BASE_URL
 
 import control_flags
 
-# Add src directory to path to import the config manager
-sys.path.append(os.path.join(os.path.dirname(__file__)))
-try:
-    from config_manager import config_manager
-    CONFIG_MANAGER_AVAILABLE = True
-except ImportError:
-    CONFIG_MANAGER_AVAILABLE = False
-    print("⚠️  Config manager unavailable, using basic configuration")
-
-
 # =============================
 # FastAPI control server setup
 # =============================
@@ -584,13 +574,6 @@ def get_monitoring_interval():
 
             print(f"✅ Monitoring interval: {interval} minutes")
 
-            # Save config to the config manager
-            if CONFIG_MANAGER_AVAILABLE:
-                try:
-                    config_manager.set_monitoring_interval(interval)
-                except Exception as e:
-                    print(f"⚠️  Failed to save configuration: {e}")
-
             return interval
 
         except ValueError:
@@ -753,7 +736,8 @@ if __name__ == "__main__":
         enable_opinion_balance = False
         enable_feedback_system = True  # Enable feedback iteration by default in standalone mode
         # Read monitoring interval from config
-        monitoring_interval = config.get('opinion_balance_system', {}).get('monitoring_interval', 30)
+        obs_config = config.get('opinion_balance_system', {}) or {}
+        monitoring_interval = obs_config['monitoring_interval_minutes']
         
         # Set standalone mode flag
         if 'opinion_balance_system' not in config:
@@ -766,7 +750,8 @@ if __name__ == "__main__":
         enable_opinion_balance = False
         enable_feedback_system = True  # Enable feedback iteration by default
         # Read monitoring interval from config
-        monitoring_interval = config.get('opinion_balance_system', {}).get('monitoring_interval', 30)
+        obs_config = config.get('opinion_balance_system', {}) or {}
+        monitoring_interval = obs_config['monitoring_interval_minutes']
         print("❌ Opinion balance system disabled")
 
     # Select fact-checking system
@@ -805,6 +790,7 @@ if __name__ == "__main__":
     config['opinion_balance_system']['monitoring_enabled'] = enable_opinion_balance  # Monitoring is tied to opinion balance, not feedback
     config['opinion_balance_system']['feedback_system_enabled'] = enable_feedback_system
     config['opinion_balance_system']['monitoring_interval'] = monitoring_interval
+    config['opinion_balance_system']['monitoring_interval_minutes'] = monitoring_interval
 
     # Update fact-checking config
     # 保留 experiment type 和 settings 供日志/其他组件参考，
@@ -824,9 +810,11 @@ if __name__ == "__main__":
         config['prebunking_system'] = {}
     config['prebunking_system']['enabled'] = enable_prebunking
 
-    # Write user selections to the config file so OpinionBalanceManager can read them
+    # Persist user selections to the config file (engine is resolved dynamically via selector; do not persist it)
+    config_to_save = dict(config)
+    config_to_save.pop('engine', None)
     with open(config_path, 'w') as f:
-        json.dump(config, f, indent=4)
+        json.dump(config_to_save, f, indent=4)
 
     Utils.configure_logging(engine=config['engine'])
 
@@ -939,7 +927,7 @@ if __name__ == "__main__":
         print(f"   Response delay: {obs_config.get('response_delay_minutes', 'N/A')} minutes")
 
         # Show monitoring interval configuration
-        monitoring_interval = obs_config.get('monitoring_interval', 30)
+        monitoring_interval = obs_config['monitoring_interval_minutes']
         interval_descriptions = {
             1: "🔥 Ultra-high-frequency monitoring",
             5: "🚀 High-frequency monitoring",
