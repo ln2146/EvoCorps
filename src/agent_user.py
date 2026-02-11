@@ -435,10 +435,6 @@ class AgentUser:
         ''', (post_author,))
         # Logging moved to _process_reaction method
 
-        # Print normal user comments
-        # Force manual export for normal user comments (ensure full fields)
-        self._manual_export_comment(comment_id, final_content, post_id, selected_model)
-
         # Trigger scenario class export
         try:
             from scenario_export_manager import on_comment_created_scenario
@@ -592,39 +588,6 @@ Your Comment:"""
         except Exception as e:
             logging.warning(f"Failed to regenerate comment: {e}")
             return original_content
-
-    def _manual_export_comment(self, comment_id: str, content: str, post_id: str, selected_model: str = 'unknown'):
-        """Manually export normal user comment to JSONL file"""
-        try:
-            import os
-            from datetime import datetime
-            import json
-
-            # Ensure export directory exists
-            os.makedirs("exported_content/data", exist_ok=True)
-
-            # Format comment data
-            formatted_comment = {
-                'comment_id': comment_id,
-                'user_query': content,
-                'author_id': self.user_id,
-                'created_at': datetime.now().isoformat(),
-                'post_id': post_id,
-                'num_likes': 0,
-                'selected_model': selected_model,
-                'agent_type': 'normal_user',
-                'exported_at': datetime.now().isoformat()
-            }
-
-            # Append to normal user file
-            normal_file = "exported_content/data/normal_users_content.jsonl"
-            with open(normal_file, 'a', encoding='utf-8') as f:
-                f.write(json.dumps(formatted_comment, ensure_ascii=False) + '\n')
-
-
-
-        except Exception as e:
-            print(f"   ❌ Manual export failed: {e}")
 
     async def _generate_comment_content(self, client, engine: str, post_content: str, comment_context: str = None, max_tokens: int = 150) -> str:
         """

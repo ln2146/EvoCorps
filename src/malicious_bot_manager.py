@@ -104,40 +104,6 @@ class MaliciousBotManager:
             else:
                 raise e
 
-    def _manual_export_comment(self, comment_id: str, content: str, author_id: str, post_id: str, selected_model: str = 'unknown', persona_used: str = 'Unknown'):
-        """Export a single malicious comment to the archive for analysis."""
-        try:
-            import os
-            from datetime import datetime
-            import json
-
-            # Ensure the export directory exists
-            os.makedirs("exported_content/data", exist_ok=True)
-
-            # Format the comment data
-            formatted_comment = {
-                'comment_id': comment_id,
-                'user_query': content,
-                'author_id': author_id,
-                'created_at': datetime.now().isoformat(),
-                'post_id': post_id,
-                'num_likes': 0,
-                'selected_model': selected_model,
-                'agent_type': 'malicious_agent',
-                'persona_used': persona_used,
-                'exported_at': datetime.now().isoformat()
-            }
-
-            # Append to the malicious agent export file
-            malicious_file = "exported_content/data/malicious_agents_content.jsonl"
-            with open(malicious_file, 'a', encoding='utf-8') as f:
-                f.write(json.dumps(formatted_comment, ensure_ascii=False) + '\n')
-
-
-
-        except Exception as e:
-            pass  # Silently ignore storage errors
-
     async def create_malicious_post(self, news_content: str, time_step: int) -> Optional[Dict[str, Any]]:
         """
         (Disabled) Previous mechanism to generate a malicious post from a news item.
@@ -537,48 +503,7 @@ Write your hostile post:"""
             except Exception as e:
                 logging.warning(f"Malicious bot cross-like mechanism failed: {e}")
 
-        # Simplified batch export (async, non-blocking)
-        try:
-            import asyncio
-            asyncio.create_task(self._async_batch_export(comment_ids, batch_comments, batch_malicious_records))
-        except Exception:
-            pass  # Silently ignore export errors
-
         return comment_ids
-
-    async def _async_batch_export(self, comment_ids: List[str], batch_comments: List, batch_malicious_records: List):
-        """Asynchronously export the batch comments and malicious records."""
-        try:
-            import os
-            import json
-            from datetime import datetime
-
-            # Ensure the export directory exists
-            os.makedirs("exported_content/data", exist_ok=True)
-
-            # Batch format the comment data
-            malicious_file = "exported_content/data/malicious_agents_content.jsonl"
-            with open(malicious_file, 'a', encoding='utf-8') as f:
-                for i, comment_data in enumerate(batch_comments):
-                    if i < len(batch_malicious_records):
-                        malicious_record = batch_malicious_records[i]
-                        formatted_comment = {
-                            'comment_id': comment_data[0],
-                            'user_query': comment_data[1],
-                            'author_id': comment_data[3],
-                            'created_at': comment_data[4],
-                            'post_id': comment_data[2],
-                            'num_likes': comment_data[5],
-                            'selected_model': comment_data[6] if len(comment_data) > 6 else 'unknown',
-                            'agent_type': 'malicious_agent',
-                            'persona_used': malicious_record[3],
-                            'exported_at': datetime.now().isoformat()
-                        }
-                        f.write(json.dumps(formatted_comment, ensure_ascii=False) + '\n')
-
-        except Exception as e:
-            # Silently ignore export errors without impacting the main flow
-            pass
 
     def _current_attack_cross_like_sync(self, comment_ids: List[str], batch_comments: List, post_id: str):
         """Synchronous version of the in-batch cross-like (15 agents like two malicious comments)."""
@@ -982,7 +907,6 @@ Write your hostile post:"""
         # The top posts are re-evaluated every timestep and attacked if they satisfy the conditions
 
         return True
-
 
 
 

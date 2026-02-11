@@ -6775,15 +6775,7 @@ class SimpleCoordinationSystem:
 
             self.long_term_memory.append(complete_cycle)
 
-            # Save to file for future learning
-            memory_file = f"cognitive_memory/{monitoring_task_id}_complete_cycle.json"
-            os.makedirs("cognitive_memory", exist_ok=True)
-
-            with open(memory_file, 'w', encoding='utf-8') as f:
-                json.dump(complete_cycle, f, ensure_ascii=False, indent=2, default=str)
-
             workflow_logger.info("    ✅ Complete action cycle archived")
-            workflow_logger.info(f"       File: {memory_file}")
             workflow_logger.info(f"       Final effectiveness score: {complete_cycle['final_effectiveness']:.1f}/10")
 
         except Exception as e:

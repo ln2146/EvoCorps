@@ -23,8 +23,6 @@ class AutoExportManager:
 
         # Export file path config - unify under exported_content/data
         self.export_files = {
-            'normal_users': 'exported_content/data/normal_users_content.jsonl',
-            'malicious_agents': 'exported_content/data/malicious_agents_content.jsonl',
             'echo_agents': 'exported_content/data/echo_agents_content.jsonl',
             'integrated': 'exported_content/data/output.jsonl'
         }
@@ -131,9 +129,7 @@ class AutoExportManager:
         """Load exported record IDs"""
         try:
             # Read exported IDs from existing files
-            for file_path in [self.export_files['normal_users'],
-                             self.export_files['malicious_agents'],
-                             self.export_files['echo_agents']]:
+            for file_path in [self.export_files['echo_agents']]:
                 if os.path.exists(file_path):
                     with open(file_path, 'r', encoding='utf-8') as f:
                         for line in f:
@@ -200,9 +196,7 @@ class AutoExportManager:
             new_entries_count = 0
             with open(self.export_files['integrated'], 'a', encoding='utf-8') as output_file:
                 # Read and merge new content from all source files
-                for source_file in [self.export_files['normal_users'],
-                                   self.export_files['malicious_agents'],
-                                   self.export_files['echo_agents']]:
+                for source_file in [self.export_files['echo_agents']]:
                     if os.path.exists(source_file):
                         with open(source_file, 'r', encoding='utf-8') as f:
                             for line in f:
@@ -230,8 +224,6 @@ class AutoExportManager:
 
         try:
             # Export new content
-            self._export_new_normal_user_content()
-            self._export_new_malicious_content()
             self._export_new_echo_agent_content()
 
             # Integrate all files into output.jsonl
@@ -241,38 +233,6 @@ class AutoExportManager:
 
         except Exception as e:
             print(f"⚠️  Auto export failed: {e}")
-
-    def _export_new_normal_user_content(self):
-        """Export new normal user content"""
-        # Export new comments
-        new_comments = self._get_new_normal_user_comments()
-        for comment in new_comments:
-            self._append_to_jsonl(self.export_files['normal_users'], comment)
-            self.exported_comments.add(comment['comment_id'])
-
-        # Export new posts
-        new_posts = self._get_new_normal_user_posts()
-        for post in new_posts:
-            # Convert post format to comment format (unified format)
-            post_as_comment = {
-                'comment_id': post['post_id'],
-                'user_query': post['content'],
-                'author_id': post['author_id'],
-                'created_at': post['created_at'],
-                'post_id': post['post_id'],  # The post_id for a post is itself
-                'num_likes': post.get('num_likes', 0),
-                'selected_model': post.get('selected_model', 'unknown'),  # Add model field
-                'exported_at': datetime.now().isoformat()
-            }
-            self._append_to_jsonl(self.export_files['normal_users'], post_as_comment)
-            self.exported_posts.add(post['post_id'])
-
-    def _export_new_malicious_content(self):
-        """Export new malicious agent content"""
-        new_comments = self._get_new_malicious_comments()
-        for comment in new_comments:
-            self._append_to_jsonl(self.export_files['malicious_agents'], comment)
-            self.exported_comments.add(comment['comment_id'])
 
     def _export_new_echo_agent_content(self):
         """Export new echo agent content"""
@@ -641,7 +601,6 @@ class AutoExportManager:
                 except Exception as e:
                     logging.error(f"Error processing malicious comment data: {e}, data: {dict(malicious_row)}")
                     return
-                self._append_to_jsonl(self.export_files['malicious_agents'], formatted_comment)
             else:
                 # Normal comment or echo agent comment
                 cursor.execute("""
@@ -685,11 +644,6 @@ class AutoExportManager:
                 # Determine type based on author_id
                 if 'echo_' in comment["author_id"]:
                     self._append_to_jsonl(self.export_files['echo_agents'], formatted_comment)
-                elif 'malicious_agent' in comment["author_id"]:
-                    # This should not happen because we already checked for malicious comments above
-                    self._append_to_jsonl(self.export_files['malicious_agents'], formatted_comment)
-                else:
-                    self._append_to_jsonl(self.export_files['normal_users'], formatted_comment)
 
             # Record exported
             self.exported_comments.add(comment_id)
