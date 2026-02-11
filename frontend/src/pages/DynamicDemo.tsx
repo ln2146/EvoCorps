@@ -483,6 +483,20 @@ export default function DynamicDemo() {
     ? postAnalysis.metricsSeries
     : []
 
+  // 获取正在追踪的帖子数据（用于评论区总体状态分析面板）
+  const trackedPostData = useMemo(() => {
+    if (!postAnalysis.isTracking || !postAnalysis.trackedPostId) return null
+
+    // 从热度榜中查找正在追踪的帖子
+    const trackedPost = data.heatPosts.find(p => (p.postId || p.id) === postAnalysis.trackedPostId)
+
+    return trackedPost ? {
+      likeCount: trackedPost.likeCount,
+      commentCount: trackedPost.commentCount,
+      shareCount: trackedPost.shareCount,
+    } : null
+  }, [postAnalysis.isTracking, postAnalysis.trackedPostId, data.heatPosts])
+
   return (
     <DynamicDemoPage>
       <DynamicDemoHeader
@@ -806,15 +820,7 @@ export default function DynamicDemo() {
         summary={postAnalysis.summary}
         onOpenConfig={() => setAnalysisOpen(true)}
         trackedPostId={postAnalysis.trackedPostId}
-        trackedPostStats={
-          postAnalysis.isTracking && selectedPost
-            ? {
-              likeCount: postDetail?.likeCount ?? selectedPost.likeCount,
-              commentCount: postDetail?.commentCount ?? selectedPost.commentCount,
-              shareCount: postDetail?.shareCount ?? selectedPost.shareCount,
-            }
-            : null
-        }
+        trackedPostStats={trackedPostData}
       />
 
       <AnalysisConfigDialog
@@ -1188,7 +1194,10 @@ function CommentsCard({
             <div key={comment.commentId || comment.id} className="bg-white/70 rounded-2xl p-4 border border-white/40 shadow-lg hover:shadow-xl transition-all">
               <p className="text-sm text-slate-700">{comment.content}</p>
               <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
-                <span>点赞 {comment.likeCount ?? comment.likes}</span>
+                <div className="flex items-center gap-1">
+                  <ThumbsUp size={14} className="text-blue-500" />
+                  <span className="font-medium">{comment.likeCount ?? comment.likes}</span>
+                </div>
                 <span>{new Date(comment.createdAt).toLocaleString('zh-CN', {
                   month: '2-digit',
                   day: '2-digit',
