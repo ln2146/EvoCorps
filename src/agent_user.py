@@ -14,6 +14,50 @@ if TYPE_CHECKING:
     from openai import OpenAI
 
 
+def try_parse_post_generation_json(raw_output: str) -> Optional[dict]:
+    """
+    Try to parse the model output as a JSON object for post generation.
+
+    The model is instructed to return plain JSON, but some models wrap it in Markdown code fences.
+    """
+    if not raw_output:
+        return None
+
+    candidates: list[str] = []
+    stripped = raw_output.strip()
+    candidates.append(stripped)
+
+    # Strip ```json ... ``` fences if present
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+        if lines and lines[0].lstrip().startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip().startswith("```"):
+            lines = lines[:-1]
+        candidates.append("\n".join(lines).strip())
+
+    decoder = json.JSONDecoder()
+
+    for candidate in candidates:
+        if not candidate:
+            continue
+        try:
+            parsed = json.loads(candidate)
+            return parsed if isinstance(parsed, dict) else None
+        except json.JSONDecodeError:
+            pass
+
+        start = candidate.find("{")
+        if start != -1:
+            try:
+                parsed, _ = decoder.raw_decode(candidate[start:])
+                return parsed if isinstance(parsed, dict) else None
+            except json.JSONDecodeError:
+                continue
+
+    return None
+
+
 
 # Use absolute imports to avoid module path issues
 try:
@@ -882,11 +926,11 @@ Your comment:"""
                 post_content = raw_output
                 summary = ""
 
-                try:
-                    parsed = json.loads(raw_output)
+                parsed = try_parse_post_generation_json(raw_output)
+                if isinstance(parsed, dict):
                     post_content = parsed.get("post") or parsed.get("content") or post_content
-                    summary = parsed.get("summary", "") if isinstance(parsed, dict) else ""
-                except json.JSONDecodeError:
+                    summary = parsed.get("summary", "")
+                else:
                     logging.debug(f"User {self.user_id}: Failed to parse JSON post output, using raw text.")
 
                 if not post_content:
@@ -1263,18 +1307,18 @@ Format your response as a single, comprehensive memory entry that can replace mu
 
                 # In-progress guard
                 if state.get('running', False):
-                    logging.info(f"User {self.user_id}: Skip memory update due to in-progress run")
+                    logging.debug(f"User {self.user_id}: Skip memory update due to in-progress run")
                     return
 
                 # Debounce window (seconds)
                 min_interval = 12.0
                 if (now - state.get('ts', 0.0)) < min_interval:
-                    logging.info(f"User {self.user_id}: Skip memory update due to rate limit")
+                    logging.debug(f"User {self.user_id}: Skip memory update due to rate limit")
                     return
 
                 # Duplicate key check
                 if state.get('key') == dedup_key:
-                    logging.info(f"User {self.user_id}: Skip memory update due to duplicate key")
+                    logging.debug(f"User {self.user_id}: Skip memory update due to duplicate key")
                     return
 
                 # Mark running and record timestamp/key

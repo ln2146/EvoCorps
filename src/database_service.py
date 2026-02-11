@@ -424,81 +424,70 @@ class DatabaseService:
         
         @self.app.route('/reset_database', methods=['POST'])
         def reset_database():
-            """Reset database with retry mechanism for file lock issues"""
+            """
+            Reset database.
+
+            Important (Windows): do NOT delete the database file.
+            Deleting an open SQLite file raises PermissionError (WinError 32). Instead, reset via SQL.
+            """
             import time
-            
+
             max_retries = 5
-            retry_delay = 1.0  # 初始延迟 1 秒
-            
+            base_delay = 0.5
+
             for attempt in range(max_retries):
+                conn = None
                 try:
-                    # Close existing connections if any
-                    # Note: using thread-safe connections, no global connection to close
-                    
-                    # 等待一小段时间，让其他进程释放文件锁
                     if attempt > 0:
-                        wait_time = retry_delay * (2 ** (attempt - 1))  # 指数退避
+                        wait_time = base_delay * (2 ** (attempt - 1))
                         print(f"⏳ Waiting {wait_time:.1f}s before retry {attempt + 1}/{max_retries}...")
                         time.sleep(wait_time)
-                    
-                    # Delete database file
-                    if os.path.exists(self.db_path):
-                        try:
-                            os.remove(self.db_path)
-                            print(f"🗑️ Deleted database file: {self.db_path}")
-                        except PermissionError as e:
-                            if attempt < max_retries - 1:
-                                print(f"⚠️ Database file locked, retry {attempt + 1}/{max_retries}: {e}")
-                                continue
-                            else:
-                                raise
-                    
-                    # Delete related files
-                    for suffix in ['-wal', '-shm', '-journal']:
-                        aux_file = self.db_path + suffix
-                        if os.path.exists(aux_file):
-                            try:
-                                os.remove(aux_file)
-                                print(f"🗑️ Deleted auxiliary file: {aux_file}")
-                            except (PermissionError, OSError) as e:
-                                # 辅助文件删除失败不是致命错误
-                                print(f"⚠️ Could not delete {aux_file}: {e}")
-                    
-                    # Reinitialize database connection
-                    self._init_database()
-                    
+
+                    conn = self._get_connection()
+                    cursor = conn.cursor()
+
+                    cursor.execute("PRAGMA foreign_keys = OFF")
+                    cursor.execute(
+                        "SELECT name, type FROM sqlite_master "
+                        "WHERE (type='table' OR type='view') AND name NOT LIKE 'sqlite_%'"
+                    )
+                    objects = cursor.fetchall()
+
+                    for name, obj_type in objects:
+                        safe_name = str(name).replace('"', '""')
+                        if obj_type == "view":
+                            cursor.execute(f'DROP VIEW IF EXISTS "{safe_name}"')
+                        else:
+                            cursor.execute(f'DROP TABLE IF EXISTS "{safe_name}"')
+
+                    cursor.execute("PRAGMA foreign_keys = ON")
+                    conn.commit()
+
                     return jsonify({
                         "success": True,
                         "message": "Database reset successfully"
                     })
-                    
-                except PermissionError as e:
-                    if attempt < max_retries - 1:
-                        # 继续重试
+
+                except sqlite3.OperationalError as e:
+                    if "database is locked" in str(e).lower() and attempt < max_retries - 1:
+                        print(f"⚠️ Database is locked, retry {attempt + 1}/{max_retries}: {e}")
                         continue
-                    else:
-                        # 最后一次尝试失败
-                        error_msg = f"Database file is locked after {max_retries} attempts. Please ensure all processes are stopped before starting a new demo."
-                        self._log_error(error_msg, e)
-                        return jsonify({
-                            "success": False,
-                            "error": error_msg,
-                            "details": str(e)
-                        }), 500
-                        
-                except Exception as e:
-                    # 其他错误，不重试
                     self._log_error("Failed to reset database", e)
                     return jsonify({
                         "success": False,
                         "error": str(e)
                     }), 500
-            
-            # 理论上不会到达这里
-            return jsonify({
-                "success": False,
-                "error": "Unexpected error in reset_database"
-            }), 500
+
+                except Exception as e:
+                    self._log_error("Failed to reset database", e)
+                    return jsonify({
+                        "success": False,
+                        "error": str(e)
+                    }), 500
+
+                finally:
+                    if conn:
+                        conn.close()
         
         @self.app.route('/opinion_balance/stats', methods=['GET'])
         def get_opinion_balance_stats():
