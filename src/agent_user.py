@@ -793,16 +793,8 @@ Your comment:"""
         """
         Flag a post.
         """
-        # Check if user already flagged this post
-        result = fetch_one('''
-            SELECT COUNT(*) as count FROM user_actions
-            WHERE user_id = ? AND action_type = 'flag' AND target_id = ?
-        ''', (self.user_id, post_id))
-        if result and result['count'] > 0:
-            return
-
-        execute_query('UPDATE posts SET num_flags = num_flags + 1 WHERE post_id = ?', (post_id,))
-        logging.info(f"User {self.user_id} flagged post {post_id}")
+        # Flagging is intentionally disabled.
+        return
 
     def follow_user(self, target_user_id: str) -> None:
         """
@@ -2862,8 +2854,8 @@ Task:
                         self.share_post(target)
                         logging.info(f"🔄 User {self.user_id} shared post {target}")
                     elif action == 'flag-post':
-                        self.flag_post(target)
-                        logging.info(f"🚩 User {self.user_id} flagged post {target}")
+                        # Flagging is intentionally disabled.
+                        pass
                     elif action == 'follow-user':
                         self.follow_user(target)
                         logging.info(f"👥 User {self.user_id} followed user {target}")
