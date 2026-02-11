@@ -20,6 +20,7 @@ venv.bak/
 organized_comments_from_jsonl
 /tests
 data/fake_news_truth_mapping.json
+negative_news_heat/
 
 *.db
 *.db-shm
