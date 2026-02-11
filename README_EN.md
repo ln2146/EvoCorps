@@ -86,8 +86,8 @@ The figure compares sentiment trajectories over time under four settings: Case 1
 <td align="center" width="50%"><strong>💬 Interview Feature</strong><br><img src="assets/talking.gif" width="100%" alt="Interview Feature"><br>Send questionnaire questions to simulated users and collect responses</td>
 </tr>
 <tr>
-<td align="center" width="50%"><strong>⚙️ Run System</strong><br><img src="assets/start.gif" width="100%" alt="Run System"><br>Run system, launch malicious attacks, post-hoc intervention, opinion balance</td>
-<td align="center" width="50%"><strong>📊 Real-time Analysis</strong><br><img src="assets/move.gif" width="100%" alt="Real-time Analysis"><br>Real-time view of post popularity, metric changes, trends, intervention flow, comment analysis</td>
+<td align="center" width="50%"><strong>▶️ Run System</strong><br><img src="assets/start.gif" width="100%" alt="Run System"><br>Run system, launch malicious attacks, post-hoc intervention, opinion balance</td>
+<td align="center" width="50%"><strong>🔍 Real-time Analysis</strong><br><img src="assets/move.gif" width="100%" alt="Real-time Analysis"><br>Real-time view of post popularity, metric changes, trends, intervention flow, comment analysis</td>
 </tr>
 </table>
 </div>
@@ -100,7 +100,7 @@ The figure compares sentiment trajectories over time under four settings: Case 1
   - [1. Create Environment](#1-create-environment)
   - [2. Install Dependencies](#2-install-dependencies)
   - [3. Configure API & Select Models](#3-configure-api--select-models)
-  - [4. System Run Steps](#4-system-run-steps)
+  - [4. Start Backend API](#4-start-backend-api)
   - [5. Launch Frontend Visualization Interface](#5-launch-frontend-visualization-interface)
 - [⚖️ Ethics Statement](#ethics)
 - [📄 Citation](#-citation)
@@ -165,37 +165,15 @@ pip install -r requirements.txt
 Fill in the corresponding API-KEY and BASE-URL in `src/keys.py`, and configure the models in `src/multi_model_selector.py`.
 (Example: if you configure DeepSeek API-KEY and BASE-URL in `src/keys.py`, you can set `DEFAULT_POOL = ["deepseek-chat"]` in `src/multi_model_selector.py`; if you configure Gemini API-KEY and BASE-URL, you can set `DEFAULT_POOL = ["gemini-2.0-flash"]`; for embeddings you can use OpenAI `text-embedding-3-large`, Zhipu `embedding-3`, etc.)
 
-
-### 4. System Run Steps
-- Start the database service
-```bash
-# New terminal
-python src/start_database_service.py
-```
-
-- Start the main program and follow the terminal prompts to select the runtime scenario
-```bash
-# New terminal
-python src/main.py
-```
-
-- If you need to use the opinion balance system, follow the prompts and do the following
-```bash
-# New terminal
-python src/opinion_balance_launcher.py
-# Enter start to begin monitoring
-start
-# Enter auto-status to print the action logs in real time
-auto-status
-```
-
-### 5. Launch Frontend Visualization Interface
+### 4. Start Backend API
 
 - Start the backend API service
 ```bash
 # New terminal
 python frontend_api.py
 ```
+
+### 5. Launch Frontend Visualization Interface
 
 - Start the frontend development server
 ```bash
