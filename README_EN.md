@@ -9,7 +9,7 @@
 [简体中文](README.md) | [English](README_EN.md)
 
   [![Paper](https://img.shields.io/badge/Paper-arXiv-red)](https://arxiv.org/abs/2602.08529)
-  [![Hugging Face Datasets](https://img.shields.io/badge/🤗%20Datasets-5%20Released-yellow)](https://huggingface.co/loge2146)
+  [![Hugging Face Datasets](https://img.shields.io/badge/Datasets-5%20Released-yellow)](https://huggingface.co/loge2146)
   ![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)
   ![License](https://img.shields.io/badge/license-MIT-green)
   ![Multi-Agent](https://img.shields.io/badge/agents-multi--agent-8a2be2)
