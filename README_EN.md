@@ -9,6 +9,7 @@
 [简体中文](README.md) | [English](README_EN.md)
 
   [![Paper](https://img.shields.io/badge/Paper-arXiv-red)](https://arxiv.org/abs/2602.08529)
+  [![Hugging Face Datasets](https://img.shields.io/badge/🤗%20Datasets-5%20Released-yellow)](https://huggingface.co/loge2146)
   ![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)
   ![License](https://img.shields.io/badge/license-MIT-green)
   ![Multi-Agent](https://img.shields.io/badge/agents-multi--agent-8a2be2)
@@ -102,8 +103,9 @@ The figure compares sentiment trajectories over time under four settings: Case 1
   - [3. Configure API & Select Models](#3-configure-api--select-models)
   - [4. Start Backend API](#4-start-backend-api)
   - [5. Launch Frontend Visualization Interface](#5-launch-frontend-visualization-interface)
-- [⚖️ Ethics Statement](#ethics)
+- [📦 Datasets](#-datasets)
 - [📄 Citation](#-citation)
+- [⚖️ Ethics Statement](#ethics)
 
 ---
 
@@ -201,17 +203,21 @@ The frontend interface provides the following features:
 - **Relationship Graph**: Visualize the network of users, posts, and comments
 - **Interview Feature**: Send questionnaires to simulated users and collect responses
 
-<a id="ethics"></a>
 
-## ⚖️ Ethics Statement
+## 📦 Datasets
 
-This work investigates mechanisms for online discourse depolarization in a simulated environment, utilizing publicly available datasets and synthetic agent interactions. It does not involve experiments with human subjects and does not collect or process personally identifying information. The primary goal of this research is to advance understanding of coordinated intervention mechanisms for platform governance, rather than to develop or deploy deceptive influence campaigns.
+To ensure reproducibility and transparency, all datasets used in this project and described in the paper have been publicly released on the Hugging Face Hub.
 
-EvoCorps is framed as a governance-assistance approach for online platforms facing coordinated and malicious activities such as disinformation campaigns or adversarial manipulation. In such settings, platform governance actors may themselves require coordinated capabilities and stylistic diversity to respond effectively and proportionately. Our study therefore examines coordination and response diversity as governance mechanisms, not as tools for artificial consensus formation or manipulation.
+| Dataset | Type | Primary Usage | Link |
+|----------|------|---------------|------|
+| evocorps-misinformation-news | News Corpus | Malicious amplification scenario construction | https://huggingface.co/datasets/loge2146/evocorps-misinformation-news |
+| evocorps-neutral-news | News Corpus | Baseline simulation environment | https://huggingface.co/datasets/loge2146/evocorps-neutral-news |
+| evocorps-positive-personas | Persona Data | Positive agent modeling | https://huggingface.co/datasets/loge2146/evocorps-positive-personas |
+| evocorps-neutral-personas | Persona Data | Neutral agent modeling | https://huggingface.co/datasets/loge2146/evocorps-neutral-personas |
+| evocorps-negative-personas | Persona Data | Negative agent modeling | https://huggingface.co/datasets/loge2146/evocorps-negative-personas |
 
-We explicitly oppose the use of deceptive strategies in any real-world deployment. Although our simulations introduce diverse agent personas to explore theoretical boundaries of influence dynamics, any practical application must adhere strictly to principles of transparency and accountability. Automated agents should be clearly identified as AI-based assistants or governance tools, such as certified fact-checking bots, and must not impersonate human users or conceal their artificial nature.
+We welcome researchers and developers to use these datasets. Please cite our paper if used.
 
-Any deployment of systems inspired by this work should be integrated with existing platform governance processes and subject to platform-specific policies, transparency requirements, and continuous auditing. Such safeguards are necessary to mitigate unintended harms, including disparate impacts, erosion of user trust, or errors arising from automated judgments. The intended use of EvoCorps is to support responsible, transparent, and accountable governance interventions, rather than to mislead users or manufacture false consensus.
 
 ## 📄 Citation
 
@@ -228,3 +234,16 @@ If you use this project in your research, please cite our paper:
       url={https://arxiv.org/abs/2602.08529}, 
 }
 ```
+
+
+<a id="ethics"></a>
+
+## ⚖️ Ethics Statement
+
+This work investigates mechanisms for online discourse depolarization in a simulated environment, utilizing publicly available datasets and synthetic agent interactions. It does not involve experiments with human subjects and does not collect or process personally identifying information. The primary goal of this research is to advance understanding of coordinated intervention mechanisms for platform governance, rather than to develop or deploy deceptive influence campaigns.
+
+EvoCorps is framed as a governance-assistance approach for online platforms facing coordinated and malicious activities such as disinformation campaigns or adversarial manipulation. In such settings, platform governance actors may themselves require coordinated capabilities and stylistic diversity to respond effectively and proportionately. Our study therefore examines coordination and response diversity as governance mechanisms, not as tools for artificial consensus formation or manipulation.
+
+We explicitly oppose the use of deceptive strategies in any real-world deployment. Although our simulations introduce diverse agent personas to explore theoretical boundaries of influence dynamics, any practical application must adhere strictly to principles of transparency and accountability. Automated agents should be clearly identified as AI-based assistants or governance tools, such as certified fact-checking bots, and must not impersonate human users or conceal their artificial nature.
+
+Any deployment of systems inspired by this work should be integrated with existing platform governance processes and subject to platform-specific policies, transparency requirements, and continuous auditing. Such safeguards are necessary to mitigate unintended harms, including disparate impacts, erosion of user trust, or errors arising from automated judgments. The intended use of EvoCorps is to support responsible, transparent, and accountable governance interventions, rather than to mislead users or manufacture false consensus.
