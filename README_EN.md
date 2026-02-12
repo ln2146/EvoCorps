@@ -112,32 +112,38 @@ The figure compares sentiment trajectories over time under four settings: Case 1
 
 ```text
 EvoCorps/
-├── agent_memory_exports/           # Exported agent memory analysis
-├── cognitive_memory/               # Cognitive memory traces
-├── config/                         # Runtime configuration
-├── configs/                        # Experiment and system configs
-├── data/                           # Data and samples
+├── assets/                         # Project assets (images, icons, etc.)
+├── cognitive_memory/               # Cognitive memory traces (complete cycle records)
+├── configs/                        # Experiment and system configurations
+├── data/                           # News data
 ├── database/                       # SQLite database
-├── evidence_database/              # Evidence database and retrieval config
-├── exported_content/               # Exported content and graphs
-├── human_study/                    # Human study data and analysis
-├── models/                         # Models and weights
-├── personas/                       # Personas and roles
-├── result/                         # Result outputs
-├── scripts/                        # Helper scripts
+├── evidence_database/              # Evidence database and retrieval configuration
+├── experiments/                    # Experiment output directory
+├── frontend/                       # Frontend visualization interface
+├── personas/                       # Persona and role database
 ├── src/                            # Core code
 │   ├── agents/                     # Agent implementations
 │   ├── config/                     # Configuration module
 │   ├── database/                   # Database-related modules
-│   ├── retriver/                   # Retrieval-related modules
-│   ├── utils_package/              # Utility package
 │   ├── main.py                     # System main entry
+│   ├── simulation.py               # Simulation core logic
+│   ├── database_service.py         # Database service
 │   ├── start_database_service.py   # Start database service
 │   ├── keys.py                     # API key configuration
-│   ├── opinion_balance_launcher.py # Standalone opinion balance launcher
-├── requirements.txt                # Dependencies
-├── LICENSE
-└── README.md
+│   ├── multi_model_selector.py     # Multi-model selector
+│   ├── opinion_balance_launcher.py # Opinion balance system launcher
+│   ├── opinion_balance_manager.py  # Opinion balance manager
+│   ├── malicious_bot_manager.py    # Malicious bot manager
+│   ├── agent_user.py               # Agent user
+│   ├── post.py                     # Post module
+│   ├── comment.py                  # Comment module
+│   └── ...                         # Other core modules
+├── frontend_api.py                 # Frontend API service
+├── requirements.txt                # Python dependencies
+├── safety_prompts.json             # Safety prompt configuration
+├── LICENSE                         # MIT License
+├── README.md                       # Chinese README
+└── README_EN.md                    # English README
 ```
 
 ## 🚀 Quick Start
