@@ -14,6 +14,15 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from pathlib import Path
 
+try:
+    from src.action_logs_store import ActionLogRecord, persist_action_log_record
+except Exception:
+    try:
+        from action_logs_store import ActionLogRecord, persist_action_log_record
+    except Exception:
+        ActionLogRecord = None
+        persist_action_log_record = None
+
 # Add database path to sys.path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'database'))
 try:
@@ -1320,24 +1329,24 @@ Develop an appropriate strategy for this context. Return a JSON response with re
                     content = recommendation.get("content", {})
                     confidence = recommendation.get("confidence", 0.3)
                     similarity = recommendation.get("similarity", 0.5)
-                    # success rate should come from historical effectiveness_score, not retrieval confidence/similarity.
+                    # effectiveness score should come from historical effectiveness_score, not retrieval confidence/similarity.
                     effectiveness = content.get("effectiveness_score", None)
-                    expected_success_rate = None
+                    effectiveness_score = None
                     try:
                         if isinstance(effectiveness, (int, float)):
                             eff = float(effectiveness)
                             if 0.0 <= eff <= 1.0:
-                                expected_success_rate = eff
+                                effectiveness_score = eff
                             elif 0.0 <= eff <= 10.0:
                                 workflow_logger.warning(
-                                    f"     ⚠️ Detected effectiveness_score on 0-10 scale ({eff:.2f}); converting to [0,1] success rate"
+                                    f"     ⚠️ Detected effectiveness_score on 0-10 scale ({eff:.2f}); converting to [0,1] effectiveness score"
                                 )
-                                expected_success_rate = eff / 10.0
+                                effectiveness_score = eff / 10.0
                     except Exception:
-                        expected_success_rate = None
-                    if expected_success_rate is None:
-                        workflow_logger.warning("     ⚠️ Missing effectiveness_score; using confidence as a proxy for expected success rate")
-                        expected_success_rate = float(confidence) if isinstance(confidence, (int, float)) else 0.3
+                        effectiveness_score = None
+                    if effectiveness_score is None:
+                        workflow_logger.warning("     ⚠️ Missing effectiveness_score; using confidence as a proxy for effectiveness score")
+                        effectiveness_score = float(confidence) if isinstance(confidence, (int, float)) else 0.3
                     
                     # Extract strategy info from action logs
                     strategic_decision = content.get("strategic_decision", "{}")
@@ -1355,12 +1364,13 @@ Develop an appropriate strategy for this context. Return a JSON response with re
                         "strategy_name": f"Learning-based strategy ({action_type})",
                         "description": f"Strategy recommendation based on historical action logs (similarity: {similarity:.1%})",
                         "recommended_actions": [action_type] if action_type != "unknown" else [],
-                        "expected_success_rate": expected_success_rate,
+                        "effectiveness_score": effectiveness_score,
+                        "expected_success_rate": effectiveness_score,
                         "confidence": confidence,
                         "source": "intelligent_learning",
                         "similarity_score": similarity
                     }
-                    workflow_logger.info(f"     🎯 Intelligent learning system recommended strategy: {strategy['strategy_name']} (success rate: {strategy['expected_success_rate']:.1%}, similarity: {similarity:.1%})")
+                    workflow_logger.info(f"     🎯 Intelligent learning system recommended strategy: {strategy['strategy_name']} (Effectiveness score: {strategy['effectiveness_score']:.1%}, similarity: {similarity:.1%})")
                     return [strategy]
                 
                 elif recommendation.get("strategy_name"):
@@ -1370,12 +1380,13 @@ Develop an appropriate strategy for this context. Return a JSON response with re
                         "strategy_name": recommendation.get("strategy_name", "Learning-based strategy"),
                         "description": recommendation.get("description", ""),
                         "recommended_actions": recommendation.get("recommended_actions", []),
-                        "expected_success_rate": recommendation.get("expected_success_rate", 0.6),
+                        "effectiveness_score": recommendation.get("effectiveness_score", recommendation.get("expected_success_rate", 0.6)),
+                        "expected_success_rate": recommendation.get("effectiveness_score", recommendation.get("expected_success_rate", 0.6)),
                         "confidence": recommendation.get("confidence", 0.5),
                         "source": recommendation.get("source", "intelligent_learning"),
                         "similarity_score": recommendation.get("similarity_score", 0.9)
                     }
-                    workflow_logger.info(f"     🎯 Intelligent learning system recommended strategy: {strategy['strategy_name']} (success rate: {strategy['expected_success_rate']:.1%})")
+                    workflow_logger.info(f"     🎯 Intelligent learning system recommended strategy: {strategy['strategy_name']} (Effectiveness score: {strategy['effectiveness_score']:.1%})")
                     return [strategy]
                 else:
                     workflow_logger.info("     ❌ Intelligent learning system returned an unknown format recommendation")
@@ -4888,7 +4899,8 @@ class SimpleCoordinationSystem:
                     monitoring_interval=monitoring_interval,
                     supplementary_plan=strategist_supplementary_plan,  # Pass supplementary plan for later monitoring
                     content_id=content_id,  # Pass content_id for monitoring
-                    baseline_data=baseline_analysis_data  # Pass the actual baseline analysis data
+                    baseline_data=baseline_analysis_data,  # Pass the actual baseline analysis data
+                    initial_strategy_result=strategy_result
                 )
 
             else:
@@ -5457,7 +5469,8 @@ class SimpleCoordinationSystem:
                                           monitoring_interval: int = 30,
                                           supplementary_plan: Dict[str, Any] = None,
                                           content_id: str = None,
-                                          baseline_data: Dict[str, Any] = None) -> str:
+                                          baseline_data: Dict[str, Any] = None,
+                                          initial_strategy_result: Optional[Dict[str, Any]] = None) -> str:
         """Start phase 3: feedback and iteration monitoring
 
         Args:
@@ -5515,7 +5528,8 @@ class SimpleCoordinationSystem:
             "adjustments_made": [],
             "supplementary_plan": supplementary_plan or {},  # Package strategist supplementary plan
             "strategist_enhanced": bool(supplementary_plan),   # Mark strategist enhancement
-            "baseline_data": baseline_data  # Save baseline data
+            "baseline_data": baseline_data,  # Save baseline data
+            "initial_strategy_result": initial_strategy_result or {}
         }
 
         self.monitoring_tasks[monitoring_task_id] = monitoring_task
@@ -5612,6 +5626,72 @@ class SimpleCoordinationSystem:
             workflow_logger.info(f"  ⏰ Max monitoring cycles reached ({max_monitoring_cycles}), stopping monitoring")
         
         workflow_logger.info(f"  📋 Monitoring task completed, {monitoring_count} rounds executed")
+
+        # Persist monitoring-based effectiveness_score into learning action_logs.
+        # NOTE: Do not persist the initial (leader+amplifier) base score; only persist monitoring score.
+        try:
+            if persist_action_log_record and ActionLogRecord and isinstance(task, dict):
+                feedback_reports = task.get("feedback_reports", [])
+                if feedback_reports:
+                    final_report = feedback_reports[-1]
+                    effectiveness_assessment = final_report.get("effectiveness_assessment", {}) if isinstance(final_report, dict) else {}
+                    monitoring_score = effectiveness_assessment.get("overall_score", None)
+
+                    if isinstance(monitoring_score, (int, float)):
+                        current_metrics = final_report.get("current_metrics", {}) if isinstance(final_report, dict) else {}
+                        success_threshold = task.get("success_criteria", {}).get("overall_score_threshold", 0.6)
+                        success = (
+                            float(monitoring_score) >= float(success_threshold)
+                            and float(current_metrics.get("extremism_score", 5.0)) <= float(self.THRESHOLDS["success_criteria"]["extremism_threshold"])
+                            and float(current_metrics.get("sentiment_score", 0.5)) >= float(self.THRESHOLDS["success_criteria"]["sentiment_threshold"])
+                        )
+
+                        baseline_data = task.get("baseline_data", {}) if isinstance(task.get("baseline_data", {}), dict) else {}
+                        analysis_result = baseline_data.get("analysis_result", {}) if isinstance(baseline_data.get("analysis_result", {}), dict) else {}
+
+                        initial_strategy_result = task.get("initial_strategy_result", {}) if isinstance(task.get("initial_strategy_result", {}), dict) else {}
+                        strategy_data = initial_strategy_result.get("strategy", {}) if isinstance(initial_strategy_result.get("strategy", {}), dict) else {}
+
+                        situation_context = {
+                            "core_viewpoint": analysis_result.get("core_viewpoint", ""),
+                            "post_theme": analysis_result.get("post_theme", ""),
+                            "viewpoint_extremism": baseline_data.get("viewpoint_extremism"),
+                            "sentiment_score": baseline_data.get("sentiment_score"),
+                            "target_post_id": task.get("target_post_id"),
+                        }
+
+                        strategic_decision = {
+                            "strategy_id": strategy_data.get("strategy_id", ""),
+                            "core_counter_argument": strategy_data.get("core_counter_argument", ""),
+                            "leader_instruction": strategy_data.get("leader_instruction", {}),
+                            "amplifier_plan": strategy_data.get("amplifier_plan", {}),
+                            "source": "monitoring_final_report",
+                        }
+
+                        execution_details = {
+                            "leader_content": task.get("leader_content", {}),
+                            "amplifier_responses": task.get("amplifier_responses", []),
+                            "monitoring_interval": task.get("monitoring_interval", 30),
+                        }
+
+                        record = ActionLogRecord(
+                            action_id=str(task.get("action_id", monitoring_task_id)),
+                            timestamp=datetime.now().isoformat(),
+                            execution_time=0.0,
+                            success=bool(success),
+                            effectiveness_score=float(monitoring_score),
+                            situation_context=situation_context,
+                            strategic_decision=strategic_decision,
+                            execution_details=execution_details,
+                            lessons_learned={"monitoring_rounds": monitoring_count},
+                            full_log={"final_effectiveness_report": final_report},
+                        )
+                        persist_action_log_record(Path("learning_data/rag/rag_database.db"), record)
+                        workflow_logger.info(
+                            f"  ✅ Persisted monitoring effectiveness_score={monitoring_score:.2f} to action_logs (action_id={record.action_id})"
+                        )
+        except Exception as e:
+            workflow_logger.info(f"  ⚠️ Failed to persist monitoring effectiveness to action_logs: {e}")
 
     async def _update_task_baseline_after_intervention(self, task: Dict[str, Any], leader_content: Dict[str, Any], amplifier_responses: List[Dict[str, Any]]):
         """Update task baseline data after intervention for later monitoring iterations
