@@ -3794,37 +3794,31 @@ class SimpleCoordinationSystem:
 
     def _load_default_feedback_monitoring_interval(self) -> int:
         """Load default feedback monitoring interval from configs/experiment_config.json."""
-        default_interval = 30
-        try:
-            config_path = Path(__file__).parent.parent.parent / "configs" / "experiment_config.json"
-            if not config_path.exists():
-                workflow_logger.warning(
-                    f"⚠️ experiment config not found: {config_path}, fallback to {default_interval} minutes"
-                )
-                return default_interval
+        config_path = Path(__file__).parent.parent.parent / "configs" / "experiment_config.json"
+        if not config_path.exists():
+            raise FileNotFoundError(f"experiment config not found: {config_path}")
 
-            with open(config_path, "r", encoding="utf-8") as file:
-                config = json.load(file)
+        with open(config_path, "r", encoding="utf-8") as file:
+            config = json.load(file)
 
-            opinion_balance_cfg = config.get("opinion_balance_system", {}) or {}
-            candidate = opinion_balance_cfg.get("feedback_monitoring_interval")
-            if isinstance(candidate, (int, float)) and int(candidate) > 0:
-                return int(candidate)
-            if isinstance(candidate, str) and candidate.strip().isdigit():
-                value = int(candidate.strip())
-                if value > 0:
-                    return value
-
-            workflow_logger.warning(
-                f"⚠️ monitoring interval missing/invalid in {config_path}, fallback to {default_interval} minutes"
+        opinion_balance_cfg = config.get("opinion_balance_system")
+        if not isinstance(opinion_balance_cfg, dict):
+            raise ValueError(
+                "opinion_balance_system section is missing in configs/experiment_config.json"
             )
-            return default_interval
-        except Exception as e:
-            workflow_logger.warning(
-                f"⚠️ failed to load monitoring interval from configs/experiment_config.json: {e}; "
-                f"fallback to {default_interval} minutes"
-            )
-            return default_interval
+
+        candidate = opinion_balance_cfg.get("feedback_monitoring_interval")
+        if isinstance(candidate, str):
+            candidate = candidate.strip()
+            if candidate.isdigit():
+                candidate = int(candidate)
+        if isinstance(candidate, (int, float)) and int(candidate) > 0:
+            return int(candidate)
+
+        raise ValueError(
+            "opinion_balance_system.feedback_monitoring_interval must be a positive integer "
+            f"in {config_path}, got: {opinion_balance_cfg.get('feedback_monitoring_interval')!r}"
+        )
     
     def _get_fixed_amplifier_agent_ids(self, count: int) -> List[str]:
         """Allocate fixed number of IDs in order from the pool."""
@@ -4642,7 +4636,9 @@ class SimpleCoordinationSystem:
             workflow_logger.debug(f"Set comment publish time step: {self.current_time_step}")
 
         if not isinstance(monitoring_interval, int) or monitoring_interval <= 0:
-            monitoring_interval = int(getattr(self, "default_feedback_monitoring_interval", 30))
+            raise ValueError(
+                f"monitoring_interval must be a positive integer (minutes), got: {monitoring_interval!r}"
+            )
 
         action_id = f"action_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         start_time = datetime.now()
@@ -5625,9 +5621,8 @@ class SimpleCoordinationSystem:
         """
 
         if not isinstance(monitoring_interval, int) or monitoring_interval <= 0:
-            monitoring_interval = int(getattr(self, "default_feedback_monitoring_interval", 30))
-            workflow_logger.info(
-                f"  🔄 Monitoring interval not provided/invalid, using config default: {monitoring_interval} minutes"
+            raise ValueError(
+                f"monitoring_interval must be a positive integer (minutes), got: {monitoring_interval!r}"
             )
 
         monitoring_task_id = f"monitor_{action_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -5763,10 +5758,11 @@ class SimpleCoordinationSystem:
             
             # Wait for interval after each round (except the last)
             if monitoring_count < max_monitoring_cycles:
-                monitoring_interval_minutes = task.get(
-                    "monitoring_interval",
-                    int(getattr(self, "default_feedback_monitoring_interval", 30))
-                )  # Get minutes
+                monitoring_interval_minutes = task.get("monitoring_interval")
+                if not isinstance(monitoring_interval_minutes, int) or monitoring_interval_minutes <= 0:
+                    raise ValueError(
+                        f"task.monitoring_interval must be a positive integer, got: {monitoring_interval_minutes!r}"
+                    )
                 monitoring_interval_seconds = monitoring_interval_minutes * 60     # Convert to seconds
                 workflow_logger.info(f"  ⏰ Waiting {monitoring_interval_minutes} minutes ({monitoring_interval_seconds} seconds) before next round...")
                 await asyncio.sleep(monitoring_interval_seconds)
@@ -5821,10 +5817,7 @@ class SimpleCoordinationSystem:
                         execution_details = {
                             "leader_content": task.get("leader_content", {}),
                             "amplifier_responses": task.get("amplifier_responses", []),
-                            "monitoring_interval": task.get(
-                                "monitoring_interval",
-                                int(getattr(self, "default_feedback_monitoring_interval", 30))
-                            ),
+                            "monitoring_interval": task.get("monitoring_interval"),
                         }
 
                         record = ActionLogRecord(
@@ -8092,6 +8085,12 @@ Your ratings:"""
             filepath = os.path.join(reports_dir, filename)
 
             # Prepare effectiveness report data to save
+            monitoring_interval_value = self.monitoring_tasks.get(monitoring_task_id, {}).get("monitoring_interval")
+            monitoring_interval_text = (
+                f"{monitoring_interval_value} minutes"
+                if isinstance(monitoring_interval_value, int) and monitoring_interval_value > 0
+                else "N/A"
+            )
             report_data = {
                 "report_id": f"effectiveness_report_{timestamp}",
                 "monitoring_task_id": monitoring_task_id,
@@ -8102,9 +8101,7 @@ Your ratings:"""
                 "system_info": {
                     "version": "MOSAIC v1.0",
                     "agent_system": "SimpleCoordinationSystem",
-                    "monitoring_interval": (
-                        f"{self.monitoring_tasks.get(monitoring_task_id, {}).get('monitoring_interval', self.default_feedback_monitoring_interval)} minutes"
-                    )
+                    "monitoring_interval": monitoring_interval_text
                 }
             }
 
@@ -8145,6 +8142,12 @@ Your ratings:"""
             workflow_logger.info(f"    📊 Analyst Agent -> Strategist Agent: effectiveness report transfer (attempt {attempt + 1}/{self.strategist.max_retries})")
 
             # Build strategist Agent evaluation prompt (English)
+            task_monitoring_interval = task.get("monitoring_interval")
+            task_monitoring_interval_text = (
+                f"{task_monitoring_interval} minutes"
+                if isinstance(task_monitoring_interval, int) and task_monitoring_interval > 0
+                else "N/A"
+            )
             strategist_prompt = f"""
 You are an experienced public-opinion balancing strategist. You have received a real-time effectiveness report from the Analyst Agent. Please evaluate whether the current strategy is working and decide the next step.
 
@@ -8162,7 +8165,7 @@ You are an experienced public-opinion balancing strategist. You have received a 
 [Current Monitoring State]
 - Target post ID: {task.get('target_post_id', 'N/A')}
 - Action ID: {task.get('action_id', 'N/A')}
-- Monitoring interval: {task.get('monitoring_interval', self.default_feedback_monitoring_interval)} minutes
+- Monitoring interval: {task_monitoring_interval_text}
 
 [Evaluation Requirements]
 1. If unexpected negative discourse appears, immediately propose supplementary action plans.

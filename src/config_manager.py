@@ -123,7 +123,20 @@ class ConfigManager:
     
     def get_monitoring_interval(self) -> int:
         """Get current monitoring interval"""
-        return self.config.get('opinion_balance_system', {}).get('feedback_monitoring_interval', 30)
+        opinion_balance = self.config.get('opinion_balance_system')
+        if not isinstance(opinion_balance, dict):
+            raise ValueError("Missing 'opinion_balance_system' section in config")
+        value = opinion_balance.get('feedback_monitoring_interval')
+        if isinstance(value, str):
+            value = value.strip()
+            if value.isdigit():
+                value = int(value)
+        if isinstance(value, (int, float)) and int(value) > 0:
+            return int(value)
+        raise ValueError(
+            "opinion_balance_system.feedback_monitoring_interval must be a positive integer, "
+            f"got: {opinion_balance.get('feedback_monitoring_interval')!r}"
+        )
     
     def set_monitoring_interval(self, interval: int) -> bool:
         """Set monitoring interval"""

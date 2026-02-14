@@ -579,6 +579,26 @@ def get_monitoring_interval():
         except ValueError:
             print("❌ Please enter a valid number")
 
+def get_required_feedback_monitoring_interval(config: dict) -> int:
+    """Read feedback monitoring interval from config without fallback."""
+    obs_config = config.get('opinion_balance_system')
+    if not isinstance(obs_config, dict):
+        raise ValueError("Missing 'opinion_balance_system' section in configs/experiment_config.json")
+
+    value = obs_config.get('feedback_monitoring_interval')
+    if isinstance(value, str):
+        value = value.strip()
+        if value.isdigit():
+            value = int(value)
+
+    if isinstance(value, (int, float)) and int(value) > 0:
+        return int(value)
+
+    raise ValueError(
+        "opinion_balance_system.feedback_monitoring_interval must be a positive integer "
+        f"in configs/experiment_config.json, got: {obs_config.get('feedback_monitoring_interval')!r}"
+    )
+
 def get_user_choice_fact_checking():
     """Get user choice for the fact-checking feature."""
     print("\n" + "="*60)
@@ -736,8 +756,7 @@ if __name__ == "__main__":
         enable_opinion_balance = False
         enable_feedback_system = True  # Enable feedback iteration by default in standalone mode
         # Read monitoring interval from config
-        obs_config = config.get('opinion_balance_system', {}) or {}
-        monitoring_interval = obs_config.get('feedback_monitoring_interval', 30)
+        monitoring_interval = get_required_feedback_monitoring_interval(config)
         
         # Set standalone mode flag
         if 'opinion_balance_system' not in config:
@@ -750,8 +769,7 @@ if __name__ == "__main__":
         enable_opinion_balance = False
         enable_feedback_system = True  # Enable feedback iteration by default
         # Read monitoring interval from config
-        obs_config = config.get('opinion_balance_system', {}) or {}
-        monitoring_interval = obs_config.get('feedback_monitoring_interval', 30)
+        monitoring_interval = get_required_feedback_monitoring_interval(config)
         print("❌ Opinion balance system disabled")
 
     # Select fact-checking system
@@ -926,7 +944,7 @@ if __name__ == "__main__":
         print(f"   Response delay: {obs_config.get('response_delay_minutes', 'N/A')} minutes")
 
         # Show monitoring interval configuration
-        monitoring_interval = obs_config.get('feedback_monitoring_interval', 30)
+        monitoring_interval = get_required_feedback_monitoring_interval(config)
         interval_descriptions = {
             1: "🔥 Ultra-high-frequency monitoring",
             3: "🚀 High-frequency monitoring",

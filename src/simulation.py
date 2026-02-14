@@ -142,6 +142,25 @@ class Simulation:
             else:
                 logging.error("🛡️ Pre-bunking system enabled but failed to load prompts.")
                 self.prebunking_enabled = False
+
+    def _get_required_feedback_monitoring_interval(self) -> int:
+        opinion_balance_config = self.config.get('opinion_balance_system')
+        if not isinstance(opinion_balance_config, dict):
+            raise ValueError("Missing 'opinion_balance_system' section in configs/experiment_config.json")
+
+        value = opinion_balance_config.get('feedback_monitoring_interval')
+        if isinstance(value, str):
+            value = value.strip()
+            if value.isdigit():
+                value = int(value)
+
+        if isinstance(value, (int, float)) and int(value) > 0:
+            return int(value)
+
+        raise ValueError(
+            "opinion_balance_system.feedback_monitoring_interval must be a positive integer "
+            f"in configs/experiment_config.json, got: {opinion_balance_config.get('feedback_monitoring_interval')!r}"
+        )
     
     async def run(self, num_time_steps: int):
         """Run the simulation."""
@@ -154,8 +173,7 @@ class Simulation:
         self.last_opinion_balance_check = 0  # Start at zero so the first check runs immediately
         
         # Get the monitoring interval from the configuration to align with user selection
-        opinion_balance_config = self.config.get('opinion_balance_system', {})
-        monitoring_interval_minutes = opinion_balance_config.get('feedback_monitoring_interval', 30)
+        monitoring_interval_minutes = self._get_required_feedback_monitoring_interval()
         self.opinion_balance_interval = monitoring_interval_minutes * 60  # Convert to seconds
 
         # Save a copy of the experiment configuration
@@ -933,7 +951,10 @@ class Simulation:
         try:
             cursor = self.conn.cursor()
 
-            print(f"\n🔍 Opinion balance background monitoring - auto-checking every 2 minutes")
+            print(
+                f"\n🔍 Opinion balance background monitoring - auto-checking every "
+                f"{self.opinion_balance_manager.trending_posts_scan_interval} minutes"
+            )
 
             # Find trending posts: comments + likes + shares >= 20, ordered by heat, include news and user posts
             cursor.execute("""

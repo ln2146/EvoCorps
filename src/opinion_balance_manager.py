@@ -33,8 +33,8 @@ class OpinionBalanceManager:
         self.max_responses_per_post = self.balance_config.get('max_responses_per_post', 5)
         self.effectiveness_tracking = self.balance_config.get('effectiveness_tracking', True)
         # Separate trending posts scan interval and feedback monitoring interval
-        self.trending_posts_scan_interval = self.balance_config.get('trending_posts_scan_interval', 1)  # Default 1 minute
-        self.feedback_monitoring_interval = self.balance_config.get('feedback_monitoring_interval', 30)  # Default 30 minutes
+        self.trending_posts_scan_interval = self._require_positive_interval('trending_posts_scan_interval')
+        self.feedback_monitoring_interval = self._require_positive_interval('feedback_monitoring_interval')
 
         # Display system config status
         print(f"📊 Opinion Balance System Config:")
@@ -64,6 +64,19 @@ class OpinionBalanceManager:
         
         # Create database tables
         self._init_database_tables()
+
+    def _require_positive_interval(self, key: str) -> int:
+        raw_value = self.balance_config.get(key)
+        if isinstance(raw_value, str):
+            raw_value = raw_value.strip()
+            if raw_value.isdigit():
+                raw_value = int(raw_value)
+        if isinstance(raw_value, (int, float)) and int(raw_value) > 0:
+            return int(raw_value)
+        raise ValueError(
+            f"opinion_balance_system.{key} must be a positive integer in configs/experiment_config.json, "
+            f"got: {self.balance_config.get(key)!r}"
+        )
     
     def _init_database_tables(self):
         """Initialize database tables related to the opinion balance system."""
