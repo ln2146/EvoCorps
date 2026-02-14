@@ -106,6 +106,7 @@ The figure compares sentiment trajectories over time under four settings: Case 1
 - [📦 Datasets](#-datasets)
 - [📄 Citation](#-citation)
 - [⚖️ Ethics Statement](#ethics)
+- [📮 Contact](#contact)
 
 ---
 
@@ -240,10 +241,15 @@ If you use this project in your research, please cite our paper:
 
 ## ⚖️ Ethics Statement
 
-This work investigates mechanisms for online discourse depolarization in a simulated environment, utilizing publicly available datasets and synthetic agent interactions. It does not involve experiments with human subjects and does not collect or process personally identifying information. The primary goal of this research is to advance understanding of coordinated intervention mechanisms for platform governance, rather than to develop or deploy deceptive influence campaigns.
+This work investigates mechanisms for online discourse depolarization in a simulated environment, utilizing publicly available datasets and synthetic agent interactions. It **does not involve experiments with human subjects** and **does not collect or process personally identifying information**. The primary goal of this research is to advance understanding of coordinated intervention mechanisms for platform governance, **rather than to develop or deploy deceptive influence campaigns**.
 
 EvoCorps is framed as a governance-assistance approach for online platforms facing coordinated and malicious activities such as disinformation campaigns or adversarial manipulation. In such settings, platform governance actors may themselves require coordinated capabilities and stylistic diversity to respond effectively and proportionately. Our study therefore examines coordination and response diversity as governance mechanisms, not as tools for artificial consensus formation or manipulation.
 
-We explicitly oppose the use of deceptive strategies in any real-world deployment. Although our simulations introduce diverse agent personas to explore theoretical boundaries of influence dynamics, any practical application must adhere strictly to principles of transparency and accountability. Automated agents should be clearly identified as AI-based assistants or governance tools, such as certified fact-checking bots, and must not impersonate human users or conceal their artificial nature.
+**We explicitly oppose the use of deceptive strategies in any real-world deployment.** Although our simulations introduce diverse agent personas to explore theoretical boundaries of influence dynamics, any practical application must adhere strictly to principles of **transparency and accountability**. **Automated agents should be clearly identified as AI-based assistants or governance tools, such as certified fact-checking bots, and must not impersonate human users or conceal their artificial nature.**
 
-Any deployment of systems inspired by this work should be integrated with existing platform governance processes and subject to platform-specific policies, transparency requirements, and continuous auditing. Such safeguards are necessary to mitigate unintended harms, including disparate impacts, erosion of user trust, or errors arising from automated judgments. The intended use of EvoCorps is to support responsible, transparent, and accountable governance interventions, rather than to mislead users or manufacture false consensus.
+Any deployment of systems inspired by this work should be integrated with existing platform governance processes and subject to platform-specific policies, transparency requirements, and continuous auditing. **Such safeguards are necessary to mitigate unintended harms**, including disparate impacts, erosion of user trust, or errors arising from automated judgments. The intended use of EvoCorps is to support responsible, transparent, and accountable governance interventions, rather than to mislead users or manufacture false consensus.
+
+<a id="contact"></a>
+## 📮 Contact
+
+- Email: 2146289682@qq.com
