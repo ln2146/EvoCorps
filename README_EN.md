@@ -106,7 +106,7 @@ The figure compares sentiment trajectories over time under four settings: Case 1
 - [📦 Datasets](#-datasets)
 - [📄 Citation](#-citation)
 - [⚖️ Ethics Statement](#ethics)
-- [📮 Contact](#contact)
+- [🤝 Support & Contact](#contact)
 
 ---
 
@@ -250,6 +250,18 @@ EvoCorps is framed as a governance-assistance approach for online platforms faci
 Any deployment of systems inspired by this work should be integrated with existing platform governance processes and subject to platform-specific policies, transparency requirements, and continuous auditing. **Such safeguards are necessary to mitigate unintended harms**, including disparate impacts, erosion of user trust, or errors arising from automated judgments. The intended use of EvoCorps is to support responsible, transparent, and accountable governance interventions, rather than to mislead users or manufacture false consensus.
 
 <a id="contact"></a>
-## 📮 Contact
+## 🤝 Support & Contact
 
-- Email: 2146289682@qq.com
+### Feedback & Discussion
+
+- Project home: [GitHub Repository](https://github.com/ln2146/EvoCorps)
+- Bug reports: [Issues](https://github.com/ln2146/EvoCorps/issues)
+- Feature requests: [Discussions](https://github.com/ln2146/EvoCorps/discussions)
+
+### Contact
+
+- Email: [linning@bupt.edu.cn](mailto:linning@bupt.edu.cn)
+
+### Collaboration
+
+For **academic exchange and collaboration** (e.g., reproducing results, joint research, and co-building datasets/benchmarks) or **industry collaboration** (e.g., solution consulting for online discourse governance, customized multi-agent system development, private deployment, and technical training), feel free to reach out via the email above with a brief description of your needs. We will respond as soon as possible.
