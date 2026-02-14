@@ -12,7 +12,7 @@
     ],
     "max_responses_per_post": 5,
     "effectiveness_tracking": true,
-    "monitoring_interval_minutes": 30,
+    "feedback_monitoring_interval": 30,
     "auto_adjustment_enabled": true,
     "adjustment_sensitivity": "medium"
   },

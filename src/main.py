@@ -556,15 +556,15 @@ def get_user_choice_feedback_system():
 def get_monitoring_interval():
     """Get user selection for monitoring interval."""
     print("\n⏰ Select monitoring interval:")
-    print("Select monitoring duration: 1/5/10/30/60 (minutes)")
+    print("Select monitoring duration: 1/3/5/10/30/60 (minutes)")
 
     while True:
         try:
-            choice = input("Please select (1/5/10/30/60): ").strip()
+            choice = input("Please select (1/3/5/10/30/60): ").strip()
 
             # Parse user input as a number directly
             interval = int(choice)
-            supported_intervals = [1, 5, 10, 30, 60]
+            supported_intervals = [1, 3, 5, 10, 30, 60]
 
             if interval not in supported_intervals:
                 print(f"❌ Unsupported {interval} minutes, supported: {supported_intervals}")
@@ -737,7 +737,7 @@ if __name__ == "__main__":
         enable_feedback_system = True  # Enable feedback iteration by default in standalone mode
         # Read monitoring interval from config
         obs_config = config.get('opinion_balance_system', {}) or {}
-        monitoring_interval = obs_config['monitoring_interval_minutes']
+        monitoring_interval = obs_config.get('feedback_monitoring_interval', 30)
         
         # Set standalone mode flag
         if 'opinion_balance_system' not in config:
@@ -751,7 +751,7 @@ if __name__ == "__main__":
         enable_feedback_system = True  # Enable feedback iteration by default
         # Read monitoring interval from config
         obs_config = config.get('opinion_balance_system', {}) or {}
-        monitoring_interval = obs_config['monitoring_interval_minutes']
+        monitoring_interval = obs_config.get('feedback_monitoring_interval', 30)
         print("❌ Opinion balance system disabled")
 
     # Select fact-checking system
@@ -789,8 +789,7 @@ if __name__ == "__main__":
     config['opinion_balance_system']['enabled'] = enable_opinion_balance
     config['opinion_balance_system']['monitoring_enabled'] = enable_opinion_balance  # Monitoring is tied to opinion balance, not feedback
     config['opinion_balance_system']['feedback_system_enabled'] = enable_feedback_system
-    config['opinion_balance_system']['monitoring_interval'] = monitoring_interval
-    config['opinion_balance_system']['monitoring_interval_minutes'] = monitoring_interval
+    config['opinion_balance_system']['feedback_monitoring_interval'] = monitoring_interval
 
     # Update fact-checking config
     # 保留 experiment type 和 settings 供日志/其他组件参考，
@@ -927,9 +926,10 @@ if __name__ == "__main__":
         print(f"   Response delay: {obs_config.get('response_delay_minutes', 'N/A')} minutes")
 
         # Show monitoring interval configuration
-        monitoring_interval = obs_config['monitoring_interval_minutes']
+        monitoring_interval = obs_config.get('feedback_monitoring_interval', 30)
         interval_descriptions = {
             1: "🔥 Ultra-high-frequency monitoring",
+            3: "🚀 High-frequency monitoring",
             5: "🚀 High-frequency monitoring",
             10: "⚡ Mid-high-frequency monitoring",
             30: "📊 Standard monitoring",
@@ -967,6 +967,7 @@ if __name__ == "__main__":
     if enable_opinion_balance and enable_feedback_system:
         interval_descriptions = {
             1: "🔥 Ultra-high-frequency monitoring (1 minute)",
+            3: "🚀 High-frequency monitoring (3 minutes)",
             5: "🚀 High-frequency monitoring (5 minutes)",
             10: "⚡ Mid-high-frequency monitoring (10 minutes)",
             30: "📊 Standard monitoring (30 minutes)",

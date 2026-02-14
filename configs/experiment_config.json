@@ -46,10 +46,8 @@
         "intervention_threshold": 1,
         "feedback_system_enabled": true,
         "trending_posts_scan_interval": 5,
-        "feedback_monitoring_interval": 30,
-        "standalone_mode": true,
-        "monitoring_interval_minutes": 30,
-        "monitoring_interval": 30
+        "feedback_monitoring_interval": 3,
+        "standalone_mode": true
     },
     "malicious_bot_system": {
         "enabled": false,

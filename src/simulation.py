@@ -155,7 +155,7 @@ class Simulation:
         
         # Get the monitoring interval from the configuration to align with user selection
         opinion_balance_config = self.config.get('opinion_balance_system', {})
-        monitoring_interval_minutes = opinion_balance_config['monitoring_interval_minutes']
+        monitoring_interval_minutes = opinion_balance_config.get('feedback_monitoring_interval', 30)
         self.opinion_balance_interval = monitoring_interval_minutes * 60  # Convert to seconds
 
         # Save a copy of the experiment configuration
@@ -1071,7 +1071,7 @@ Latest comments (chronological):"""
                                     coordination_system.execute_workflow(
                                         content_text=formatted_content,
                                         content_id=post_id,
-                                        monitoring_interval=30,  # Feedback monitoring interval: 30 minutes
+                                        monitoring_interval=self.opinion_balance_manager.feedback_monitoring_interval,
                                         enable_feedback=self.opinion_balance_manager.feedback_enabled,
                                         force_intervention=False,  # Leave the intervention decision to the internal analysts
                                         time_step=current_time_step  # Pass the current time step

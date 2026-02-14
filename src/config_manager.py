@@ -52,7 +52,7 @@ class ConfigManager:
                 "response_delay_minutes": [2, 4, 6, 8, 10],
                 "max_responses_per_post": 5,
                 "effectiveness_tracking": True,
-                "monitoring_interval_minutes": 30,
+                "feedback_monitoring_interval": 30,
                 "auto_adjustment_enabled": True,
                 "adjustment_sensitivity": "medium"
             },
@@ -123,7 +123,7 @@ class ConfigManager:
     
     def get_monitoring_interval(self) -> int:
         """Get current monitoring interval"""
-        return self.config.get('opinion_balance_system', {}).get('monitoring_interval_minutes', 30)
+        return self.config.get('opinion_balance_system', {}).get('feedback_monitoring_interval', 30)
     
     def set_monitoring_interval(self, interval: int) -> bool:
         """Set monitoring interval"""
@@ -133,9 +133,7 @@ class ConfigManager:
             print(f"📋 Supported intervals: {self.supported_monitoring_intervals}")
             return False
         
-        # Save both key names for compatibility
-        self.config['opinion_balance_system']['monitoring_interval_minutes'] = interval
-        self.config['opinion_balance_system']['monitoring_interval'] = interval
+        self.config['opinion_balance_system']['feedback_monitoring_interval'] = interval
         self._save_config(self.config)
         
         print(f"✅ Monitoring interval set to: {interval} minutes")

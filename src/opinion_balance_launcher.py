@@ -281,7 +281,7 @@ class OpinionBalanceLauncher:
             # Debug: print the configuration passed to the OpinionBalanceManager
             print(f"🔍 Debug: config passed to OpinionBalanceManager:")
             print(f"   opinion_balance_system: {self.config.get('opinion_balance_system', {})}")
-            print(f"   monitoring_interval: {self.config.get('opinion_balance_system', {}).get('monitoring_interval', 'not_set')}")
+            print(f"   feedback_monitoring_interval: {self.config.get('opinion_balance_system', {}).get('feedback_monitoring_interval', 'not_set')}")
             
             # Instantiate the opinion balance manager
             self.opinion_balance_manager = OpinionBalanceManager(self.config, self.conn)
