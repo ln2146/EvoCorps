@@ -81,7 +81,7 @@ class IntelligentLearningSystem:
 
         # Configuration parameters
         self.config = {
-            "success_threshold": 0.7,
+            "success_threshold": 0.5,
             "min_cases_for_pattern": 3,
             "pattern_confidence_threshold": 0.6,
             "learning_rate": 0.1,
@@ -715,7 +715,7 @@ class IntelligentLearningSystem:
             query = context_to_query(
                 context=context,
                 query_type="mixed",  # Retrieve cases and strategies
-                similarity_threshold=0.1,
+                similarity_threshold=0.5,
                 max_results=5
             )
             

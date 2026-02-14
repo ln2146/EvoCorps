@@ -61,13 +61,13 @@ class RetrievalQuery:
     query_text: str
     query_type: str  # "case", "strategy", "mixed"
     context_filters: Dict[str, Any]
-    similarity_threshold: float = 0.1  # Lower threshold to get more results, for cosine similarity
+    similarity_threshold: float = 0.5  # Cosine similarity threshold (normalized vectors)
     max_results: int = 5
     include_metadata: bool = True
 
 
 def context_to_query(context: Dict[str, Any], query_type: str = "mixed", 
-                     similarity_threshold: float = 0.1, max_results: int = 5) -> RetrievalQuery:
+                     similarity_threshold: float = 0.5, max_results: int = 5) -> RetrievalQuery:
     """
     Convert a context dict to a retrieval query object
     
