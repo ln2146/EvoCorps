@@ -91,6 +91,7 @@ class IntelligentLearningSystem:
 
         # Database
         self.db_path = self.data_path / "learning_database.db"
+        self.last_recommendation_diagnosis: Optional[Dict[str, Any]] = None
     
     def _initialize_database(self):
         """Initialize the learning database."""
@@ -709,6 +710,7 @@ class IntelligentLearningSystem:
     def recommend_strategy(self, context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Recommend a strategy based on context."""
         try:
+            self.last_recommendation_diagnosis = None
             # Use context_to_query for retrieval
             
             # Convert context to retrieval query
@@ -724,6 +726,12 @@ class IntelligentLearningSystem:
             
             if not results:
                 logger.info("🔍 No relevant historical cases or strategies found")
+                diagnose_fn = getattr(self.rag_system, "diagnose_action_logs_retrieval", None)
+                if callable(diagnose_fn):
+                    try:
+                        self.last_recommendation_diagnosis = diagnose_fn(query)
+                    except Exception:
+                        self.last_recommendation_diagnosis = None
                 return None
             
             # Analyze retrieval results and recommend the best strategy

@@ -401,8 +401,8 @@ class EnhancedLeaderAgent:
                     count = llm_step.get("count", "?")
                     low_conf = llm_step.get("low_confidence_count")
                     if low_conf is None:
-                        return f"3. LLM 生成论据：count={count}（不入库）"
-                    return f"3. LLM 生成论据：count={count}，low_confidence={low_conf}（不入库）"
+                        return f"3. LLM 生成论据：count={count}"
+                    return f"3. LLM 生成论据：count={count}，low_confidence={low_conf}"
 
                 return "\n".join([_db_line(), _wiki_line(), _llm_line()])
 

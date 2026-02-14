@@ -1237,6 +1237,37 @@ Develop an appropriate strategy for this context. Return a JSON response with re
     async def _query_historical_strategies(self, alert: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Query historical action result logs, find most successful strategies for similar cases."""
         try:
+            def _get_thresholds() -> tuple[float, float]:
+                sim_th = 0.5
+                eff_th = 0.5
+
+                diagnosis = getattr(self.learning_system, "last_recommendation_diagnosis", None)
+                if isinstance(diagnosis, dict):
+                    try:
+                        if diagnosis.get("similarity_threshold") is not None:
+                            sim_th = float(diagnosis.get("similarity_threshold"))
+                    except Exception:
+                        pass
+                    try:
+                        if diagnosis.get("effectiveness_threshold") is not None:
+                            eff_th = float(diagnosis.get("effectiveness_threshold"))
+                    except Exception:
+                        pass
+
+                cfg = getattr(self.learning_system, "config", None)
+                if isinstance(cfg, dict):
+                    try:
+                        if cfg.get("success_threshold") is not None:
+                            eff_th = float(cfg.get("success_threshold"))
+                    except Exception:
+                        pass
+
+                return sim_th, eff_th
+
+            def _cmp_expr(v: float, th: float) -> str:
+                op = ">=" if v >= th else "<"
+                return f"{v:.3f}{op}{th:.3f}"
+
             # Use initialized learning system to avoid re-initialization
             if not self._learning_system_initialized:
                 self._initialize_learning_system()
@@ -1370,8 +1401,21 @@ Develop an appropriate strategy for this context. Return a JSON response with re
                         "source": "intelligent_learning",
                         "similarity_score": similarity
                     }
-                    workflow_logger.info(f"     🎯 Intelligent learning system recommended strategy: {strategy['strategy_name']} (Effectiveness score: {strategy['effectiveness_score']:.1%}, similarity: {similarity:.1%})")
-                    return [strategy]
+                    sim_th, eff_th = _get_thresholds()
+                    sim_v = float(similarity) if isinstance(similarity, (int, float)) else 0.0
+                    eff_v = float(effectiveness_score) if isinstance(effectiveness_score, (int, float)) else 0.0
+                    workflow_logger.info(
+                        "     ✅ Top matching strategy: {sid}, similarity={sim_expr}, effectiveness score={eff_expr}".format(
+                            sid=strategy_id,
+                            sim_expr=_cmp_expr(sim_v, sim_th),
+                            eff_expr=_cmp_expr(eff_v, eff_th),
+                        )
+                    )
+                    if sim_v >= sim_th and eff_v >= eff_th:
+                        workflow_logger.info("     ✅ Use this strategy")
+                        return [strategy]
+                    workflow_logger.info("     ⏭️ Strategy not suitable, use a new strategy")
+                    return []
                 
                 elif recommendation.get("strategy_name"):
                     # Handle traditional strategy recommendation format
@@ -1386,13 +1430,74 @@ Develop an appropriate strategy for this context. Return a JSON response with re
                         "source": recommendation.get("source", "intelligent_learning"),
                         "similarity_score": recommendation.get("similarity_score", 0.9)
                     }
-                    workflow_logger.info(f"     🎯 Intelligent learning system recommended strategy: {strategy['strategy_name']} (Effectiveness score: {strategy['effectiveness_score']:.1%})")
-                    return [strategy]
+                    sim_th, eff_th = _get_thresholds()
+                    sim_v = float(strategy.get("similarity_score", 0.0) or 0.0)
+                    eff_v = float(strategy.get("effectiveness_score", 0.0) or 0.0)
+                    workflow_logger.info(
+                        "     ✅ Top matching strategy: {sid}, similarity={sim_expr}, effectiveness score={eff_expr}".format(
+                            sid=strategy.get("strategy_id"),
+                            sim_expr=_cmp_expr(sim_v, sim_th),
+                            eff_expr=_cmp_expr(eff_v, eff_th),
+                        )
+                    )
+                    if sim_v >= sim_th and eff_v >= eff_th:
+                        workflow_logger.info("     ✅ Use this strategy")
+                        return [strategy]
+                    workflow_logger.info("     ⏭️ Strategy not suitable, use a new strategy")
+                    return []
                 else:
                     workflow_logger.info("     ❌ Intelligent learning system returned an unknown format recommendation")
                     return []
             else:
                 workflow_logger.info("     ❌ Intelligent learning system found no matching strategy, none available")
+                diagnosis = getattr(self.learning_system, "last_recommendation_diagnosis", None)
+                if isinstance(diagnosis, dict):
+                    reason = diagnosis.get("reason", "no_results")
+                    top_candidates = diagnosis.get("top_candidates", [])
+                    try:
+                        threshold = float(diagnosis.get("similarity_threshold", 0.5))
+                    except Exception:
+                        threshold = diagnosis.get("similarity_threshold", 0.5)
+                    try:
+                        eff_th = float(diagnosis.get("effectiveness_threshold", getattr(getattr(self.learning_system, "config", {}), "get", lambda *_: 0.5)("success_threshold", 0.5)))
+                    except Exception:
+                        eff_th = 0.5
+
+                    if isinstance(top_candidates, list) and top_candidates:
+                        best = top_candidates[0] if isinstance(top_candidates[0], dict) else {}
+                        sim = best.get("similarity")
+                        eff = best.get("effectiveness_score")
+                        try:
+                            sim_f = float(sim)
+                            eff_f = float(eff) if eff is not None else None
+                            eff_v = eff_f if eff_f is not None else 0.0
+                            workflow_logger.info(
+                                "     ✅ Top matching strategy: {aid}, similarity={sim_expr}, effectiveness score={eff_expr}".format(
+                                    aid=best.get("action_id"),
+                                    sim_expr=_cmp_expr(sim_f, float(threshold)),
+                                    eff_expr=_cmp_expr(eff_v, float(eff_th)),
+                                )
+                            )
+                        except Exception:
+                            workflow_logger.info(
+                                f"     ✅ Top matching strategy: {best.get('action_id')}, similarity={sim}<{threshold}, effectiveness score={eff}<{eff_th}"
+                            )
+
+                        preview = []
+                        for c in top_candidates[:3]:
+                            if isinstance(c, dict):
+                                preview.append(
+                                    {
+                                        "action_id": c.get("action_id"),
+                                        "similarity": c.get("similarity"),
+                                        "effectiveness_score": c.get("effectiveness_score"),
+                                    }
+                                )
+                        if preview:
+                            workflow_logger.info(f"     ℹ️ Top candidates (pre-threshold): {preview}（reason={reason}）")
+                    else:
+                        workflow_logger.info(f"     ℹ️ No matching strategy: similarity_threshold={threshold}; reason={reason}")
+                workflow_logger.info("     ⏭️ Strategy not suitable, use a new strategy")
                 return []
 
         except Exception as e:

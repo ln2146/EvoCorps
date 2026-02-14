@@ -599,6 +599,125 @@ class AdvancedRAGSystem:
 
         return results
 
+    def diagnose_action_logs_retrieval(self, query: RetrievalQuery, top_k: int = 3) -> Dict[str, Any]:
+        """Diagnose why action_logs retrieval returns empty.
+
+        Returns a dict containing similarity_threshold, reason, and top_candidates (pre-threshold).
+        This is best-effort diagnostics for workflow logs.
+        """
+        diagnosis: Dict[str, Any] = {
+            "query_text": getattr(query, "query_text", ""),
+            "similarity_threshold": getattr(query, "similarity_threshold", None),
+            "reason": "unknown",
+            "top_candidates": [],
+        }
+
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='action_logs'")
+            if not cursor.fetchone():
+                diagnosis["reason"] = "action_logs_table_missing"
+                return diagnosis
+
+            cursor.execute("SELECT COUNT(*) FROM action_logs")
+            total = cursor.fetchone()[0]
+            diagnosis["action_logs_count"] = int(total)
+            if total == 0:
+                diagnosis["reason"] = "action_logs_empty"
+                return diagnosis
+
+            query_text = getattr(query, "query_text", "")
+            query_vector = self._encode_text(query_text)
+            if query_vector is None:
+                diagnosis["reason"] = "query_encode_failed"
+                return diagnosis
+
+            if not hasattr(self, "query_text_index") or self.query_text_index is None:
+                if not self._load_query_text_index():
+                    self._build_query_text_faiss_index(conn)
+
+            if not hasattr(self, "query_text_index") or self.query_text_index is None or not getattr(self, "query_text_ids", None):
+                diagnosis["reason"] = "faiss_index_unavailable"
+                return diagnosis
+
+            # Ensure dimensions match
+            qdim = int(query_vector.shape[0])
+            if int(self.query_text_index.d) != qdim:
+                diagnosis["reason"] = "faiss_dim_mismatch"
+                return diagnosis
+
+            k = min(int(top_k), len(self.query_text_ids))
+            if k <= 0:
+                diagnosis["reason"] = "no_index_items"
+                return diagnosis
+
+            scores, indices = self.query_text_index.search(query_vector.reshape(1, -1).astype("float32"), k)
+            raw = []
+            for score, idx in zip(scores[0], indices[0]):
+                if idx < 0 or idx >= len(self.query_text_ids):
+                    continue
+                action_log_id = self.query_text_ids[idx]
+                raw.append((int(action_log_id), float(score)))
+
+            if not raw:
+                diagnosis["reason"] = "no_candidates"
+                return diagnosis
+
+            ids = [r[0] for r in raw]
+            placeholders = ",".join(["?" for _ in ids])
+            cursor.execute(
+                f"SELECT id, action_id, effectiveness_score FROM action_logs WHERE id IN ({placeholders})",
+                [str(i) for i in ids],
+            )
+            rows = cursor.fetchall()
+            id_to_row = {int(r[0]): r for r in rows}
+
+            candidates = []
+            for action_log_id, sim in raw:
+                row = id_to_row.get(int(action_log_id))
+                if not row:
+                    continue
+                _, action_id, eff = row
+                try:
+                    eff_f = float(eff) if eff is not None else None
+                except Exception:
+                    eff_f = None
+                candidates.append(
+                    {
+                        "action_id": action_id,
+                        "similarity": float(sim),
+                        "effectiveness_score": eff_f,
+                    }
+                )
+
+            diagnosis["top_candidates"] = candidates
+            diagnosis["top_similarity"] = float(candidates[0]["similarity"]) if candidates else None
+
+            try:
+                threshold = float(getattr(query, "similarity_threshold", 0.0))
+            except Exception:
+                threshold = getattr(query, "similarity_threshold", 0.0)
+
+            if candidates and float(candidates[0]["similarity"]) < float(threshold):
+                diagnosis["reason"] = "similarity_below_threshold"
+            else:
+                diagnosis["reason"] = "no_results"
+
+            return diagnosis
+
+        except Exception as e:
+            diagnosis["reason"] = f"diagnose_error:{e}"
+            return diagnosis
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
     def _retrieve_from_action_logs(self, query: RetrievalQuery) -> List[RetrievalResult]:
         """Retrieve similar query and strategic_decision from action_logs"""
         results = []
