@@ -57,6 +57,35 @@ describe('toUserMilestone', () => {
     expect(toUserMilestone('💬 Second leader comment ID: comment-0cd2c7')).toBe('第二条领袖评论ID：comment-0cd2c7')
   })
 
+  it('maps leader evidence retrieval flow lines from English backend to Chinese UI labels', () => {
+    expect(toUserMilestone('Evidence retrieval flow:')).toBe('论据检索流程：')
+    expect(toUserMilestone('1. Database retrieval:')).toBe('1. 检索数据库：')
+    expect(toUserMilestone('- Theme match: theme=Science & Health, matched=True')).toBe(
+      '- 主题匹配：theme=Science & Health, matched=True',
+    )
+    expect(toUserMilestone('- Keyword retrieval: keyword=vaccine, sim=0.650<0.700 (fail)')).toBe(
+      '- 关键词检索：keyword=vaccine, sim=0.650<0.700 (fail)',
+    )
+    expect(toUserMilestone('- Viewpoint retrieval: skipped (reason: keyword threshold not met or no matched viewpoint)')).toBe(
+      '- 观点检索：skipped (reason: keyword threshold not met or no matched viewpoint)',
+    )
+    expect(toUserMilestone('- Conclusion: skipped (reason: keyword similarity below threshold)')).toBe(
+      '- 结论：skipped (reason: keyword similarity below threshold)',
+    )
+    expect(toUserMilestone('2. Wikipedia retrieval: keyword=vaccine, retrieved=15, selected=0 (retrieved but none passed acceptance filtering)')).toBe(
+      '2. 检索维基百科：keyword=vaccine, retrieved=15, selected=0 (retrieved but none passed acceptance filtering)',
+    )
+    expect(toUserMilestone('- Wikipedia selected evidence 1: score=0.77, content=W1')).toBe(
+      '- 维基百科入选论据1：score=0.77, content=W1',
+    )
+    expect(toUserMilestone('3. LLM evidence generation: count=3, low_confidence=3')).toBe(
+      '3. LLM 生成论据：count=3, low_confidence=3',
+    )
+    expect(toUserMilestone('- LLM evidence/comment 1: score=0.30, content=L1')).toBe(
+      '- LLM论据/评论1：score=0.30, content=L1',
+    )
+  })
+
   it('maps per-comment scoring lines (keep raw content, translate labels)', () => {
     expect(toUserMilestone('🔍 Comment 1 LLM result: (8.0, 0.1)')).toBe('🔍 评论1 计算结果：极端度 8.0/10.0，情绪度 0.1/1.0')
     expect(toUserMilestone('INFO: 🔍 Comment 1 LLM result: (8.0, 0.1)')).toBe('🔍 评论1 计算结果：极端度 8.0/10.0，情绪度 0.1/1.0')

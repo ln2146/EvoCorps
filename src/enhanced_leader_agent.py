@@ -324,6 +324,7 @@ class EnhancedLeaderAgent:
                 workflow_logger.warning("   ⚠️ Keyword missing in evidence system result; defaulting to 'general'")
             workflow_logger.info(f"   Keyword: {keyword_value or 'general'}")
 
+            evidence_list = result.get('evidence', [])
             trace = result.get("trace")
 
             def _get_first_step(step_name: str):
@@ -341,73 +342,187 @@ class EnhancedLeaderAgent:
                 db_step = _get_first_step("db_evidence")
                 wikipedia_step = _get_first_step("wikipedia_refresh") or _get_first_step("wikipedia")
                 llm_step = _get_first_step("llm_fallback")
+                result_status = result.get("status")
 
-                def _db_line() -> str:
+                def _clip_text(text: str, limit: int = 90) -> str:
+                    normalized = (text or "").replace("\n", " ").strip()
+                    if len(normalized) <= limit:
+                        return normalized
+                    return normalized[:limit] + "..."
+
+                def _db_lines() -> List[str]:
+                    lines: List[str] = ["1. Database retrieval:"]
+                    theme_step = _get_first_step("theme_match")
+                    keyword_step = _get_first_step("faiss_keyword")
+                    viewpoint_step = _get_first_step("faiss_viewpoint")
+
+                    reason = "did not enter DB evidence branch"
+
+                    if isinstance(theme_step, dict):
+                        theme_name = theme_step.get("theme", theme_value or "?")
+                        matched = theme_step.get("matched")
+                        if matched is True:
+                            lines.append(f"   - Theme match: theme={theme_name}, matched=True")
+                        elif matched is False:
+                            lines.append(f"   - Theme match: theme={theme_name}, matched=False")
+                            reason = f"no DB records matched theme (theme={theme_name}, matched=False)"
+                        else:
+                            lines.append(f"   - Theme match: theme={theme_name}, matched={matched}")
+                    else:
+                        lines.append("   - Theme match: no trace data")
+
+                    if isinstance(keyword_step, dict):
+                        keyword_name = keyword_step.get("keyword", keyword_value or "general")
+                        sim = keyword_step.get("similarity")
+                        th = keyword_step.get("threshold")
+                        try:
+                            sim_f = float(sim)
+                            th_f = float(th)
+                            cmp_symbol = ">=" if sim_f >= th_f else "<"
+                            verdict = "pass" if sim_f >= th_f else "fail"
+                            lines.append(
+                                f"   - Keyword retrieval: keyword={keyword_name}, sim={sim_f:.3f}{cmp_symbol}{th_f:.3f} ({verdict})"
+                            )
+                            if sim_f < th_f:
+                                reason = (
+                                    f"keyword similarity below threshold (sim={sim_f:.3f} < threshold={th_f:.3f}, compare: {sim_f:.3f}<{th_f:.3f})"
+                                )
+                        except Exception:
+                            lines.append(f"   - Keyword retrieval: keyword={keyword_name}, sim={sim}, threshold={th}")
+                    elif isinstance(theme_step, dict) and theme_step.get("matched") is False:
+                        lines.append("   - Keyword retrieval: skipped (reason: theme mismatch)")
+                    else:
+                        lines.append("   - Keyword retrieval: no trace data")
+
+                    if isinstance(viewpoint_step, dict):
+                        sim = viewpoint_step.get("similarity")
+                        th = viewpoint_step.get("threshold")
+                        try:
+                            sim_f = float(sim)
+                            th_f = float(th)
+                            cmp_symbol = ">=" if sim_f >= th_f else "<"
+                            verdict = "pass" if sim_f >= th_f else "fail"
+                            lines.append(
+                                f"   - Viewpoint retrieval: sim={sim_f:.3f}{cmp_symbol}{th_f:.3f} ({verdict})"
+                            )
+                            if sim_f < th_f:
+                                reason = (
+                                    f"viewpoint similarity below threshold (sim={sim_f:.3f} < threshold={th_f:.3f}, compare: {sim_f:.3f}<{th_f:.3f})"
+                                )
+                        except Exception:
+                            lines.append(f"   - Viewpoint retrieval: sim={sim}, threshold={th}")
+                    elif isinstance(keyword_step, dict):
+                        lines.append("   - Viewpoint retrieval: skipped (reason: keyword threshold not met or no matched viewpoint)")
+                    else:
+                        lines.append("   - Viewpoint retrieval: no trace data")
+
                     if not isinstance(db_step, dict):
-                        reason = "未命中 DB 取证据分支"
-                        if isinstance(trace, dict):
-                            theme_step = _get_first_step("theme_match")
-                            keyword_step = _get_first_step("faiss_keyword")
-                            viewpoint_step = _get_first_step("faiss_viewpoint")
+                        lines.append(f"   - Conclusion: skipped (reason: {reason})")
+                        return lines
 
-                            if isinstance(theme_step, dict) and theme_step.get("matched") is False:
-                                theme_value = theme_step.get("theme", "?")
-                                reason = f"主题在数据库中无匹配记录（theme={theme_value}，matched=False）"
-                            elif isinstance(keyword_step, dict):
-                                sim = keyword_step.get("similarity")
-                                th = keyword_step.get("threshold")
-                                try:
-                                    if sim is not None and th is not None and float(sim) < float(th):
-                                        sim_f = float(sim)
-                                        th_f = float(th)
-                                        reason = (
-                                            f"关键词相似度不足（sim={sim_f:.3f} < threshold={th_f:.3f}，比较：{sim_f:.3f}<{th_f:.3f}）"
-                                        )
-                                except Exception:
-                                    reason = f"关键词相似度不足（sim={sim} < threshold={th}）"
-                            elif isinstance(viewpoint_step, dict):
-                                sim = viewpoint_step.get("similarity")
-                                th = viewpoint_step.get("threshold")
-                                try:
-                                    if sim is not None and th is not None and float(sim) < float(th):
-                                        sim_f = float(sim)
-                                        th_f = float(th)
-                                        reason = (
-                                            f"观点相似度不足（sim={sim_f:.3f} < threshold={th_f:.3f}，比较：{sim_f:.3f}<{th_f:.3f}）"
-                                        )
-                                except Exception:
-                                    reason = f"观点相似度不足（sim={sim} < threshold={th}）"
-
-                        return f"1. 检索数据库：跳过（原因：{reason}）"
                     selected = db_step.get("selected_count", "?")
                     min_rate = db_step.get("min_acceptance_rate", trace.get("min_acceptance_rate") if isinstance(trace, dict) else None)
                     if min_rate is None:
-                        return f"1. 检索数据库：selected={selected}"
-                    return f"1. 检索数据库：阈值>={min_rate}，selected={selected}"
+                        lines.append(f"   - DB evidence read: selected={selected}")
+                    else:
+                        lines.append(f"   - DB evidence read: threshold>={min_rate}, selected={selected}")
+                    lines.append("   - Conclusion: entered DB evidence branch")
+                    return lines
 
                 def _wiki_line() -> str:
                     if not isinstance(wikipedia_step, dict):
-                        return "2. 检索维基百科：跳过"
+                        return "2. Wikipedia retrieval: skipped"
                     keyword = wikipedia_step.get("keyword", "?")
                     retrieved = wikipedia_step.get("retrieved_count", "?")
                     selected = wikipedia_step.get("selected_count")
+                    min_rate = trace.get("min_acceptance_rate") if isinstance(trace, dict) else None
+                    try:
+                        retrieved_i = int(retrieved)
+                    except Exception:
+                        retrieved_i = None
+                    try:
+                        selected_i = int(selected) if selected is not None else None
+                    except Exception:
+                        selected_i = None
+
+                    if retrieved_i == 0:
+                        return f"2. Wikipedia retrieval: keyword={keyword}, retrieved=0 (no relevant evidence retrieved)"
                     if selected is None:
-                        return f"2. 检索维基百科：keyword={keyword}，retrieved={retrieved}"
-                    return f"2. 检索维基百科：keyword={keyword}，retrieved={retrieved}，selected={selected}"
+                        return f"2. Wikipedia retrieval: keyword={keyword}, retrieved={retrieved}"
+                    if selected_i == 0 and (retrieved_i is None or retrieved_i > 0):
+                        if min_rate is None:
+                            return (
+                                f"2. Wikipedia retrieval: keyword={keyword}, retrieved={retrieved}, selected=0"
+                                " (retrieved but none passed acceptance filtering)"
+                            )
+                        return (
+                            f"2. Wikipedia retrieval: keyword={keyword}, retrieved={retrieved}, selected=0"
+                            f" (retrieved but none passed acceptance filtering, threshold>={min_rate})"
+                        )
+                    return f"2. Wikipedia retrieval: keyword={keyword}, retrieved={retrieved}, selected={selected}"
+
+                def _wiki_preview_lines() -> List[str]:
+                    wiki_items = []
+                    for item in evidence_list:
+                        if not isinstance(item, dict):
+                            continue
+                        source = str(item.get("source", "")).lower()
+                        if "wikipedia" in source:
+                            wiki_items.append(item)
+                    lines: List[str] = []
+                    for index, item in enumerate(wiki_items[:3], 1):
+                        rate = item.get("acceptance_rate", "?")
+                        try:
+                            score = f"{float(rate):.2f}"
+                        except Exception:
+                            score = str(rate)
+                        lines.append(
+                            f"   - Wikipedia selected evidence {index}: score={score}, content={_clip_text(item.get('evidence', ''))}"
+                        )
+                    return lines
 
                 def _llm_line() -> str:
                     if not isinstance(llm_step, dict):
-                        return "3. LLM 生成论据：跳过"
+                        return "3. LLM evidence generation: skipped"
                     count = llm_step.get("count", "?")
                     low_conf = llm_step.get("low_confidence_count")
                     if low_conf is None:
-                        return f"3. LLM 生成论据：count={count}"
-                    return f"3. LLM 生成论据：count={count}，low_confidence={low_conf}"
+                        return f"3. LLM evidence generation: count={count}"
+                    return f"3. LLM evidence generation: count={count}, low_confidence={low_conf}"
 
-                return "\n".join([_db_line(), _wiki_line(), _llm_line()])
+                def _llm_preview_lines() -> List[str]:
+                    llm_items = []
+                    for item in evidence_list:
+                        if not isinstance(item, dict):
+                            continue
+                        source = str(item.get("source", "")).lower()
+                        if "llm" in source:
+                            llm_items.append(item)
+                    if result_status == "llm_fallback_evidence" and not llm_items:
+                        llm_items = [item for item in evidence_list if isinstance(item, dict)]
+
+                    lines: List[str] = []
+                    for index, item in enumerate(llm_items[:3], 1):
+                        rate = item.get("acceptance_rate", "?")
+                        try:
+                            score = f"{float(rate):.2f}"
+                        except Exception:
+                            score = str(rate)
+                        lines.append(
+                            f"   - LLM evidence/comment {index}: score={score}, content={_clip_text(item.get('evidence', ''))}"
+                        )
+                    return lines
+
+                return "\n".join([
+                    *_db_lines(),
+                    _wiki_line(),
+                    *_wiki_preview_lines(),
+                    _llm_line(),
+                    *_llm_preview_lines(),
+                ])
 
             if isinstance(trace, dict):
-                workflow_logger.info("   论据检索流程：")
+                workflow_logger.info("   Evidence retrieval flow:")
                 for line in _build_evidence_pipeline_summary().splitlines():
                     workflow_logger.info(f"   {line}")
 
@@ -424,7 +539,6 @@ class EnhancedLeaderAgent:
                 )
 
             # Extract evidence info
-            evidence_list = result.get('evidence', [])
             relevant_arguments = []
 
             for i, evidence in enumerate(evidence_list):

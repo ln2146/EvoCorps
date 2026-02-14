@@ -58,6 +58,44 @@ export function toUserMilestone(cleanLine: string): string | null {
       return `关键词：${kw}`
     }
   }
+  if (/^Evidence retrieval flow:\s*$/i.test(s)) return '论据检索流程：'
+  if (/^1\.\s*Database retrieval:\s*$/i.test(s)) return '1. 检索数据库：'
+  {
+    const m = s.match(/^-+\s*Theme match:\s*(.+)$/i)
+    if (m) return `- 主题匹配：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^-+\s*Keyword retrieval:\s*(.+)$/i)
+    if (m) return `- 关键词检索：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^-+\s*Viewpoint retrieval:\s*(.+)$/i)
+    if (m) return `- 观点检索：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^-+\s*DB evidence read:\s*(.+)$/i)
+    if (m) return `- DB证据读取：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^-+\s*Conclusion:\s*(.+)$/i)
+    if (m) return `- 结论：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^2\.\s*Wikipedia retrieval:\s*(.+)$/i)
+    if (m) return `2. 检索维基百科：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^-+\s*Wikipedia selected evidence\s*(\d+):\s*(.+)$/i)
+    if (m) return `- 维基百科入选论据${m[1]}：${m[2].trim()}`
+  }
+  {
+    const m = s.match(/^3\.\s*LLM evidence generation:\s*(.+)$/i)
+    if (m) return `3. LLM 生成论据：${m[1].trim()}`
+  }
+  {
+    const m = s.match(/^-+\s*LLM evidence\/comment\s*(\d+):\s*(.+)$/i)
+    if (m) return `- LLM论据/评论${m[1]}：${m[2].trim()}`
+  }
   {
     const m = s.match(/^Argument\s+(\d+):\s*(.+)$/i)
     if (m) return `论据${m[1]}：${m[2].trim()}`
