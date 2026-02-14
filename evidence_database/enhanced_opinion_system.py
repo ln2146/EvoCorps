@@ -834,6 +834,43 @@ class EnhancedOpinionSystem:
             "retrieval_path": [],
             "min_acceptance_rate": MIN_EVIDENCE_ACCEPTANCE_RATE,
         }
+
+        def _attach_trace(result: Dict[str, Any]) -> Dict[str, Any]:
+            if not isinstance(result, dict):
+                return result
+
+            outer_path = trace.get("retrieval_path", [])
+            outer_min_rate = trace.get("min_acceptance_rate")
+            existing_trace = result.get("trace")
+
+            if not isinstance(existing_trace, dict):
+                result["trace"] = {
+                    "retrieval_path": list(outer_path) if isinstance(outer_path, list) else [],
+                    "min_acceptance_rate": outer_min_rate,
+                }
+                return result
+
+            existing_path = existing_trace.get("retrieval_path")
+            merged_path: List[Dict[str, Any]] = []
+            if isinstance(outer_path, list):
+                merged_path.extend([step for step in outer_path if isinstance(step, dict)])
+            if isinstance(existing_path, list):
+                merged_path.extend([step for step in existing_path if isinstance(step, dict)])
+
+            deduped_path: List[Dict[str, Any]] = []
+            seen = set()
+            for step in merged_path:
+                key = tuple(sorted(step.items()))
+                if key in seen:
+                    continue
+                seen.add(key)
+                deduped_path.append(step)
+
+            existing_trace["retrieval_path"] = deduped_path
+            if existing_trace.get("min_acceptance_rate") is None:
+                existing_trace["min_acceptance_rate"] = outer_min_rate
+            result["trace"] = existing_trace
+            return result
         
         # Display cache statistics
         cache_stats = self.get_cache_stats()
@@ -859,9 +896,7 @@ class EnhancedOpinionSystem:
                     {"step": "theme_match", "matched": False, "theme": theme}
                 )
                 result = self._handle_completely_new_opinion(opinion, theme, keyword)
-                if isinstance(result, dict) and "trace" not in result:
-                    result["trace"] = trace
-                return result
+                return _attach_trace(result)
 
             trace["retrieval_path"].append(
                 {"step": "theme_match", "matched": True, "theme": theme}
@@ -908,29 +943,21 @@ class EnhancedOpinionSystem:
                         result = self._handle_new_viewpoint_existing_keywords(
                             opinion, theme, matched_keywords
                         )
-                        if isinstance(result, dict) and "trace" not in result:
-                            result["trace"] = trace
-                        return result
+                        return _attach_trace(result)
                     result = self._return_top5_evidence(viewpoint_id, requested_viewpoint=opinion)
-                    if isinstance(result, dict) and "trace" not in result:
-                        result["trace"] = trace
-                    return result
+                    return _attach_trace(result)
                 else:
                     print(f"❌ Viewpoint match failed (similarity: {viewpoint_match_result['similarity']:.3f})")
                     # Case 1.2: new viewpoint but keywords exist
                     result = self._handle_new_viewpoint_existing_keywords(
                         opinion, theme, matched_keywords
                     )
-                    if isinstance(result, dict) and "trace" not in result:
-                        result["trace"] = trace
-                    return result
+                    return _attach_trace(result)
             else:
                 print(f"❌ Keyword match failed (similarity: {keyword_match_result['similarity']:.3f})")
                 # Case (2): similarity below threshold, new keyword flow
                 result = self._handle_completely_new_opinion(opinion, theme, keyword)
-                if isinstance(result, dict) and "trace" not in result:
-                    result["trace"] = trace
-                return result
+                return _attach_trace(result)
         
         except Exception as e:
             print(f"❌ Processing failed: {e}")

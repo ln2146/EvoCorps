@@ -1449,7 +1449,6 @@ Develop an appropriate strategy for this context. Return a JSON response with re
                     workflow_logger.info("     ❌ Intelligent learning system returned an unknown format recommendation")
                     return []
             else:
-                workflow_logger.info("     ❌ Intelligent learning system found no matching strategy, none available")
                 diagnosis = getattr(self.learning_system, "last_recommendation_diagnosis", None)
                 if isinstance(diagnosis, dict):
                     reason = diagnosis.get("reason", "no_results")
@@ -1472,7 +1471,7 @@ Develop an appropriate strategy for this context. Return a JSON response with re
                             eff_f = float(eff) if eff is not None else None
                             eff_v = eff_f if eff_f is not None else 0.0
                             workflow_logger.info(
-                                "     ✅ Top matching strategy: {aid}, similarity={sim_expr}, effectiveness score={eff_expr}".format(
+                                "     🔍 Top strategy candidate: {aid}, similarity={sim_expr}, effectiveness score={eff_expr}, decision=new_strategy".format(
                                     aid=best.get("action_id"),
                                     sim_expr=_cmp_expr(sim_f, float(threshold)),
                                     eff_expr=_cmp_expr(eff_v, float(eff_th)),
@@ -1480,23 +1479,10 @@ Develop an appropriate strategy for this context. Return a JSON response with re
                             )
                         except Exception:
                             workflow_logger.info(
-                                f"     ✅ Top matching strategy: {best.get('action_id')}, similarity={sim}<{threshold}, effectiveness score={eff}<{eff_th}"
+                                f"     🔍 Top strategy candidate: {best.get('action_id')}, similarity={sim}<{threshold}, effectiveness score={eff}<{eff_th}, decision=new_strategy"
                             )
-
-                        preview = []
-                        for c in top_candidates[:3]:
-                            if isinstance(c, dict):
-                                preview.append(
-                                    {
-                                        "action_id": c.get("action_id"),
-                                        "similarity": c.get("similarity"),
-                                        "effectiveness_score": c.get("effectiveness_score"),
-                                    }
-                                )
-                        if preview:
-                            workflow_logger.info(f"     ℹ️ Top candidates (pre-threshold): {preview}（reason={reason}）")
                     else:
-                        workflow_logger.info(f"     ℹ️ No matching strategy: similarity_threshold={threshold}; reason={reason}")
+                        workflow_logger.info(f"     ℹ️ No strategy candidate available (similarity_threshold={threshold})")
                 workflow_logger.info("     ⏭️ Strategy not suitable, use a new strategy")
                 return []
 
@@ -3775,6 +3761,7 @@ class SimpleCoordinationSystem:
         # Phase three: feedback and iteration
         self.monitoring_active = False
         self.monitoring_tasks = {}
+        self.monitoring_task_handles = {}
         self.feedback_history = []
         self.default_feedback_monitoring_interval = self._load_default_feedback_monitoring_interval()
         self.feedback_monitoring_cycles = self._load_feedback_monitoring_cycles()
@@ -5657,6 +5644,8 @@ class SimpleCoordinationSystem:
             raise ValueError(
                 f"monitoring_interval must be a positive integer (minutes), got: {monitoring_interval!r}"
             )
+        if not hasattr(self, "monitoring_task_handles") or not isinstance(self.monitoring_task_handles, dict):
+            self.monitoring_task_handles = {}
 
         monitoring_task_id = f"monitor_{action_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
@@ -5710,10 +5699,45 @@ class SimpleCoordinationSystem:
         self.monitoring_tasks[monitoring_task_id] = monitoring_task
         self.monitoring_active = True
 
-        # Start async monitoring loop
-        asyncio.create_task(self._monitoring_loop(monitoring_task_id))
+        # Start async monitoring loop and keep a trackable handle
+        monitoring_task_handle = asyncio.create_task(self._monitoring_loop(monitoring_task_id))
+        self.monitoring_task_handles[monitoring_task_id] = monitoring_task_handle
+        monitoring_task_handle.add_done_callback(
+            lambda completed_task, task_id=monitoring_task_id: self._on_monitoring_task_done(task_id, completed_task)
+        )
 
         return monitoring_task_id
+
+    def _on_monitoring_task_done(self, monitoring_task_id: str, task_handle: asyncio.Task):
+        """Monitoring task completion callback for tracking/diagnostics."""
+        try:
+            task_meta = self.monitoring_tasks.get(monitoring_task_id)
+            if isinstance(task_meta, dict):
+                task_meta["completed_at"] = datetime.now()
+
+            if task_handle.cancelled():
+                workflow_logger.warning(f"  ⚠️ Monitoring task cancelled: {monitoring_task_id}")
+                if isinstance(task_meta, dict):
+                    task_meta["status"] = "cancelled"
+                return
+
+            exception = task_handle.exception()
+            if exception is not None:
+                workflow_logger.warning(f"  ⚠️ Monitoring task failed: {monitoring_task_id}, error={exception}")
+                if isinstance(task_meta, dict):
+                    task_meta["status"] = "failed"
+                    task_meta["error"] = str(exception)
+                return
+
+            if isinstance(task_meta, dict):
+                task_meta["status"] = "completed"
+            workflow_logger.info(f"  ✅ Monitoring task finished: {monitoring_task_id}")
+        except Exception as callback_error:
+            workflow_logger.warning(
+                f"  ⚠️ Monitoring task completion callback error ({monitoring_task_id}): {callback_error}"
+            )
+        finally:
+            self.monitoring_task_handles.pop(monitoring_task_id, None)
 
     async def _monitoring_loop(self, monitoring_task_id: str):
         """Phase 3: feedback and iteration monitoring loop
@@ -5866,11 +5890,26 @@ class SimpleCoordinationSystem:
                             full_log={"final_effectiveness_report": final_report},
                         )
                         persist_action_log_record(Path("learning_data/rag/rag_database.db"), record)
+                        self._persist_monitoring_score_to_opinion_interventions(
+                            action_id=record.action_id,
+                            monitoring_score=float(monitoring_score),
+                        )
                         workflow_logger.info(
                             f"  ✅ Persisted monitoring effectiveness_score={monitoring_score:.2f} to action_logs (action_id={record.action_id})"
                         )
         except Exception as e:
             workflow_logger.info(f"  ⚠️ Failed to persist monitoring effectiveness to action_logs: {e}")
+
+    def _persist_monitoring_score_to_opinion_interventions(self, action_id: str, monitoring_score: float):
+        """Sync monitoring effectiveness score to opinion_interventions by action_id."""
+        execute_query(
+            """
+            UPDATE opinion_interventions
+            SET effectiveness_score = ?
+            WHERE action_id = ?
+            """,
+            (float(monitoring_score), str(action_id)),
+        )
 
     async def _update_task_baseline_after_intervention(self, task: Dict[str, Any], leader_content: Dict[str, Any], amplifier_responses: List[Dict[str, Any]]):
         """Update task baseline data after intervention for later monitoring iterations
@@ -8514,13 +8553,21 @@ Please return the decision in JSON format:
             task = self.monitoring_tasks.get(monitoring_task_id)
             if task:
                 workflow_logger.info(f"⏹️  Stopping monitoring task: {monitoring_task_id}")
+                handle = self.monitoring_task_handles.get(monitoring_task_id)
+                if handle and not handle.done():
+                    handle.cancel()
                 # Remove from monitoring task list
                 if monitoring_task_id in self.monitoring_tasks:
                     del self.monitoring_tasks[monitoring_task_id]
+                self.monitoring_task_handles.pop(monitoring_task_id, None)
             else:
                 workflow_logger.info(f"⚠️  Monitoring task not found: {monitoring_task_id}")
         else:
             workflow_logger.info("⏹️  Stopping all monitoring tasks")
+            for task_id, handle in list(self.monitoring_task_handles.items()):
+                if handle and not handle.done():
+                    handle.cancel()
+                self.monitoring_task_handles.pop(task_id, None)
             # Clear all monitoring tasks
             self.monitoring_tasks.clear()
 
@@ -8531,6 +8578,10 @@ Please return the decision in JSON format:
         workflow_logger.info("🚨 Emergency stop for all monitoring tasks")
         self.monitoring_active = False
         self.monitoring_tasks.clear()
+        for task_id, handle in list(self.monitoring_task_handles.items()):
+            if handle and not handle.done():
+                handle.cancel()
+            self.monitoring_task_handles.pop(task_id, None)
         workflow_logger.info("✅ All monitoring tasks stopped")
 
     def get_monitoring_status(self) -> Dict[str, Any]:

@@ -346,9 +346,7 @@ class EnhancedLeaderAgent:
 
                 def _clip_text(text: str, limit: int = 90) -> str:
                     normalized = (text or "").replace("\n", " ").strip()
-                    if len(normalized) <= limit:
-                        return normalized
-                    return normalized[:limit] + "..."
+                    return normalized
 
                 def _db_lines() -> List[str]:
                     lines: List[str] = ["1. Database retrieval:"]
@@ -385,7 +383,7 @@ class EnhancedLeaderAgent:
                             )
                             if sim_f < th_f:
                                 reason = (
-                                    f"keyword similarity below threshold (sim={sim_f:.3f} < threshold={th_f:.3f}, compare: {sim_f:.3f}<{th_f:.3f})"
+                                    f"keyword similarity below threshold (sim={sim_f:.3f} < threshold={th_f:.3f})"
                                 )
                         except Exception:
                             lines.append(f"   - Keyword retrieval: keyword={keyword_name}, sim={sim}, threshold={th}")
@@ -407,13 +405,11 @@ class EnhancedLeaderAgent:
                             )
                             if sim_f < th_f:
                                 reason = (
-                                    f"viewpoint similarity below threshold (sim={sim_f:.3f} < threshold={th_f:.3f}, compare: {sim_f:.3f}<{th_f:.3f})"
+                                    f"viewpoint similarity below threshold (sim={sim_f:.3f} < threshold={th_f:.3f})"
                                 )
                         except Exception:
                             lines.append(f"   - Viewpoint retrieval: sim={sim}, threshold={th}")
-                    elif isinstance(keyword_step, dict):
-                        lines.append("   - Viewpoint retrieval: skipped (reason: keyword threshold not met or no matched viewpoint)")
-                    else:
+                    elif not isinstance(keyword_step, dict):
                         lines.append("   - Viewpoint retrieval: no trace data")
 
                     if not isinstance(db_step, dict):

@@ -57,6 +57,8 @@ class Simulation:
 
         # Initialize posts list
         self.posts = []
+        self.intervention_tasks = []
+        self._active_intervention_post_ids = set()
 
         # Create news agent
         self.news_manager = NewsManager(self.config, self.conn)
@@ -638,18 +640,10 @@ class Simulation:
     async def _wait_for_monitoring_completion(self):
         """Wait for the opinion balance monitoring cycle to finish"""
         try:
-            print(f"\n⏳ Waiting for opinion balance monitoring to finish...")
-            print(f"   Trending posts scan interval: {self.opinion_balance_manager.trending_posts_scan_interval} minutes")
-            print(f"   Feedback monitoring interval: {self.opinion_balance_manager.feedback_monitoring_interval} minutes")
-            print(f"   Will wait at least {self.opinion_balance_manager.feedback_monitoring_interval + 1} minutes to ensure the first briefing is generated")
-
-            # Wait long enough for the monitoring loop to complete at least one cycle (using the feedback interval)
-            wait_time = (self.opinion_balance_manager.feedback_monitoring_interval + 1) * 60  # Convert to seconds
-
-            import asyncio
-            await asyncio.sleep(wait_time)
-
-            print(f"✅ Monitoring wait complete")
+            print("\n⏳ Waiting for opinion balance tasks to finish...")
+            await self._wait_for_intervention_tasks_completion()
+            await self._wait_for_coordination_monitoring_handles()
+            print("✅ Monitoring wait complete")
 
             # Check if any briefings were generated
             import os
@@ -666,6 +660,125 @@ class Simulation:
 
         except Exception as e:
             logging.error(f"Error while waiting for monitor completion: {e}")
+
+    async def _wait_for_intervention_tasks_completion(self):
+        """Wait until all asynchronous intervention workflow tasks complete."""
+        if not hasattr(self, "intervention_tasks") or not self.intervention_tasks:
+            return
+
+        pending_tasks = [
+            task_info.get("task")
+            for task_info in self.intervention_tasks
+            if task_info.get("task") is not None and not task_info["task"].done()
+        ]
+        if pending_tasks:
+            await asyncio.gather(*pending_tasks, return_exceptions=True)
+        await self._check_intervention_tasks_status()
+
+    async def _wait_for_coordination_monitoring_handles(self):
+        """Wait until all monitoring handles in coordination system complete."""
+        if not self.opinion_balance_manager or not self.opinion_balance_manager.enabled:
+            return
+
+        coordination_system = getattr(self.opinion_balance_manager, "coordination_system", None)
+        if coordination_system is None:
+            return
+
+        while True:
+            handles = getattr(coordination_system, "monitoring_task_handles", {})
+            if not isinstance(handles, dict):
+                return
+            pending_handles = [handle for handle in handles.values() if not handle.done()]
+            if not pending_handles:
+                break
+            await asyncio.gather(*pending_handles, return_exceptions=True)
+
+    def _register_intervention_task(self, post_id: str, intervention_task: asyncio.Task, content_preview: str) -> bool:
+        """Register an intervention task; return False when the same post is already in-flight."""
+        if not hasattr(self, "intervention_tasks") or self.intervention_tasks is None:
+            self.intervention_tasks = []
+        if not hasattr(self, "_active_intervention_post_ids") or self._active_intervention_post_ids is None:
+            self._active_intervention_post_ids = set()
+
+        if post_id in self._active_intervention_post_ids:
+            return False
+
+        self._active_intervention_post_ids.add(post_id)
+        self.intervention_tasks.append({
+            "task": intervention_task,
+            "post_id": post_id,
+            "start_time": datetime.now(),
+            "content_preview": content_preview
+        })
+        intervention_task.add_done_callback(
+            lambda completed_task, tracked_post_id=post_id: self._on_intervention_task_done(tracked_post_id, completed_task)
+        )
+        return True
+
+    def _on_intervention_task_done(self, post_id: str, task: asyncio.Task):
+        """Completion callback for async intervention task."""
+        try:
+            self._active_intervention_post_ids.discard(post_id)
+            if task.cancelled():
+                logging.warning(f"Async intervention task cancelled: post_id={post_id}")
+                return
+
+            exception = task.exception()
+            if exception is not None:
+                logging.error(f"Async intervention task failed: post_id={post_id}, error={exception}")
+                return
+
+            result = task.result()
+            self._persist_opinion_intervention_result(post_id, result)
+        except Exception as callback_error:
+            logging.error(f"Intervention task callback error: post_id={post_id}, error={callback_error}")
+
+    def _persist_opinion_intervention_result(self, post_id: str, result: dict):
+        """Upsert workflow result into opinion_interventions for consistent persistence."""
+        if not isinstance(result, dict):
+            return
+        if not result.get("success") or not result.get("intervention_triggered"):
+            return
+
+        action_id = result.get("action_id")
+        if not action_id:
+            logging.error(f"Intervention result missing action_id, post_id={post_id}")
+            return
+
+        phases = result.get("phases", {}) if isinstance(result.get("phases"), dict) else {}
+        phase_1 = phases.get("phase_1", {}) if isinstance(phases.get("phase_1"), dict) else {}
+        phase_3 = phases.get("phase_3", {}) if isinstance(phases.get("phase_3"), dict) else {}
+
+        strategy_id = (
+            phase_1.get("strategy", {})
+            .get("strategy", {})
+            .get("strategy_id")
+            if isinstance(phase_1.get("strategy"), dict)
+            else None
+        )
+        effectiveness_score = phase_3.get("effectiveness_score", 0.0)
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id FROM opinion_interventions WHERE action_id = ? LIMIT 1", (action_id,))
+        existing = cursor.fetchone()
+        if existing:
+            cursor.execute(
+                """
+                UPDATE opinion_interventions
+                SET original_post_id = ?, strategy_id = ?, effectiveness_score = ?
+                WHERE action_id = ?
+                """,
+                (post_id, strategy_id, effectiveness_score, action_id),
+            )
+        else:
+            cursor.execute(
+                """
+                INSERT INTO opinion_interventions (original_post_id, action_id, strategy_id, leader_response_id, effectiveness_score)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (post_id, action_id, strategy_id, None, effectiveness_score),
+            )
+        self.conn.commit()
 
     async def _parallel_content_generation(self):
         """Parallel content generation for regular users, malicious bots, and amplifier agents"""
@@ -984,6 +1097,9 @@ class Simulation:
                     print(f"   💬 Comments: {num_comments}, 👍 Likes: {num_likes}, 🔄 Shares: {num_shares}")
                     print(f"   🔥 Total heat: {total_engagement}")
                     print(f"   📝 Content: {content[:80]}...")
+                    if hasattr(self, "_active_intervention_post_ids") and post_id in self._active_intervention_post_ids:
+                        print(f"   ⏭️  Skip post {post_id}: intervention task already running")
+                        continue
 
                     # Collect four comments for this post: two for hottest, two for latest (matching regular user logic)
                     # First get the two highest-heat comments
@@ -1099,15 +1215,15 @@ Latest comments (chronological):"""
                                     )
                                 )
                                 
-                                # Add the task to the tracking list for later follow-up
-                                if not hasattr(self, 'intervention_tasks'):
-                                    self.intervention_tasks = []
-                                self.intervention_tasks.append({
-                                    'task': intervention_task,
-                                    'post_id': post_id,
-                                    'start_time': datetime.now(),
-                                    'content_preview': formatted_content[:100] + "..." if len(formatted_content) > 100 else formatted_content
-                                })
+                                task_registered = self._register_intervention_task(
+                                    post_id=post_id,
+                                    intervention_task=intervention_task,
+                                    content_preview=formatted_content[:100] + "..." if len(formatted_content) > 100 else formatted_content,
+                                )
+                                if not task_registered:
+                                    intervention_task.cancel()
+                                    print(f"   ⏭️  Skip duplicate launch for post {post_id}: task already registered")
+                                    continue
                                 
                                 print(f"   ✅ Opinion balance workflow launched asynchronously")
                                 print(f"   📋 Task ID: {post_id}")
@@ -1151,7 +1267,7 @@ Latest comments (chronological):"""
                     if result and result.get("success"):
                         if result.get("intervention_triggered"):
                             print(f"   ✅ Async intervention task completed - post ID: {post_id}")
-                            print(f"   📋 Intervention ID: {result.get('intervention_id')}")
+                            print(f"   📋 Action ID: {result.get('action_id')}")
                             print(f"   🤖 Agent responses: {result.get('total_responses', 0)}")
                         else:
                             print(f"   ✅ Async analysis complete - post ID: {post_id} (no intervention needed)")

@@ -180,6 +180,7 @@ class OpinionBalanceLauncher:
         # Initialize the opinion balance manager
         self.opinion_balance_manager = None
         self.monitoring_task = None
+        self.inflight_post_ids = set()
         
         # Configure logging
         self._setup_logging()
@@ -708,6 +709,10 @@ Please analyze the opinion tendency of this post and whether intervention is nee
                     print(f"   📈 Feed score: {feed_score:.2f} (based on engagement at feed time)")
                     print(f"   📝 Content: {content[:80]}...")
                     print(f"   ✅ Included for analysis (based on feed scoring)")
+
+                    if self._should_skip_post_for_active_monitoring(post_id):
+                        print(f"   ⏭️ Skip post {post_id}: workflow/monitoring already in progress")
+                        continue
                     
                     # Invoke the opinion balance workflow
                     if self.opinion_balance_manager.coordination_system:
@@ -744,6 +749,7 @@ Please analyze the opinion tendency of this post and whether intervention is nee
                                 pass
                             
                             try:
+                                self.inflight_post_ids.add(post_id)
                                 # Call directly and await result
                                 result = await self.opinion_balance_manager.coordination_system.execute_workflow(
                                     content_text=formatted_content,
@@ -768,6 +774,8 @@ Please analyze the opinion tendency of this post and whether intervention is nee
                                 print(f"   ❌ Opinion balance workflow execution exception: {e}")
                                 import traceback
                                 traceback.print_exc()
+                            finally:
+                                self.inflight_post_ids.discard(post_id)
 
                             print(f"   📋 Task ID: {post_id}")
                             print("="*60)
@@ -875,6 +883,10 @@ Please analyze the opinion tendency of this post and whether intervention is nee
                     print(f"   📈 Feed score: {feed_score:.2f} (based on engagement at feed time)")
                     print(f"   📝 Content: {content[:80]}...")
                     print(f"   ✅ Included for analysis (based on feed scoring)")
+
+                    if self._should_skip_post_for_active_monitoring(post_id):
+                        print(f"   ⏭️ Skip post {post_id}: workflow/monitoring already in progress")
+                        continue
                     
                     # Invoke the opinion balance workflow (sync version)
                     if self.opinion_balance_manager.coordination_system:
@@ -929,6 +941,7 @@ Please analyze the opinion tendency of this post and whether intervention is nee
                                     loop.close()
                             
                             with concurrent.futures.ThreadPoolExecutor() as executor:
+                                self.inflight_post_ids.add(post_id)
                                 future = executor.submit(run_async_workflow)
                                 result = future.result()  # Remove timeout limit
                             
@@ -953,6 +966,8 @@ Please analyze the opinion tendency of this post and whether intervention is nee
                             print(f"   ❌ Opinion balance workflow execution failed: {e}")
                             import traceback
                             traceback.print_exc()
+                        finally:
+                            self.inflight_post_ids.discard(post_id)
                     else:
                         print(f"   ❌ Coordination system not initialized")
             else:
@@ -962,6 +977,28 @@ Please analyze the opinion tendency of this post and whether intervention is nee
             print(f"❌ Failed to monitor trending posts: {e}")
             import traceback
             traceback.print_exc()
+
+    def _should_skip_post_for_active_monitoring(self, post_id: str) -> bool:
+        """Skip re-triggering a post if it is already in workflow execution or feedback monitoring."""
+        if post_id in self.inflight_post_ids:
+            return True
+
+        if not self.opinion_balance_manager or not self.opinion_balance_manager.coordination_system:
+            return False
+
+        monitoring_tasks = getattr(self.opinion_balance_manager.coordination_system, "monitoring_tasks", {})
+        if not isinstance(monitoring_tasks, dict):
+            return False
+
+        for task in monitoring_tasks.values():
+            if not isinstance(task, dict):
+                continue
+            if task.get("target_post_id") != post_id:
+                continue
+            status = task.get("status")
+            if status not in {"completed", "failed", "cancelled"}:
+                return True
+        return False
     
     def get_system_status(self) -> Dict[str, Any]:
         """Get system status"""
