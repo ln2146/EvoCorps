@@ -11,20 +11,254 @@ import os
 from typing import Dict, List, Tuple, Optional, Any
 from datetime import datetime
 import time
+import re
 
 # Import configuration
 try:
     from .config import (
         TOPICS,
         KEYWORD_SIMILARITY_THRESHOLD, VIEWPOINT_SIMILARITY_THRESHOLD,
-        MAX_WIKIPEDIA_RESULTS, MAX_EVIDENCE_PER_VIEWPOINT, DEFAULT_DB_PATH
+        MAX_WIKIPEDIA_RESULTS,
+        MAX_EVIDENCE_PER_VIEWPOINT,
+        MIN_EVIDENCE_ACCEPTANCE_RATE,
+        FALLBACK_EVIDENCE_COUNT,
+        DEFAULT_DB_PATH,
     )
 except ImportError:
     from config import (
         TOPICS,
         KEYWORD_SIMILARITY_THRESHOLD, VIEWPOINT_SIMILARITY_THRESHOLD,
-        MAX_WIKIPEDIA_RESULTS, MAX_EVIDENCE_PER_VIEWPOINT, DEFAULT_DB_PATH
+        MAX_WIKIPEDIA_RESULTS,
+        MAX_EVIDENCE_PER_VIEWPOINT,
+        MIN_EVIDENCE_ACCEPTANCE_RATE,
+        FALLBACK_EVIDENCE_COUNT,
+        DEFAULT_DB_PATH,
     )
+
+
+def select_top_evidence(scored_evidence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Select evidences for persistence/return.
+
+    Rules:
+    - Keep only items with acceptance_rate >= MIN_EVIDENCE_ACCEPTANCE_RATE
+    - Sort by acceptance_rate descending
+    - Cap at MAX_EVIDENCE_PER_VIEWPOINT
+    """
+    if scored_evidence is None:
+        raise ValueError("scored_evidence cannot be None")
+
+    filtered: List[Dict[str, Any]] = []
+    for item in scored_evidence:
+        if not isinstance(item, dict):
+            raise ValueError(f"evidence item must be a dict, got {type(item)}")
+        if "acceptance_rate" not in item:
+            raise ValueError("evidence item missing 'acceptance_rate'")
+        if "evidence" not in item:
+            raise ValueError("evidence item missing 'evidence'")
+
+        rate = item["acceptance_rate"]
+        try:
+            rate_float = float(rate)
+        except Exception as e:
+            raise ValueError(f"invalid acceptance_rate: {rate!r}") from e
+
+        if rate_float >= MIN_EVIDENCE_ACCEPTANCE_RATE:
+            normalized = dict(item)
+            normalized["acceptance_rate"] = rate_float
+            filtered.append(normalized)
+
+    filtered.sort(key=lambda x: x["acceptance_rate"], reverse=True)
+    return filtered[:MAX_EVIDENCE_PER_VIEWPOINT]
+
+
+def _parse_llm_score(content: str) -> float:
+    if content is None:
+        raise ValueError("LLM score content cannot be None")
+    text = str(content).strip()
+    match = re.search(r"(-?\d+(?:\.\d+)?)", text)
+    if not match:
+        raise ValueError(f"LLM returned non-numeric score: {text!r}")
+    score = float(match.group(1))
+    if not (0.0 <= score <= 1.0):
+        raise ValueError(f"LLM score out of range [0,1]: {score!r}")
+    return score
+
+
+def llm_score_single_evidence(
+    llm_client: Any,
+    llm_model_name: str,
+    viewpoint: str,
+    evidence: str,
+) -> float:
+    prompt = f"""
+Rate the following evidence for its support of the viewpoint on a 0.0-1.0 scale:
+
+Viewpoint: "{viewpoint}"
+Evidence: "{evidence}"
+
+Please evaluate using the following dimensions:
+1. Relevance – How closely does the evidence relate to the viewpoint?
+2. Credibility – How trustworthy is the source and its phrasing?
+3. Persuasiveness – How logically compelling is the argument?
+4. Specificity – Does it include concrete data, cases, or studies?
+
+Return a single number between 0.0 and 1.0 with no explanation.
+"""
+    response = llm_client.chat.completions.create(
+        model=llm_model_name,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.1,
+    )
+    content = response.choices[0].message.content.strip()
+    return _parse_llm_score(content)
+
+
+def llm_generate_fallback_evidence(
+    llm_client: Any,
+    llm_model_name: str,
+    viewpoint: str,
+    seed_evidence: str,
+) -> str:
+    prompt = f"""
+You are generating a fallback evidence statement for an opinion system.
+
+Goal: produce a single, clear, concise evidence statement that supports the viewpoint.
+Constraints:
+- MUST be based ONLY on the seed evidence (no new facts, numbers, studies, or entities).
+- You may rewrite, summarize, and improve clarity, but do not change meaning.
+- Output plain text only. No markdown, no quotes, no bullet points.
+- Keep it under 280 characters.
+
+Viewpoint: "{viewpoint}"
+Seed evidence: "{seed_evidence}"
+
+Rewrite the seed evidence into one suitable evidence statement.
+"""
+    response = llm_client.chat.completions.create(
+        model=llm_model_name,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.2,
+    )
+    content = response.choices[0].message.content
+    if content is None:
+        raise ValueError("LLM returned empty fallback evidence")
+    text = str(content).strip()
+    if not text:
+        raise ValueError("LLM returned blank fallback evidence")
+    return text
+
+
+def llm_generate_fallback_evidence_list(
+    llm_client: Any,
+    llm_model_name: str,
+    viewpoint: str,
+    seed_evidence: Optional[str],
+    count: int = FALLBACK_EVIDENCE_COUNT,
+) -> List[str]:
+    seed_text = (seed_evidence or "").strip()
+    seed_part = f'Seed evidence: "{seed_text}"' if seed_text else "Seed evidence: (none)"
+
+    prompt = f"""
+You are generating fallback evidence statements for an opinion system.
+
+Goal: produce {count} distinct evidence statements that support the viewpoint.
+Constraints:
+- If seed evidence is provided, you MUST base statements ONLY on that seed (no new facts, numbers, studies, or entities).
+- If seed evidence is not provided, do NOT introduce specific factual claims; use general reasoning and non-factual support.
+- Output MUST be valid JSON: a list of {count} strings.
+- Each string: plain text only, no markdown, no quotes, no bullet points inside the string.
+- Each string under 280 characters.
+
+Viewpoint: "{viewpoint}"
+{seed_part}
+
+Generate {count} fallback evidence statements as JSON.
+"""
+    response = llm_client.chat.completions.create(
+        model=llm_model_name,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,
+    )
+    content = response.choices[0].message.content
+    if content is None:
+        raise ValueError("LLM returned empty fallback evidence list")
+
+    text = str(content).strip()
+    if text.startswith("```json"):
+        text = text[7:].strip()
+    if text.endswith("```"):
+        text = text[:-3].strip()
+
+    try:
+        data = json.loads(text)
+    except Exception as e:
+        raise ValueError(f"LLM returned invalid JSON for fallback evidence list: {text!r}") from e
+
+    if not isinstance(data, list) or len(data) != count:
+        raise ValueError(f"LLM returned non-{count}-item list for fallback evidence list: {data!r}")
+
+    evidences: List[str] = []
+    for item in data:
+        s = str(item).strip()
+        if not s:
+            raise ValueError("LLM returned blank fallback evidence item")
+        evidences.append(s)
+    return evidences
+
+
+def generate_fallback_evidence_items(
+    llm_client: Any,
+    llm_model_name: str,
+    viewpoint: str,
+    scored_evidence: Optional[List[Dict[str, Any]]],
+    min_acceptance_rate: float = MIN_EVIDENCE_ACCEPTANCE_RATE,
+) -> List[Dict[str, Any]]:
+    seed_text: Optional[str] = None
+    seed_source: Optional[str] = None
+    seed_acceptance_rate: Optional[float] = None
+
+    if scored_evidence:
+        seed = scored_evidence[0]
+        if "evidence" not in seed:
+            raise ValueError("seed evidence missing 'evidence'")
+        seed_text = str(seed["evidence"]).strip()
+        if not seed_text:
+            seed_text = None
+        seed_source = seed.get("source")
+        seed_acceptance_rate = seed.get("acceptance_rate")
+
+    generated_list = llm_generate_fallback_evidence_list(
+        llm_client=llm_client,
+        llm_model_name=llm_model_name,
+        viewpoint=viewpoint,
+        seed_evidence=seed_text,
+        count=FALLBACK_EVIDENCE_COUNT,
+    )
+
+    scored_items: List[Dict[str, Any]] = []
+    for generated in generated_list:
+        score = llm_score_single_evidence(
+            llm_client=llm_client,
+            llm_model_name=llm_model_name,
+            viewpoint=viewpoint,
+            evidence=generated,
+        )
+        if score < min_acceptance_rate:
+            raise ValueError(
+                f"fallback evidence did not meet acceptance threshold (score={score}, min={min_acceptance_rate})"
+            )
+        scored_items.append(
+            {
+                "evidence": generated,
+                "acceptance_rate": score,
+                "source": "LLMGenerated",
+                "seed_source": seed_source,
+                "seed_acceptance_rate": seed_acceptance_rate,
+            }
+        )
+
+    return scored_items
 
 # FAISS vector search
 try:
@@ -1002,14 +1236,80 @@ Example:
         print(f"🔍 Wikipedia returned {len(evidence_list)} evidences")
         
         if not evidence_list:
-            return {'error': 'no relevant evidence found'}
+            try:
+                fallback_items = generate_fallback_evidence_items(
+                    llm_client=self.llm_client,
+                    llm_model_name=self.llm_model_name,
+                    viewpoint=opinion,
+                    scored_evidence=None,
+                    min_acceptance_rate=MIN_EVIDENCE_ACCEPTANCE_RATE,
+                )
+            except Exception as e:
+                return {'error': f'no relevant evidence found; fallback generation failed: {e}'}
+
+            return {
+                'status': 'llm_fallback_evidence',
+                'viewpoint': opinion,
+                'theme': theme,
+                'keywords': keywords,
+                'keyword': keywords,
+                'evidence_count': len(fallback_items),
+                'persisted': False,
+                'fallback_reason': 'wikipedia_empty',
+                'evidence': [
+                    {
+                        'rank': i + 1,
+                        'evidence': item['evidence'],
+                        'acceptance_rate': item['acceptance_rate'],
+                        'source': item['source'],
+                        'seed_source': item.get('seed_source'),
+                        'seed_acceptance_rate': item.get('seed_acceptance_rate'),
+                    }
+                    for i, item in enumerate(fallback_items)
+                ],
+            }
         
         # Score via the LLM
         scored_evidence = self._llm_score_evidence(opinion, evidence_list)
         print(f"📊 LLM scored {len(scored_evidence)} evidences")
         
-        # Take the top entries by acceptance_rate
-        top_evidence = scored_evidence[:MAX_EVIDENCE_PER_VIEWPOINT]
+        # Take the top entries by acceptance_rate, with a minimum acceptance threshold
+        top_evidence = select_top_evidence(scored_evidence)
+        if not top_evidence:
+            try:
+                fallback_items = generate_fallback_evidence_items(
+                    llm_client=self.llm_client,
+                    llm_model_name=self.llm_model_name,
+                    viewpoint=opinion,
+                    scored_evidence=scored_evidence,
+                    min_acceptance_rate=MIN_EVIDENCE_ACCEPTANCE_RATE,
+                )
+            except Exception as e:
+                return {
+                    'error': f'no evidence met acceptance threshold (>= {MIN_EVIDENCE_ACCEPTANCE_RATE}); fallback generation failed: {e}'
+                }
+
+            return {
+                'status': 'llm_fallback_evidence',
+                'viewpoint': opinion,
+                'theme': theme,
+                'keywords': keywords,
+                'keyword': keywords,
+                'evidence_count': len(fallback_items),
+                'persisted': False,
+                'fallback_reason': 'below_threshold',
+                'evidence': [
+                    {
+                        'rank': i + 1,
+                        'evidence': item['evidence'],
+                        'acceptance_rate': item['acceptance_rate'],
+                        'source': item['source'],
+                        'seed_source': item.get('seed_source'),
+                        'seed_acceptance_rate': item.get('seed_acceptance_rate'),
+                    }
+                    for i, item in enumerate(fallback_items)
+                ],
+            }
         
         # Store the entries in the database
         viewpoint_id = self._save_to_database(opinion, theme, keywords, top_evidence)
@@ -1058,14 +1358,80 @@ Example:
         print(f"🔍 Wikipedia returned {len(evidence_list)} evidences")
         
         if not evidence_list:
-            return {'error': 'no relevant evidence found'}
+            try:
+                fallback_items = generate_fallback_evidence_items(
+                    llm_client=self.llm_client,
+                    llm_model_name=self.llm_model_name,
+                    viewpoint=opinion,
+                    scored_evidence=None,
+                    min_acceptance_rate=MIN_EVIDENCE_ACCEPTANCE_RATE,
+                )
+            except Exception as e:
+                return {'error': f'no relevant evidence found; fallback generation failed: {e}'}
+
+            return {
+                'status': 'llm_fallback_evidence',
+                'viewpoint': opinion,
+                'theme': theme,
+                'keywords': keyword,
+                'keyword': keyword,
+                'evidence_count': len(fallback_items),
+                'persisted': False,
+                'fallback_reason': 'wikipedia_empty',
+                'evidence': [
+                    {
+                        'rank': i + 1,
+                        'evidence': item['evidence'],
+                        'acceptance_rate': item['acceptance_rate'],
+                        'source': item['source'],
+                        'seed_source': item.get('seed_source'),
+                        'seed_acceptance_rate': item.get('seed_acceptance_rate'),
+                    }
+                    for i, item in enumerate(fallback_items)
+                ],
+            }
         
         # Score using the LLM
         scored_evidence = self._llm_score_evidence(opinion, evidence_list)
         print(f"📊 LLM scored {len(scored_evidence)} evidences")
         
-        # Take top entries by acceptance_rate
-        top_evidence = scored_evidence[:MAX_EVIDENCE_PER_VIEWPOINT]
+        # Take the top entries by acceptance_rate, with a minimum acceptance threshold
+        top_evidence = select_top_evidence(scored_evidence)
+        if not top_evidence:
+            try:
+                fallback_items = generate_fallback_evidence_items(
+                    llm_client=self.llm_client,
+                    llm_model_name=self.llm_model_name,
+                    viewpoint=opinion,
+                    scored_evidence=scored_evidence,
+                    min_acceptance_rate=MIN_EVIDENCE_ACCEPTANCE_RATE,
+                )
+            except Exception as e:
+                return {
+                    'error': f'no evidence met acceptance threshold (>= {MIN_EVIDENCE_ACCEPTANCE_RATE}); fallback generation failed: {e}'
+                }
+
+            return {
+                'status': 'llm_fallback_evidence',
+                'viewpoint': opinion,
+                'theme': theme,
+                'keywords': keyword,
+                'keyword': keyword,
+                'evidence_count': len(fallback_items),
+                'persisted': False,
+                'fallback_reason': 'below_threshold',
+                'evidence': [
+                    {
+                        'rank': i + 1,
+                        'evidence': item['evidence'],
+                        'acceptance_rate': item['acceptance_rate'],
+                        'source': item['source'],
+                        'seed_source': item.get('seed_source'),
+                        'seed_acceptance_rate': item.get('seed_acceptance_rate'),
+                    }
+                    for i, item in enumerate(fallback_items)
+                ],
+            }
         
         # Store into the database
         viewpoint_id = self._save_to_database(opinion, theme, keyword, top_evidence)
@@ -1196,33 +1562,12 @@ Example:
         scored_evidence = []
         
         for evidence in evidence_list:
-            prompt = f"""
-Rate the following evidence for its support of the viewpoint on a 0.0-1.0 scale:
-
-Viewpoint: "{viewpoint}"
-Evidence: "{evidence}"
-
-Please evaluate using the following dimensions:
-1. Relevance – How closely does the evidence relate to the viewpoint?
-2. Credibility – How trustworthy is the source and its phrasing?
-3. Persuasiveness – How logically compelling is the argument?
-4. Specificity – Does it include concrete data, cases, or studies?
-
-Return a single number between 0.0 and 1.0 with no explanation.
-"""
-            
-            try:
-                response = self.llm_client.chat.completions.create(
-                    model=self.llm_model_name,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.1
-                )
-                content = response.choices[0].message.content.strip()
-                score = float(content)
-                score = max(0.0, min(1.0, score))
-            except Exception as e:
-                print(f"⚠️ LLM scoring API failed: {e}")
-                score = 0.5  # default score
+            score = llm_score_single_evidence(
+                llm_client=self.llm_client,
+                llm_model_name=self.llm_model_name,
+                viewpoint=viewpoint,
+                evidence=evidence,
+            )
             
             scored_evidence.append({
                 'evidence': evidence,
@@ -1240,6 +1585,12 @@ Return a single number between 0.0 and 1.0 with no explanation.
     def _save_to_database(self, viewpoint: str, theme: str, keywords: str, evidence_list: List[Dict]) -> int:
         """Save the viewpoint and evidences into the database."""
         try:
+            evidence_to_save = select_top_evidence(evidence_list)
+            if not evidence_to_save:
+                raise ValueError(
+                    f"refusing to save viewpoint without evidence meeting acceptance threshold (>= {MIN_EVIDENCE_ACCEPTANCE_RATE})"
+                )
+
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
@@ -1252,7 +1603,7 @@ Return a single number between 0.0 and 1.0 with no explanation.
             viewpoint_id = cursor.lastrowid
             
             # Insert evidence records
-            for item in evidence_list[:MAX_EVIDENCE_PER_VIEWPOINT]:
+            for item in evidence_to_save:
                 cursor.execute('''
                     INSERT INTO evidence (viewpoint_id, evidence, acceptance_rate, source)
                     VALUES (?, ?, ?, ?)
