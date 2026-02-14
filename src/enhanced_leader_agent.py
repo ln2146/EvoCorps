@@ -315,24 +315,117 @@ class EnhancedLeaderAgent:
                 workflow_logger.info("   🔄 Trying backup argument generation")
                 return self._get_backup_arguments(core_viewpoint)
 
+            # Extract classification info early so workflow shows Theme/Keyword before evidence pipeline.
+            keyword_value = (result.get('keyword') or result.get('keywords') or '').strip()
+            theme_value = (result.get('theme') or '').strip()
+
+            workflow_logger.info(f"   Theme: {theme_value or 'unknown'}")
+            if not keyword_value:
+                workflow_logger.warning("   ⚠️ Keyword missing in evidence system result; defaulting to 'general'")
+            workflow_logger.info(f"   Keyword: {keyword_value or 'general'}")
+
             trace = result.get("trace")
+
+            def _get_first_step(step_name: str):
+                if not isinstance(trace, dict):
+                    return None
+                retrieval_path = trace.get("retrieval_path")
+                if not isinstance(retrieval_path, list):
+                    return None
+                for step in retrieval_path:
+                    if isinstance(step, dict) and step.get("step") == step_name:
+                        return step
+                return None
+
+            def _build_evidence_pipeline_summary() -> str:
+                db_step = _get_first_step("db_evidence")
+                wikipedia_step = _get_first_step("wikipedia_refresh") or _get_first_step("wikipedia")
+                llm_step = _get_first_step("llm_fallback")
+
+                def _db_line() -> str:
+                    if not isinstance(db_step, dict):
+                        reason = "未命中 DB 取证据分支"
+                        if isinstance(trace, dict):
+                            theme_step = _get_first_step("theme_match")
+                            keyword_step = _get_first_step("faiss_keyword")
+                            viewpoint_step = _get_first_step("faiss_viewpoint")
+
+                            if isinstance(theme_step, dict) and theme_step.get("matched") is False:
+                                theme_value = theme_step.get("theme", "?")
+                                reason = f"主题在数据库中无匹配记录（theme={theme_value}，matched=False）"
+                            elif isinstance(keyword_step, dict):
+                                sim = keyword_step.get("similarity")
+                                th = keyword_step.get("threshold")
+                                try:
+                                    if sim is not None and th is not None and float(sim) < float(th):
+                                        sim_f = float(sim)
+                                        th_f = float(th)
+                                        reason = (
+                                            f"关键词相似度不足（sim={sim_f:.3f} < threshold={th_f:.3f}，比较：{sim_f:.3f}<{th_f:.3f}）"
+                                        )
+                                except Exception:
+                                    reason = f"关键词相似度不足（sim={sim} < threshold={th}）"
+                            elif isinstance(viewpoint_step, dict):
+                                sim = viewpoint_step.get("similarity")
+                                th = viewpoint_step.get("threshold")
+                                try:
+                                    if sim is not None and th is not None and float(sim) < float(th):
+                                        sim_f = float(sim)
+                                        th_f = float(th)
+                                        reason = (
+                                            f"观点相似度不足（sim={sim_f:.3f} < threshold={th_f:.3f}，比较：{sim_f:.3f}<{th_f:.3f}）"
+                                        )
+                                except Exception:
+                                    reason = f"观点相似度不足（sim={sim} < threshold={th}）"
+
+                        return f"1. 检索数据库：跳过（原因：{reason}）"
+                    selected = db_step.get("selected_count", "?")
+                    min_rate = db_step.get("min_acceptance_rate", trace.get("min_acceptance_rate") if isinstance(trace, dict) else None)
+                    if min_rate is None:
+                        return f"1. 检索数据库：selected={selected}"
+                    return f"1. 检索数据库：阈值>={min_rate}，selected={selected}"
+
+                def _wiki_line() -> str:
+                    if not isinstance(wikipedia_step, dict):
+                        return "2. 检索维基百科：跳过"
+                    keyword = wikipedia_step.get("keyword", "?")
+                    retrieved = wikipedia_step.get("retrieved_count", "?")
+                    selected = wikipedia_step.get("selected_count")
+                    if selected is None:
+                        return f"2. 检索维基百科：keyword={keyword}，retrieved={retrieved}"
+                    return f"2. 检索维基百科：keyword={keyword}，retrieved={retrieved}，selected={selected}"
+
+                def _llm_line() -> str:
+                    if not isinstance(llm_step, dict):
+                        return "3. LLM 生成论据：跳过"
+                    count = llm_step.get("count", "?")
+                    low_conf = llm_step.get("low_confidence_count")
+                    if low_conf is None:
+                        return f"3. LLM 生成论据：count={count}（不入库）"
+                    return f"3. LLM 生成论据：count={count}，low_confidence={low_conf}（不入库）"
+
+                return "\n".join([_db_line(), _wiki_line(), _llm_line()])
+
+            if isinstance(trace, dict):
+                workflow_logger.info("   论据检索流程：")
+                for line in _build_evidence_pipeline_summary().splitlines():
+                    workflow_logger.info(f"   {line}")
+
             if isinstance(trace, dict):
                 retrieval_path = trace.get("retrieval_path")
                 if isinstance(retrieval_path, list):
-                    workflow_logger.info("   Retrieval path:")
+                    workflow_logger.debug("   Retrieval path:")
                     for step in retrieval_path:
-                        workflow_logger.info(f"     - {step}")
+                        workflow_logger.debug(f"     - {step}")
 
             if result.get("status") == "llm_fallback_evidence":
-                workflow_logger.info(
+                workflow_logger.debug(
                     f"   🛟 Using LLM-generated fallback evidences (persisted={result.get('persisted', False)})"
                 )
 
             # Extract evidence info
             evidence_list = result.get('evidence', [])
             relevant_arguments = []
-            keyword_value = (result.get('keyword') or result.get('keywords') or '').strip()
-            theme_value = (result.get('theme') or '').strip()
 
             for i, evidence in enumerate(evidence_list):
                 argument = {
@@ -347,12 +440,7 @@ class EnhancedLeaderAgent:
                 }
                 relevant_arguments.append(argument)
 
-            workflow_logger.info(f"   Argument system status: {result.get('status', 'unknown')}")
-            workflow_logger.info(f"   Theme: {theme_value or 'unknown'}")
-            # EnhancedOpinionSystem uses 'keywords' in its result payload; keep compatibility with both keys.
-            if not keyword_value:
-                workflow_logger.warning("   ⚠️ Keyword missing in evidence system result; defaulting to 'general'")
-            workflow_logger.info(f"   Keyword: {keyword_value or 'general'}")
+            workflow_logger.debug(f"   Argument system status: {result.get('status', 'unknown')}")
 
             # If no relevant arguments found, use backup
             if not relevant_arguments:

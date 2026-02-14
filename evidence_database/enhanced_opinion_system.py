@@ -166,6 +166,8 @@ Goal: produce {count} distinct evidence statements that support the viewpoint.
 Constraints:
 - If seed evidence is provided, you MUST base statements ONLY on that seed (no new facts, numbers, studies, or entities).
 - If seed evidence is not provided, do NOT introduce specific factual claims; use general reasoning and non-factual support.
+- Make them SPECIFIC and directly tied to the viewpoint; avoid vague filler like "policies are based on goals".
+- Prefer concrete, checkable phrasing derived from the seed (names, entities, causal links present in the seed).
 - Output MUST be valid JSON: a list of {count} strings.
 - Each string: plain text only, no markdown, no quotes, no bullet points inside the string.
 - Each string under 280 characters.
@@ -1314,6 +1316,11 @@ Example:
                     scored_evidence=None,
                     min_acceptance_rate=MIN_EVIDENCE_ACCEPTANCE_RATE,
                 )
+                self._save_evidence_items(
+                    viewpoint_id=viewpoint_id,
+                    evidence_items=fallback_items,
+                    allow_below_threshold=True,
+                )
                 result = {
                     'status': 'llm_fallback_evidence',
                     'viewpoint': viewpoint_info[0],
@@ -1321,7 +1328,8 @@ Example:
                     'keywords': viewpoint_info[2],
                     'keyword': viewpoint_info[2],
                     'evidence_count': len(fallback_items),
-                    'persisted': False,
+                    'persisted': True,
+                    'viewpoint_id': viewpoint_id,
                     'fallback_reason': 'db_below_threshold_then_wikipedia_below_threshold',
                     'evidence': [
                         {
@@ -1425,6 +1433,14 @@ Example:
             for i, item in enumerate(fallback_items, 1):
                 print(f"  {i}. [Acceptance rate: {item['acceptance_rate']:.3f}] {item['evidence'][:60]}...")
 
+            viewpoint_id = self._save_to_database(
+                opinion,
+                theme,
+                keywords,
+                fallback_items,
+                allow_below_threshold=True,
+            )
+
             return {
                 'status': 'llm_fallback_evidence',
                 'viewpoint': opinion,
@@ -1432,7 +1448,8 @@ Example:
                 'keywords': keywords,
                 'keyword': keywords,
                 'evidence_count': len(fallback_items),
-                'persisted': False,
+                'persisted': True,
+                'viewpoint_id': viewpoint_id,
                 'fallback_reason': 'wikipedia_empty',
                 'trace': {
                     'retrieval_path': [
@@ -1480,6 +1497,14 @@ Example:
             for i, item in enumerate(fallback_items, 1):
                 print(f"  {i}. [Acceptance rate: {item['acceptance_rate']:.3f}] {item['evidence'][:60]}...")
 
+            viewpoint_id = self._save_to_database(
+                opinion,
+                theme,
+                keywords,
+                fallback_items,
+                allow_below_threshold=True,
+            )
+
             return {
                 'status': 'llm_fallback_evidence',
                 'viewpoint': opinion,
@@ -1487,7 +1512,8 @@ Example:
                 'keywords': keywords,
                 'keyword': keywords,
                 'evidence_count': len(fallback_items),
-                'persisted': False,
+                'persisted': True,
+                'viewpoint_id': viewpoint_id,
                 'fallback_reason': 'below_threshold',
                 'trace': {
                     'retrieval_path': [
@@ -1571,6 +1597,14 @@ Example:
             for i, item in enumerate(fallback_items, 1):
                 print(f"  {i}. [Acceptance rate: {item['acceptance_rate']:.3f}] {item['evidence'][:60]}...")
 
+            viewpoint_id = self._save_to_database(
+                opinion,
+                theme,
+                keyword,
+                fallback_items,
+                allow_below_threshold=True,
+            )
+
             return {
                 'status': 'llm_fallback_evidence',
                 'viewpoint': opinion,
@@ -1578,7 +1612,8 @@ Example:
                 'keywords': keyword,
                 'keyword': keyword,
                 'evidence_count': len(fallback_items),
-                'persisted': False,
+                'persisted': True,
+                'viewpoint_id': viewpoint_id,
                 'fallback_reason': 'wikipedia_empty',
                 'trace': {
                     'retrieval_path': [
@@ -1626,6 +1661,14 @@ Example:
             for i, item in enumerate(fallback_items, 1):
                 print(f"  {i}. [Acceptance rate: {item['acceptance_rate']:.3f}] {item['evidence'][:60]}...")
 
+            viewpoint_id = self._save_to_database(
+                opinion,
+                theme,
+                keyword,
+                fallback_items,
+                allow_below_threshold=True,
+            )
+
             return {
                 'status': 'llm_fallback_evidence',
                 'viewpoint': opinion,
@@ -1633,7 +1676,8 @@ Example:
                 'keywords': keyword,
                 'keyword': keyword,
                 'evidence_count': len(fallback_items),
-                'persisted': False,
+                'persisted': True,
+                'viewpoint_id': viewpoint_id,
                 'fallback_reason': 'below_threshold',
                 'trace': {
                     'retrieval_path': [
@@ -1811,10 +1855,60 @@ Example:
         return scored_evidence
     
     
-    def _save_to_database(self, viewpoint: str, theme: str, keywords: str, evidence_list: List[Dict]) -> int:
+    def _save_evidence_items(
+        self,
+        viewpoint_id: int,
+        evidence_items: List[Dict[str, Any]],
+        *,
+        allow_below_threshold: bool = False,
+    ) -> None:
+        if viewpoint_id is None:
+            raise ValueError("viewpoint_id cannot be None")
+
+        evidence_to_save = (
+            evidence_items[:MAX_EVIDENCE_PER_VIEWPOINT]
+            if allow_below_threshold
+            else select_top_evidence(evidence_items)
+        )
+        if not evidence_to_save:
+            raise ValueError(
+                f"no evidence to save for viewpoint_id={viewpoint_id} (allow_below_threshold={allow_below_threshold})"
+            )
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        for item in evidence_to_save:
+            cursor.execute(
+                '''
+                    INSERT INTO evidence (viewpoint_id, evidence, acceptance_rate, source)
+                    VALUES (?, ?, ?, ?)
+                ''',
+                (
+                    viewpoint_id,
+                    item['evidence'],
+                    float(item['acceptance_rate']),
+                    item.get('source', 'Wikipedia'),
+                ),
+            )
+        conn.commit()
+        conn.close()
+
+    def _save_to_database(
+        self,
+        viewpoint: str,
+        theme: str,
+        keywords: str,
+        evidence_list: List[Dict],
+        *,
+        allow_below_threshold: bool = False,
+    ) -> int:
         """Save the viewpoint and evidences into the database."""
         try:
-            evidence_to_save = select_top_evidence(evidence_list)
+            evidence_to_save = (
+                evidence_list[:MAX_EVIDENCE_PER_VIEWPOINT]
+                if allow_below_threshold
+                else select_top_evidence(evidence_list)
+            )
             if not evidence_to_save:
                 raise ValueError(
                     f"refusing to save viewpoint without evidence meeting acceptance threshold (>= {MIN_EVIDENCE_ACCEPTANCE_RATE})"
@@ -1833,10 +1927,13 @@ Example:
             
             # Insert evidence records
             for item in evidence_to_save:
-                cursor.execute('''
-                    INSERT INTO evidence (viewpoint_id, evidence, acceptance_rate, source)
-                    VALUES (?, ?, ?, ?)
-                ''', (viewpoint_id, item['evidence'], item['acceptance_rate'], item.get('source', 'Wikipedia')))
+                cursor.execute(
+                    '''
+                        INSERT INTO evidence (viewpoint_id, evidence, acceptance_rate, source)
+                        VALUES (?, ?, ?, ?)
+                    ''',
+                    (viewpoint_id, item['evidence'], float(item['acceptance_rate']), item.get('source', 'Wikipedia')),
+                )
             
             conn.commit()
             conn.close()
