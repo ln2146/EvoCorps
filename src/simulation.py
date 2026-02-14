@@ -928,7 +928,7 @@ class Simulation:
 
             while True:
                 # Main monitoring loop: continuous watch
-                await asyncio.sleep(1)
+                await asyncio.sleep(self.opinion_balance_manager.trending_posts_scan_interval * 60)
 
                 monitor_count += 1
                 print(f"\n🔍 [Monitoring cycle {monitor_count}] starting opinion balance scan...")

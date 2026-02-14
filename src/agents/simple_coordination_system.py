@@ -3777,6 +3777,7 @@ class SimpleCoordinationSystem:
         self.monitoring_tasks = {}
         self.feedback_history = []
         self.default_feedback_monitoring_interval = self._load_default_feedback_monitoring_interval()
+        self.feedback_monitoring_cycles = self._load_feedback_monitoring_cycles()
 
         # Database connection
         self.db_path = self._get_database_path()
@@ -3790,6 +3791,10 @@ class SimpleCoordinationSystem:
         workflow_logger.info(
             f"📊 Default feedback monitoring interval from configs/experiment_config.json: "
             f"{self.default_feedback_monitoring_interval} minutes"
+        )
+        workflow_logger.info(
+            f"🔁 Feedback monitoring cycles from configs/experiment_config.json: "
+            f"{self.feedback_monitoring_cycles} rounds"
         )
 
     def _load_default_feedback_monitoring_interval(self) -> int:
@@ -3818,6 +3823,34 @@ class SimpleCoordinationSystem:
         raise ValueError(
             "opinion_balance_system.feedback_monitoring_interval must be a positive integer "
             f"in {config_path}, got: {opinion_balance_cfg.get('feedback_monitoring_interval')!r}"
+        )
+
+    def _load_feedback_monitoring_cycles(self) -> int:
+        """Load feedback monitoring cycles from configs/experiment_config.json."""
+        config_path = Path(__file__).parent.parent.parent / "configs" / "experiment_config.json"
+        if not config_path.exists():
+            raise FileNotFoundError(f"experiment config not found: {config_path}")
+
+        with open(config_path, "r", encoding="utf-8") as file:
+            config = json.load(file)
+
+        opinion_balance_cfg = config.get("opinion_balance_system")
+        if not isinstance(opinion_balance_cfg, dict):
+            raise ValueError(
+                "opinion_balance_system section is missing in configs/experiment_config.json"
+            )
+
+        candidate = opinion_balance_cfg.get("feedback_monitoring_cycles")
+        if isinstance(candidate, str):
+            candidate = candidate.strip()
+            if candidate.isdigit():
+                candidate = int(candidate)
+        if isinstance(candidate, (int, float)) and int(candidate) > 0:
+            return int(candidate)
+
+        raise ValueError(
+            "opinion_balance_system.feedback_monitoring_cycles must be a positive integer "
+            f"in {config_path}, got: {opinion_balance_cfg.get('feedback_monitoring_cycles')!r}"
         )
     
     def _get_fixed_amplifier_agent_ids(self, count: int) -> List[str]:
@@ -5696,7 +5729,7 @@ class SimpleCoordinationSystem:
             return
 
         monitoring_count = 0
-        max_monitoring_cycles = 3
+        max_monitoring_cycles = self.feedback_monitoring_cycles
 
         # ========== Multi-round monitoring loop ==========
         while monitoring_count < max_monitoring_cycles:

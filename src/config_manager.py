@@ -53,6 +53,7 @@ class ConfigManager:
                 "max_responses_per_post": 5,
                 "effectiveness_tracking": True,
                 "feedback_monitoring_interval": 30,
+                "feedback_monitoring_cycles": 3,
                 "auto_adjustment_enabled": True,
                 "adjustment_sensitivity": "medium"
             },

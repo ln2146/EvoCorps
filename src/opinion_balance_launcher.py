@@ -221,15 +221,17 @@ class OpinionBalanceLauncher:
     
     def _create_default_config(self) -> Dict[str, Any]:
         """Create a default configuration."""
-        # Only create the default configuration when the file is completely missing
-        # Only create defaults when the configuration file is entirely missing
-        # OpinionBalanceManager will fall back to its built-in defaults in that case
+        # Only create defaults when the configuration file is entirely missing.
+        # Keep all required opinion_balance_system fields explicit.
         from multi_model_selector import MultiModelSelector
         default_config = {
             "opinion_balance_system": {
                 "enabled": True,
-                "monitoring_enabled": True
-                # Let OpinionBalanceManager use its default values for other settings
+                "monitoring_enabled": True,
+                "feedback_system_enabled": True,
+                "trending_posts_scan_interval": 5,
+                "feedback_monitoring_interval": 30,
+                "feedback_monitoring_cycles": 3
             },
             "engine": MultiModelSelector.DEFAULT_POOL[0],
             "temperature": 0.7
