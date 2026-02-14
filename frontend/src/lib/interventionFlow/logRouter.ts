@@ -68,7 +68,7 @@ const ROLE_BEFORE_COPY: Record<Role, string> = {
   Analyst: '监测舆情信号，判断是否触发干预',
   Strategist: '生成可执行的平衡策略与投放指令',
   Leader: '生成并发布主导评论，定调讨论方向',
-  Amplifier: '组织扩音器集群扩散，提升优质观点权重',
+  Amplifier: '组织扩散者集群扩散，提升优质观点权重',
 }
 
 // Option B: 4 fixed rows per role (stable layout; values update as logs arrive).

@@ -1363,7 +1363,7 @@ function InterventionFlowPanel({ state, enabled }: { state: FlowState; enabled: 
     { role: 'Analyst', tone: 'from-blue-500 to-cyan-500', label: '分析师' },
     { role: 'Strategist', tone: 'from-purple-500 to-blue-500', label: '战略家' },
     { role: 'Leader', tone: 'from-green-500 to-emerald-500', label: '领袖' },
-    { role: 'Amplifier', tone: 'from-orange-500 to-red-500', label: '扩音器' },
+    { role: 'Amplifier', tone: 'from-orange-500 to-red-500', label: '扩散者' },
   ]
 
   // Review mode (A): once user clicks a tab, don't auto-jump when activeRole changes.

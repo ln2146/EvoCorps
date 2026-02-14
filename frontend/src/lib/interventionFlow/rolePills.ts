@@ -82,15 +82,15 @@ export function buildRolePills(
       amplifierSummary.find((s) => /^Amplifier:\s*\d+/i.test(s)) ??
       amplifierSummary.find((s) => /^amplifier:\s*\d+/i.test(s)) ??
       amplifierSummary.find((s) => /^Amplifiers:\s*\d+/i.test(s)) ??
-      amplifierSummary.find((s) => /^扩音器：\s*\d+/.test(s)) ??
+      amplifierSummary.find((s) => /^扩散者：\s*\d+/.test(s)) ??
       ''
     const amplifierCount =
       rawAmplifierLine.match(/^Amplifier:\s*(\d+)/i)?.[1] ??
       rawAmplifierLine.match(/^amplifier:\s*(\d+)/i)?.[1] ??
       rawAmplifierLine.match(/^Amplifiers:\s*(\d+)/i)?.[1] ??
-      rawAmplifierLine.match(/^扩音器：\s*(\d+)/)?.[1] ??
+      rawAmplifierLine.match(/^扩散者：\s*(\d+)/)?.[1] ??
       ''
-    if (amplifierCount) pills.push(`扩音器：${amplifierCount}`)
+    if (amplifierCount) pills.push(`扩散者：${amplifierCount}`)
 
     // Strategist core argument is displayed in the dynamic panel (it can be long), so don't duplicate it here.
     return pills.slice(0, 4)

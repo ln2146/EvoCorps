@@ -22,7 +22,7 @@ describe('buildRolePills', () => {
         amplifierSummary: ['Amplifier: 12'],
       },
     })
-    expect(strategist).toEqual(['策略：balanced_response', '风格：diplomatic', '语气：empathetic', '扩音器：12'])
+    expect(strategist).toEqual(['策略：balanced_response', '风格：diplomatic', '语气：empathetic', '扩散者：12'])
     expect(strategist.join(' ')).not.toContain('热度')
     // Strategist core argument should be shown in the dynamic panel, not duplicated in the summary pills.
     expect(strategist.join(' ')).not.toContain('核心论点：')

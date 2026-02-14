@@ -626,7 +626,7 @@ describe('routeLogLine', () => {
     expect(state.roles.Amplifier.stage.current).toBe(2)
 
     const beforeCompletion = [...state.roles.Amplifier.during]
-    expect(beforeCompletion).toEqual(['扩音器：点赞扩散（12）'])
+    expect(beforeCompletion).toEqual(['扩散者：点赞扩散（12）'])
 
     state = routeLogLine(state, '2026-01-30 23:22:53,393 - INFO - 🎉 Workflow completed - effectiveness score: 10.0/10')
     state = routeLogLine(state, '2026-01-30 23:22:53,394 - INFO - 📊 Response success rate: 12/12')
@@ -634,7 +634,7 @@ describe('routeLogLine', () => {
     const joined = state.roles.Amplifier.during.join('\n')
     // Completion lines should be appended without clearing earlier content.
     for (const line of beforeCompletion) expect(joined).toContain(line)
-    expect(joined).toContain('扩音器：点赞扩散完成')
+    expect(joined).toContain('扩散者：点赞扩散完成')
     expect(joined).toContain('Response success rate: 12/12')
   })
 
@@ -647,7 +647,7 @@ describe('routeLogLine', () => {
 
     state = routeLogLine(state, '2026-01-30 23:22:52,352 - INFO - 💖 12 Amplifier Agents liked leader comments')
     expect(state.roles.Amplifier.stage.current).toBe(2)
-    expect(state.roles.Amplifier.during).toEqual(['扩音器：点赞扩散（12）'])
+    expect(state.roles.Amplifier.during).toEqual(['扩散者：点赞扩散（12）'])
   })
 
   it('does not duplicate sentiment/extremity values in Analyst milestone lines', () => {
