@@ -315,6 +315,19 @@ class EnhancedLeaderAgent:
                 workflow_logger.info("   🔄 Trying backup argument generation")
                 return self._get_backup_arguments(core_viewpoint)
 
+            trace = result.get("trace")
+            if isinstance(trace, dict):
+                retrieval_path = trace.get("retrieval_path")
+                if isinstance(retrieval_path, list):
+                    workflow_logger.info("   Retrieval path:")
+                    for step in retrieval_path:
+                        workflow_logger.info(f"     - {step}")
+
+            if result.get("status") == "llm_fallback_evidence":
+                workflow_logger.info(
+                    f"   🛟 Using LLM-generated fallback evidences (persisted={result.get('persisted', False)})"
+                )
+
             # Extract evidence info
             evidence_list = result.get('evidence', [])
             relevant_arguments = []

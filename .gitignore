@@ -36,3 +36,4 @@ evidence_database/*.binevidence_database/embedding_cache.faiss
 experiments/
 # Worktrees
 .worktrees/
+.vscode/

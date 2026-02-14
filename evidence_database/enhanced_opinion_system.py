@@ -238,27 +238,31 @@ def generate_fallback_evidence_items(
 
     scored_items: List[Dict[str, Any]] = []
     for generated in generated_list:
-        score = llm_score_single_evidence(
-            llm_client=llm_client,
-            llm_model_name=llm_model_name,
-            viewpoint=viewpoint,
-            evidence=generated,
-        )
-        if score < min_acceptance_rate:
-            raise ValueError(
-                f"fallback evidence did not meet acceptance threshold (score={score}, min={min_acceptance_rate})"
+        score_error: Optional[str] = None
+        try:
+            score = llm_score_single_evidence(
+                llm_client=llm_client,
+                llm_model_name=llm_model_name,
+                viewpoint=viewpoint,
+                evidence=generated,
             )
+        except Exception as e:
+            score = 0.0
+            score_error = str(e)
         scored_items.append(
             {
                 "evidence": generated,
                 "acceptance_rate": score,
                 "source": "LLMGenerated",
+                "low_confidence": score < min_acceptance_rate,
+                "score_error": score_error,
                 "seed_source": seed_source,
                 "seed_acceptance_rate": seed_acceptance_rate,
             }
         )
 
-    return scored_items
+    scored_items.sort(key=lambda x: x["acceptance_rate"], reverse=True)
+    return scored_items[:FALLBACK_EVIDENCE_COUNT]
 
 # FAISS vector search
 try:
@@ -823,6 +827,11 @@ class EnhancedOpinionSystem:
         """Execute the full opinion processing workflow as required."""
         print(f"🎯 Processing opinion: {opinion}")
         print("-" * 80)
+
+        trace: Dict[str, Any] = {
+            "retrieval_path": [],
+            "min_acceptance_rate": MIN_EVIDENCE_ACCEPTANCE_RATE,
+        }
         
         # Display cache statistics
         cache_stats = self.get_cache_stats()
@@ -844,10 +853,29 @@ class EnhancedOpinionSystem:
             if not theme_matched:
                 print(f"⚠️ Theme '{theme}' has no matching records in the database")
                 # Case (2): similarity below threshold, new-keyword flow
-                return self._handle_completely_new_opinion(opinion, theme, keyword)
+                trace["retrieval_path"].append(
+                    {"step": "theme_match", "matched": False, "theme": theme}
+                )
+                result = self._handle_completely_new_opinion(opinion, theme, keyword)
+                if isinstance(result, dict) and "trace" not in result:
+                    result["trace"] = trace
+                return result
+
+            trace["retrieval_path"].append(
+                {"step": "theme_match", "matched": True, "theme": theme}
+            )
             
             # Step 3: FAISS keyword matching
             keyword_match_result = self._faiss_search_keywords(keyword)
+            trace["retrieval_path"].append(
+                {
+                    "step": "faiss_keyword",
+                    "keyword": keyword,
+                    "similarity": keyword_match_result.get("similarity"),
+                    "threshold": self.keyword_similarity_threshold,
+                    "matched_keywords": keyword_match_result.get("matched_keywords"),
+                }
+            )
             
             if keyword_match_result['similarity'] >= self.keyword_similarity_threshold:
                 print(f"✅ Keyword match succeeded (similarity: {keyword_match_result['similarity']:.3f})")
@@ -860,6 +888,14 @@ class EnhancedOpinionSystem:
 
                 # Step 4: FAISS viewpoint matching
                 viewpoint_match_result = self._faiss_search_viewpoints(opinion, matched_keywords)
+                trace["retrieval_path"].append(
+                    {
+                        "step": "faiss_viewpoint",
+                        "similarity": viewpoint_match_result.get("similarity"),
+                        "threshold": self.viewpoint_similarity_threshold,
+                        "viewpoint_id": viewpoint_match_result.get("viewpoint_id"),
+                    }
+                )
 
                 if viewpoint_match_result['similarity'] >= self.viewpoint_similarity_threshold:
                     print(f"✅ Viewpoint match succeeded (similarity: {viewpoint_match_result['similarity']:.3f})")
@@ -867,20 +903,32 @@ class EnhancedOpinionSystem:
                     viewpoint_id = viewpoint_match_result.get('viewpoint_id')
                     if viewpoint_id is None:
                         print(f"⚠️ Viewpoint ID missing; switching to existing-keyword flow")
-                        return self._handle_new_viewpoint_existing_keywords(
+                        result = self._handle_new_viewpoint_existing_keywords(
                             opinion, theme, matched_keywords
                         )
-                    return self._return_top5_evidence(viewpoint_id)
+                        if isinstance(result, dict) and "trace" not in result:
+                            result["trace"] = trace
+                        return result
+                    result = self._return_top5_evidence(viewpoint_id, requested_viewpoint=opinion)
+                    if isinstance(result, dict) and "trace" not in result:
+                        result["trace"] = trace
+                    return result
                 else:
                     print(f"❌ Viewpoint match failed (similarity: {viewpoint_match_result['similarity']:.3f})")
                     # Case 1.2: new viewpoint but keywords exist
-                    return self._handle_new_viewpoint_existing_keywords(
+                    result = self._handle_new_viewpoint_existing_keywords(
                         opinion, theme, matched_keywords
                     )
+                    if isinstance(result, dict) and "trace" not in result:
+                        result["trace"] = trace
+                    return result
             else:
                 print(f"❌ Keyword match failed (similarity: {keyword_match_result['similarity']:.3f})")
                 # Case (2): similarity below threshold, new keyword flow
-                return self._handle_completely_new_opinion(opinion, theme, keyword)
+                result = self._handle_completely_new_opinion(opinion, theme, keyword)
+                if isinstance(result, dict) and "trace" not in result:
+                    result["trace"] = trace
+                return result
         
         except Exception as e:
             print(f"❌ Processing failed: {e}")
@@ -1140,7 +1188,7 @@ Example:
             print(f"⚠️ Failed to find a similar viewpoint record: {e}")
             return None
     
-    def _return_top5_evidence(self, viewpoint_id: int) -> Dict[str, Any]:
+    def _return_top5_evidence(self, viewpoint_id: int, requested_viewpoint: Optional[str] = None) -> Dict[str, Any]:
         """Return the top-ranked evidences for a given viewpoint by acceptance rate."""
         try:
             conn = sqlite3.connect(self.db_path)
@@ -1190,6 +1238,123 @@ Example:
             evidence_list = cursor.fetchall()
             
             conn.close()
+
+            db_scored = [
+                {"evidence": evidence, "acceptance_rate": rate, "source": source}
+                for (evidence, rate, source) in evidence_list
+            ]
+            db_selected = select_top_evidence(db_scored)
+
+            # If DB contains no acceptable evidence, try Wikipedia retrieval for this existing viewpoint.
+            if not db_selected:
+                keywords = (viewpoint_info[2] or "").strip()
+                search_keyword = keywords.split(",")[0].strip() if "," in keywords else keywords
+
+                if search_keyword:
+                    print(
+                        f"🛟 Existing viewpoint has no acceptable DB evidence (>= {MIN_EVIDENCE_ACCEPTANCE_RATE}); trying Wikipedia refresh: {search_keyword}"
+                    )
+                    evidence_snippets = self._search_wikipedia_evidence_15(search_keyword)
+                    print(f"🔍 Wikipedia returned {len(evidence_snippets)} evidences")
+
+                    if evidence_snippets:
+                        scoring_viewpoint = (
+                            requested_viewpoint.strip()
+                            if isinstance(requested_viewpoint, str) and requested_viewpoint.strip()
+                            else viewpoint_info[0]
+                        )
+                        scored_wiki = self._llm_score_evidence(scoring_viewpoint, evidence_snippets)
+                        wiki_selected = select_top_evidence(scored_wiki)
+                        if wiki_selected:
+                            print("✅ Wikipedia refresh found acceptable evidences (not persisted)")
+                            result = {
+                                'status': 'existing_match_wikipedia_refresh',
+                                'viewpoint': viewpoint_info[0],
+                                'theme': viewpoint_info[1],
+                                'keywords': viewpoint_info[2],
+                                'keyword': viewpoint_info[2],
+                                'evidence_count': len(wiki_selected),
+                                'persisted': False,
+                                'fallback_reason': 'db_below_threshold_then_wikipedia_ok',
+                                'evidence': [
+                                    {
+                                        'rank': i + 1,
+                                        'evidence': item['evidence'],
+                                        'acceptance_rate': item['acceptance_rate'],
+                                        'source': item.get('source', 'Wikipedia'),
+                                    }
+                                    for i, item in enumerate(wiki_selected)
+                                ],
+                            }
+                            result["trace"] = {
+                                "retrieval_path": [
+                                    {
+                                        "step": "db_evidence",
+                                        "selected_count": 0,
+                                        "min_acceptance_rate": MIN_EVIDENCE_ACCEPTANCE_RATE,
+                                    },
+                                    {
+                                        "step": "wikipedia_refresh",
+                                        "keyword": search_keyword,
+                                        "retrieved_count": len(evidence_snippets),
+                                        "selected_count": len(wiki_selected),
+                                    },
+                                ]
+                            }
+                            return result
+
+                # Wikipedia didn't help; generate LLM fallback evidences (not persisted)
+                print(
+                    f"🛟 Wikipedia refresh did not yield acceptable evidences; generating fallback evidences via LLM (not persisted)"
+                )
+                fallback_items = generate_fallback_evidence_items(
+                    llm_client=self.llm_client,
+                    llm_model_name=self.llm_model_name,
+                    viewpoint=(requested_viewpoint or viewpoint_info[0]),
+                    scored_evidence=None,
+                    min_acceptance_rate=MIN_EVIDENCE_ACCEPTANCE_RATE,
+                )
+                result = {
+                    'status': 'llm_fallback_evidence',
+                    'viewpoint': viewpoint_info[0],
+                    'theme': viewpoint_info[1],
+                    'keywords': viewpoint_info[2],
+                    'keyword': viewpoint_info[2],
+                    'evidence_count': len(fallback_items),
+                    'persisted': False,
+                    'fallback_reason': 'db_below_threshold_then_wikipedia_below_threshold',
+                    'evidence': [
+                        {
+                            'rank': i + 1,
+                            'evidence': item['evidence'],
+                            'acceptance_rate': item['acceptance_rate'],
+                            'source': item['source'],
+                            'low_confidence': item.get('low_confidence', True),
+                        }
+                        for i, item in enumerate(fallback_items)
+                    ],
+                }
+                result["trace"] = {
+                    "retrieval_path": [
+                        {
+                            "step": "db_evidence",
+                            "selected_count": 0,
+                            "min_acceptance_rate": MIN_EVIDENCE_ACCEPTANCE_RATE,
+                        },
+                        {
+                            "step": "wikipedia_refresh",
+                            "keyword": search_keyword,
+                            "retrieved_count": 0 if not search_keyword else None,
+                            "selected_count": 0,
+                        },
+                        {
+                            "step": "llm_fallback",
+                            "count": len(fallback_items),
+                            "low_confidence_count": sum(1 for x in fallback_items if x.get("low_confidence")),
+                        },
+                    ]
+                }
+                return result
             
             result = {
                 'status': 'existing_match',
@@ -1199,19 +1364,28 @@ Example:
                 # Backward-compat: some callers historically used 'keyword' (singular).
                 # Keep it identical to 'keywords' to avoid "unknown" in downstream logs/UI.
                 'keyword': viewpoint_info[2],
-                'evidence_count': len(evidence_list),
+                'evidence_count': len(db_selected),
                 'evidence': []
+            }
+            result["trace"] = {
+                "retrieval_path": [
+                    {
+                        "step": "db_evidence",
+                        "selected_count": len(db_selected),
+                        "min_acceptance_rate": MIN_EVIDENCE_ACCEPTANCE_RATE,
+                    }
+                ]
             }
             
             print(f"📋 Returning the top {MAX_EVIDENCE_PER_VIEWPOINT} evidences (sorted by acceptance_rate)")
-            for i, (evidence, rate, source) in enumerate(evidence_list, 1):
+            for i, item in enumerate(db_selected, 1):
                 result['evidence'].append({
                     'rank': i,
-                    'evidence': evidence,
-                    'acceptance_rate': rate,
-                    'source': source
+                    'evidence': item['evidence'],
+                    'acceptance_rate': item['acceptance_rate'],
+                    'source': item.get('source', 'Wikipedia')
                 })
-                print(f"  {i}. [Acceptance rate: {rate:.3f}] {evidence[:60]}...")
+                print(f"  {i}. [Acceptance rate: {item['acceptance_rate']:.3f}] {item['evidence'][:60]}...")
             
             return result
             
@@ -1236,6 +1410,7 @@ Example:
         print(f"🔍 Wikipedia returned {len(evidence_list)} evidences")
         
         if not evidence_list:
+            print("🛟 No Wikipedia evidence found; generating fallback evidences via LLM (not persisted)")
             try:
                 fallback_items = generate_fallback_evidence_items(
                     llm_client=self.llm_client,
@@ -1247,6 +1422,9 @@ Example:
             except Exception as e:
                 return {'error': f'no relevant evidence found; fallback generation failed: {e}'}
 
+            for i, item in enumerate(fallback_items, 1):
+                print(f"  {i}. [Acceptance rate: {item['acceptance_rate']:.3f}] {item['evidence'][:60]}...")
+
             return {
                 'status': 'llm_fallback_evidence',
                 'viewpoint': opinion,
@@ -1256,6 +1434,13 @@ Example:
                 'evidence_count': len(fallback_items),
                 'persisted': False,
                 'fallback_reason': 'wikipedia_empty',
+                'trace': {
+                    'retrieval_path': [
+                        {'step': 'wikipedia', 'keyword': search_keyword, 'retrieved_count': 0},
+                        {'step': 'llm_fallback', 'count': len(fallback_items)},
+                    ],
+                    'min_acceptance_rate': MIN_EVIDENCE_ACCEPTANCE_RATE,
+                },
                 'evidence': [
                     {
                         'rank': i + 1,
@@ -1276,6 +1461,9 @@ Example:
         # Take the top entries by acceptance_rate, with a minimum acceptance threshold
         top_evidence = select_top_evidence(scored_evidence)
         if not top_evidence:
+            print(
+                f"🛟 No evidence met acceptance threshold (>= {MIN_EVIDENCE_ACCEPTANCE_RATE}); generating fallback evidences via LLM (not persisted)"
+            )
             try:
                 fallback_items = generate_fallback_evidence_items(
                     llm_client=self.llm_client,
@@ -1289,6 +1477,9 @@ Example:
                     'error': f'no evidence met acceptance threshold (>= {MIN_EVIDENCE_ACCEPTANCE_RATE}); fallback generation failed: {e}'
                 }
 
+            for i, item in enumerate(fallback_items, 1):
+                print(f"  {i}. [Acceptance rate: {item['acceptance_rate']:.3f}] {item['evidence'][:60]}...")
+
             return {
                 'status': 'llm_fallback_evidence',
                 'viewpoint': opinion,
@@ -1298,6 +1489,13 @@ Example:
                 'evidence_count': len(fallback_items),
                 'persisted': False,
                 'fallback_reason': 'below_threshold',
+                'trace': {
+                    'retrieval_path': [
+                        {'step': 'wikipedia', 'keyword': search_keyword, 'retrieved_count': len(evidence_list), 'selected_count': 0},
+                        {'step': 'llm_fallback', 'count': len(fallback_items)},
+                    ],
+                    'min_acceptance_rate': MIN_EVIDENCE_ACCEPTANCE_RATE,
+                },
                 'evidence': [
                     {
                         'rank': i + 1,
@@ -1358,6 +1556,7 @@ Example:
         print(f"🔍 Wikipedia returned {len(evidence_list)} evidences")
         
         if not evidence_list:
+            print("🛟 No Wikipedia evidence found; generating fallback evidences via LLM (not persisted)")
             try:
                 fallback_items = generate_fallback_evidence_items(
                     llm_client=self.llm_client,
@@ -1369,6 +1568,9 @@ Example:
             except Exception as e:
                 return {'error': f'no relevant evidence found; fallback generation failed: {e}'}
 
+            for i, item in enumerate(fallback_items, 1):
+                print(f"  {i}. [Acceptance rate: {item['acceptance_rate']:.3f}] {item['evidence'][:60]}...")
+
             return {
                 'status': 'llm_fallback_evidence',
                 'viewpoint': opinion,
@@ -1378,6 +1580,13 @@ Example:
                 'evidence_count': len(fallback_items),
                 'persisted': False,
                 'fallback_reason': 'wikipedia_empty',
+                'trace': {
+                    'retrieval_path': [
+                        {'step': 'wikipedia', 'keyword': search_keyword, 'retrieved_count': 0},
+                        {'step': 'llm_fallback', 'count': len(fallback_items)},
+                    ],
+                    'min_acceptance_rate': MIN_EVIDENCE_ACCEPTANCE_RATE,
+                },
                 'evidence': [
                     {
                         'rank': i + 1,
@@ -1398,6 +1607,9 @@ Example:
         # Take the top entries by acceptance_rate, with a minimum acceptance threshold
         top_evidence = select_top_evidence(scored_evidence)
         if not top_evidence:
+            print(
+                f"🛟 No evidence met acceptance threshold (>= {MIN_EVIDENCE_ACCEPTANCE_RATE}); generating fallback evidences via LLM (not persisted)"
+            )
             try:
                 fallback_items = generate_fallback_evidence_items(
                     llm_client=self.llm_client,
@@ -1411,6 +1623,9 @@ Example:
                     'error': f'no evidence met acceptance threshold (>= {MIN_EVIDENCE_ACCEPTANCE_RATE}); fallback generation failed: {e}'
                 }
 
+            for i, item in enumerate(fallback_items, 1):
+                print(f"  {i}. [Acceptance rate: {item['acceptance_rate']:.3f}] {item['evidence'][:60]}...")
+
             return {
                 'status': 'llm_fallback_evidence',
                 'viewpoint': opinion,
@@ -1420,6 +1635,13 @@ Example:
                 'evidence_count': len(fallback_items),
                 'persisted': False,
                 'fallback_reason': 'below_threshold',
+                'trace': {
+                    'retrieval_path': [
+                        {'step': 'wikipedia', 'keyword': search_keyword, 'retrieved_count': len(evidence_list), 'selected_count': 0},
+                        {'step': 'llm_fallback', 'count': len(fallback_items)},
+                    ],
+                    'min_acceptance_rate': MIN_EVIDENCE_ACCEPTANCE_RATE,
+                },
                 'evidence': [
                     {
                         'rank': i + 1,
@@ -1562,17 +1784,24 @@ Example:
         scored_evidence = []
         
         for evidence in evidence_list:
-            score = llm_score_single_evidence(
-                llm_client=self.llm_client,
-                llm_model_name=self.llm_model_name,
-                viewpoint=viewpoint,
-                evidence=evidence,
-            )
+            score_error = None
+            try:
+                score = llm_score_single_evidence(
+                    llm_client=self.llm_client,
+                    llm_model_name=self.llm_model_name,
+                    viewpoint=viewpoint,
+                    evidence=evidence,
+                )
+            except Exception as e:
+                print(f"⚠️ LLM scoring failed for one evidence: {e}")
+                score = 0.0
+                score_error = str(e)
             
             scored_evidence.append({
                 'evidence': evidence,
                 'acceptance_rate': score,
-                'source': 'Wikipedia'
+                'source': 'Wikipedia',
+                'score_error': score_error,
             })
             
             time.sleep(0.1)  # Throttle requests
