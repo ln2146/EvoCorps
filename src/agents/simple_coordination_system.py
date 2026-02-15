@@ -1238,8 +1238,8 @@ Develop an appropriate strategy for this context. Return a JSON response with re
         """Query historical action result logs, find most successful strategies for similar cases."""
         try:
             def _get_thresholds() -> tuple[float, float]:
-                sim_th = 0.5
-                eff_th = 0.5
+                sim_th = 0.7
+                eff_th = 0.7
 
                 diagnosis = getattr(self.learning_system, "last_recommendation_diagnosis", None)
                 if isinstance(diagnosis, dict):
@@ -1454,13 +1454,13 @@ Develop an appropriate strategy for this context. Return a JSON response with re
                     reason = diagnosis.get("reason", "no_results")
                     top_candidates = diagnosis.get("top_candidates", [])
                     try:
-                        threshold = float(diagnosis.get("similarity_threshold", 0.5))
+                        threshold = float(diagnosis.get("similarity_threshold", 0.7))
                     except Exception:
-                        threshold = diagnosis.get("similarity_threshold", 0.5)
+                        threshold = diagnosis.get("similarity_threshold", 0.7)
                     try:
-                        eff_th = float(diagnosis.get("effectiveness_threshold", getattr(getattr(self.learning_system, "config", {}), "get", lambda *_: 0.5)("success_threshold", 0.5)))
+                        eff_th = float(diagnosis.get("effectiveness_threshold", getattr(getattr(self.learning_system, "config", {}), "get", lambda *_: 0.7)("success_threshold", 0.7)))
                     except Exception:
-                        eff_th = 0.5
+                        eff_th = 0.7
 
                     if isinstance(top_candidates, list) and top_candidates:
                         best = top_candidates[0] if isinstance(top_candidates[0], dict) else {}
