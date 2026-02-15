@@ -537,6 +537,7 @@ class OpinionBalanceManager:
     def _record_intervention(self, original_post_id: int, action_id: str, strategy_id: str,
                            leader_response_id: Optional[int], effectiveness_score: float) -> int:
         """Record the intervention details in the database."""
+        normalized_effectiveness_score = self._normalize_monitoring_effectiveness_score(effectiveness_score)
         cursor = self.conn.cursor()
         cursor.execute('''
             INSERT INTO opinion_interventions
@@ -547,12 +548,23 @@ class OpinionBalanceManager:
             action_id,
             strategy_id,
             leader_response_id,
-            effectiveness_score
+            normalized_effectiveness_score
         ))
 
         intervention_id = cursor.lastrowid
         self.conn.commit()
         return intervention_id
+
+    @staticmethod
+    def _normalize_monitoring_effectiveness_score(raw_score) -> float:
+        """Normalize score to monitoring scale [0, 1]."""
+        try:
+            score = float(raw_score or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+        if score > 1.0:
+            score = score / 10.0
+        return max(0.0, min(1.0, score))
     
     def _calculate_basic_effectiveness_score(self, leader_post_id: int, successful_responses: list, phase2: dict) -> float:
         """Calculate a basic effectiveness score independent of monitoring data."""

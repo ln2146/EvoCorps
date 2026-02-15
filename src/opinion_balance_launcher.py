@@ -1065,7 +1065,9 @@ Please analyze the opinion tendency of this post and whether intervention is nee
             if isinstance(phase_1.get("strategy"), dict)
             else None
         )
-        effectiveness_score = float(phase_3.get("effectiveness_score", 0.0) or 0.0)
+        effectiveness_score = self._normalize_monitoring_effectiveness_score(
+            phase_3.get("effectiveness_score", 0.0)
+        )
 
         cursor = self.conn.cursor()
         cursor.execute("SELECT id FROM opinion_interventions WHERE action_id = ? LIMIT 1", (action_id,))
@@ -1088,6 +1090,17 @@ Please analyze the opinion tendency of this post and whether intervention is nee
                 (post_id, action_id, strategy_id, None, effectiveness_score),
             )
         self.conn.commit()
+
+    @staticmethod
+    def _normalize_monitoring_effectiveness_score(raw_score) -> float:
+        """Normalize score to monitoring scale [0, 1]."""
+        try:
+            score = float(raw_score or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+        if score > 1.0:
+            score = score / 10.0
+        return max(0.0, min(1.0, score))
     
     def get_system_status(self) -> Dict[str, Any]:
         """Get system status"""
