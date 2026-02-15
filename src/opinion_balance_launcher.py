@@ -531,19 +531,39 @@ Please analyze the opinion tendency of this post and whether intervention is nee
                             import asyncio
                             
                             def run_async_workflow():
+                                async def execute_and_wait_for_monitoring():
+                                    workflow_result = await self.opinion_balance_manager.coordination_system.execute_workflow(
+                                        content_text=formatted_content,
+                                        content_id=post_id,
+                                        monitoring_interval=self.opinion_balance_manager.feedback_monitoring_interval,
+                                        enable_feedback=self.opinion_balance_manager.feedback_enabled,
+                                        force_intervention=False,
+                                        time_step=current_time_step
+                                    )
+
+                                    phase_3 = (
+                                        workflow_result.get("phases", {}).get("phase_3", {})
+                                        if isinstance(workflow_result, dict) else {}
+                                    )
+                                    monitoring_task_id = phase_3.get("monitoring_task_id")
+                                    if monitoring_task_id:
+                                        handles = getattr(
+                                            self.opinion_balance_manager.coordination_system,
+                                            "monitoring_task_handles",
+                                            {},
+                                        )
+                                        handle = handles.get(monitoring_task_id) if isinstance(handles, dict) else None
+                                        if handle is not None and not handle.done():
+                                            print(f"   ⏳ Waiting monitoring task completion: {monitoring_task_id}")
+                                            await asyncio.gather(handle, return_exceptions=True)
+                                            print(f"   ✅ Monitoring task completion observed: {monitoring_task_id}")
+
+                                    return workflow_result
+
                                 loop = asyncio.new_event_loop()
                                 asyncio.set_event_loop(loop)
                                 try:
-                                    return loop.run_until_complete(
-                                        self.opinion_balance_manager.coordination_system.execute_workflow(
-                                            content_text=formatted_content,
-                                            content_id=post_id,
-                                            monitoring_interval=self.opinion_balance_manager.feedback_monitoring_interval,
-                                            enable_feedback=self.opinion_balance_manager.feedback_enabled,
-                                            force_intervention=False,
-                                            time_step=current_time_step  # Pass current time step
-                                        )
-                                    )
+                                    return loop.run_until_complete(execute_and_wait_for_monitoring())
                                 finally:
                                     loop.close()
                             
@@ -924,19 +944,39 @@ Please analyze the opinion tendency of this post and whether intervention is nee
                             import asyncio
                             
                             def run_async_workflow():
+                                async def execute_and_wait_for_monitoring():
+                                    workflow_result = await self.opinion_balance_manager.coordination_system.execute_workflow(
+                                        content_text=formatted_content,
+                                        content_id=post_id,
+                                        monitoring_interval=self.opinion_balance_manager.feedback_monitoring_interval,
+                                        enable_feedback=self.opinion_balance_manager.feedback_enabled,
+                                        force_intervention=False,
+                                        time_step=current_time_step
+                                    )
+
+                                    phase_3 = (
+                                        workflow_result.get("phases", {}).get("phase_3", {})
+                                        if isinstance(workflow_result, dict) else {}
+                                    )
+                                    monitoring_task_id = phase_3.get("monitoring_task_id")
+                                    if monitoring_task_id:
+                                        handles = getattr(
+                                            self.opinion_balance_manager.coordination_system,
+                                            "monitoring_task_handles",
+                                            {},
+                                        )
+                                        handle = handles.get(monitoring_task_id) if isinstance(handles, dict) else None
+                                        if handle is not None and not handle.done():
+                                            print(f"   ⏳ Waiting monitoring task completion: {monitoring_task_id}")
+                                            await asyncio.gather(handle, return_exceptions=True)
+                                            print(f"   ✅ Monitoring task completion observed: {monitoring_task_id}")
+
+                                    return workflow_result
+
                                 loop = asyncio.new_event_loop()
                                 asyncio.set_event_loop(loop)
                                 try:
-                                    return loop.run_until_complete(
-                                        self.opinion_balance_manager.coordination_system.execute_workflow(
-                                            content_text=formatted_content,
-                                            content_id=post_id,
-                                            monitoring_interval=self.opinion_balance_manager.feedback_monitoring_interval,
-                                            enable_feedback=self.opinion_balance_manager.feedback_enabled,
-                                            force_intervention=False,
-                                            time_step=current_time_step  # Pass current time step
-                                        )
-                                    )
+                                    return loop.run_until_complete(execute_and_wait_for_monitoring())
                                 finally:
                                     loop.close()
                             

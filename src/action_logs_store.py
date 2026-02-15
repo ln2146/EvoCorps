@@ -37,6 +37,11 @@ CREATE TABLE IF NOT EXISTS action_logs (
 )
 """
 
+def _json_default_serializer(value: Any) -> str:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
 
 def persist_action_log_record(db_path: Path, record: ActionLogRecord) -> None:
     db_path = Path(db_path)
@@ -68,14 +73,13 @@ def persist_action_log_record(db_path: Path, record: ActionLogRecord) -> None:
                 float(record.execution_time),
                 bool(record.success),
                 float(record.effectiveness_score),
-                json.dumps(situation_context, ensure_ascii=False),
-                json.dumps(strategic_decision, ensure_ascii=False),
-                json.dumps(execution_details, ensure_ascii=False),
-                json.dumps(lessons_learned, ensure_ascii=False),
-                json.dumps(full_log, ensure_ascii=False, default=str),
+                json.dumps(situation_context, ensure_ascii=False, default=_json_default_serializer),
+                json.dumps(strategic_decision, ensure_ascii=False, default=_json_default_serializer),
+                json.dumps(execution_details, ensure_ascii=False, default=_json_default_serializer),
+                json.dumps(lessons_learned, ensure_ascii=False, default=_json_default_serializer),
+                json.dumps(full_log, ensure_ascii=False, default=_json_default_serializer),
             ),
         )
         conn.commit()
     finally:
         conn.close()
-
