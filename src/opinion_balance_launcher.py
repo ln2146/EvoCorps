@@ -785,6 +785,7 @@ Please analyze the opinion tendency of this post and whether intervention is nee
                                     print(f"   ❌ Opinion balance workflow returned None - possible internal error")
                                     print(f"   💡 Suggestion: check logs/workflow/workflow_*.log for details")
                                 elif result.get('success'):
+                                    self._persist_opinion_intervention_result(post_id, result)
                                     print(f"   ✅ Opinion balance workflow completed: {result.get('action_id', 'unknown')}")
                                     print(f"   📊 Intervention result: {result.get('intervention_summary', 'No details')}")
                                 else:
@@ -991,6 +992,7 @@ Please analyze the opinion tendency of this post and whether intervention is nee
                                 print(f"   📋 Task ID: {post_id}")
                                 print(f"   💡 Suggestion: check workflow logs")
                                 continue
+                            self._persist_opinion_intervention_result(post_id, result)
                             
                             print(f"   ✅ Opinion balance workflow completed")
                             print(f"   📋 Task ID: {post_id}")
@@ -1039,6 +1041,53 @@ Please analyze the opinion tendency of this post and whether intervention is nee
             if status not in {"completed", "failed", "cancelled"}:
                 return True
         return False
+
+    def _persist_opinion_intervention_result(self, post_id: str, result: Dict[str, Any]) -> None:
+        """Upsert workflow result into opinion_interventions for launcher path consistency."""
+        if not isinstance(result, dict):
+            return
+        if not result.get("success") or not result.get("intervention_triggered"):
+            return
+
+        action_id = result.get("action_id")
+        if not action_id:
+            logging.error(f"Launcher persistence skipped: missing action_id for post_id={post_id}")
+            return
+
+        phases = result.get("phases", {}) if isinstance(result.get("phases"), dict) else {}
+        phase_1 = phases.get("phase_1", {}) if isinstance(phases.get("phase_1"), dict) else {}
+        phase_3 = phases.get("phase_3", {}) if isinstance(phases.get("phase_3"), dict) else {}
+
+        strategy_id = (
+            phase_1.get("strategy", {})
+            .get("strategy", {})
+            .get("strategy_id")
+            if isinstance(phase_1.get("strategy"), dict)
+            else None
+        )
+        effectiveness_score = float(phase_3.get("effectiveness_score", 0.0) or 0.0)
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id FROM opinion_interventions WHERE action_id = ? LIMIT 1", (action_id,))
+        existing = cursor.fetchone()
+        if existing:
+            cursor.execute(
+                """
+                UPDATE opinion_interventions
+                SET original_post_id = ?, strategy_id = ?, effectiveness_score = ?
+                WHERE action_id = ?
+                """,
+                (post_id, strategy_id, effectiveness_score, action_id),
+            )
+        else:
+            cursor.execute(
+                """
+                INSERT INTO opinion_interventions (original_post_id, action_id, strategy_id, leader_response_id, effectiveness_score)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (post_id, action_id, strategy_id, None, effectiveness_score),
+            )
+        self.conn.commit()
     
     def get_system_status(self) -> Dict[str, Any]:
         """Get system status"""

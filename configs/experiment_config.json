@@ -46,7 +46,7 @@
         "intervention_threshold": 1,
         "feedback_system_enabled": true,
         "trending_posts_scan_interval": 3,
-        "feedback_monitoring_interval": 3,
+        "feedback_monitoring_interval": 1,
         "feedback_monitoring_cycles": 2,
         "standalone_mode": true
     },
