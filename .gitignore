@@ -1,39 +1,41 @@
 ﻿# Sensitive data
 # data/
-experiment_outputs/
+data/fake_news_truth_mapping.json
+
+# Editors / IDEs
 .vscode/
+.idea/
 .kiro/
-# General
+
+# OS artifacts
 .DS_Store
+
+# Python artifacts
 __pycache__/
 *.py[cod]
 *$py.class
-.env
-.venv
-env/
-logs/
-venv/
-ENV/
-env.bak/
-venv.bak/
-.idea/
-organized_comments_from_jsonl
-/tests
-data/fake_news_truth_mapping.json
-negative_news_heat/
 
+# Environment files
+.env
+
+# Logs
+logs/
+
+# Local outputs
+experiment_outputs/
+learning_data/rag/
+temp_reaction_log.jsonl
+
+# Local databases / indexes
 *.db
 *.db-shm
 *.db-wal
-myenv/
-
-learning_data/rag
-sentiment_analysis_results/
-exported_content/data/
-temp_reaction_log.jsonl
 evidence_database/*.json
-evidence_database/*.binevidence_database/embedding_cache.faiss
-experiments/
+evidence_database/*.bin
+evidence_database/embedding_cache.faiss
+
+# Project-specific
+/tests/
+
 # Worktrees
 .worktrees/
-.vscode/
