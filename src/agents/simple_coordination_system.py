@@ -1239,7 +1239,7 @@ Develop an appropriate strategy for this context. Return a JSON response with re
         try:
             def _get_thresholds() -> tuple[float, float]:
                 sim_th = 0.7
-                eff_th = 0.7
+                eff_th = 0.8
 
                 diagnosis = getattr(self.learning_system, "last_recommendation_diagnosis", None)
                 if isinstance(diagnosis, dict):
@@ -1458,9 +1458,9 @@ Develop an appropriate strategy for this context. Return a JSON response with re
                     except Exception:
                         threshold = diagnosis.get("similarity_threshold", 0.7)
                     try:
-                        eff_th = float(diagnosis.get("effectiveness_threshold", getattr(getattr(self.learning_system, "config", {}), "get", lambda *_: 0.7)("success_threshold", 0.7)))
+                        eff_th = float(diagnosis.get("effectiveness_threshold", getattr(getattr(self.learning_system, "config", {}), "get", lambda *_: 0.8)("success_threshold", 0.8)))
                     except Exception:
-                        eff_th = 0.7
+                        eff_th = 0.8
 
                     if isinstance(top_candidates, list) and top_candidates:
                         best = top_candidates[0] if isinstance(top_candidates[0], dict) else {}
@@ -6291,7 +6291,7 @@ class SimpleCoordinationSystem:
             # Get success criteria defined in task (supports multiple criteria)
             # Use unified threshold config, remove hard improvement requirements
             success_criteria = task.get('success_criteria', {
-                'overall_score_threshold': 0.6,      # Effectiveness score threshold (0-1)
+                'overall_score_threshold': 0.6,      # Effectiveness score threshold (reward scale)
                 'extremism_threshold': self.THRESHOLDS["success_criteria"]["extremism_threshold"],  # Use unified threshold
                 'sentiment_threshold': self.THRESHOLDS["success_criteria"]["sentiment_threshold"]   # Use unified threshold
                 # Remove hard requirements for extremism_improvement and sentiment_improvement
@@ -6313,7 +6313,7 @@ class SimpleCoordinationSystem:
             
             # Detailed log output - show threshold checks and improvement info
             workflow_logger.info("  📊 Success criteria check details:")
-            workflow_logger.info(f"     Overall score: {overall_score:.2f}/1.0 (required: >= {success_criteria.get('overall_score_threshold', 0.6)}) {'✅' if criteria_results['overall_score'] else '❌'}")
+            workflow_logger.info(f"     Overall score: {overall_score:.2f} (required: >= {success_criteria.get('overall_score_threshold', 0.6)}) {'✅' if criteria_results['overall_score'] else '❌'}")
             workflow_logger.info(f"     Extremism: {current_extremism:.2f}/1.0 (required: <= {extremism_threshold_normalized:.2f}) {'✅' if criteria_results['extremism_absolute'] else '❌'}")
             workflow_logger.info(f"     Sentiment: {current_sentiment:.2f}/1.0 (required: >= {success_criteria.get('sentiment_threshold', 0.4)}) {'✅' if criteria_results['sentiment_absolute'] else '❌'}")
             workflow_logger.info("  📈 Improvement info:")
@@ -6405,20 +6405,14 @@ class SimpleCoordinationSystem:
             extremism_change = float(change_metrics.get('extremism_change', 0.0) or 0.0)  # baseline - current
             sentiment_change = float(change_metrics.get('sentiment_change', 0.0) or 0.0)  # current - baseline
 
-            # Reward function:
-            # R(s_t, a_t) = -λ1 * Δv_t + λ2 * Δe_t
-            # where:
-            #   Δv_t = current_extremism - baseline_extremism = -extremism_change
-            #   Δe_t = current_sentiment - baseline_sentiment = sentiment_change
-            lambda_1 = 1.0
-            lambda_2 = 1.0
-            delta_vt = -extremism_change
-            delta_et = sentiment_change
-            reward_score = (-lambda_1 * delta_vt) + (lambda_2 * delta_et)
+            reward_score, delta_vt, delta_et = self._calculate_reward_from_changes(
+                extremism_change,
+                sentiment_change
+            )
             
-            workflow_logger.info(f"   📊 Actual effectiveness score: {effectiveness_score:.4f}/1.0")
+            workflow_logger.info(f"   📊 Actual effectiveness score: {effectiveness_score:.4f}")
             workflow_logger.info(
-                f"   🎯 Reward score R = -{lambda_1:.1f}*Δv_t + {lambda_2:.1f}*Δe_t = {reward_score:.4f} "
+                f"   🎯 Reward score R = -1.0*Δv_t + 1.0*Δe_t = {reward_score:.4f} "
                 f"(Δv_t={delta_vt:.4f}, Δe_t={delta_et:.4f})"
             )
             
@@ -6735,7 +6729,8 @@ class SimpleCoordinationSystem:
                 or (extremism_change < 0.05 and sentiment_change < 0.1)
             )
             
-            # Calculate effectiveness score
+            # Calculate effectiveness score (aligned with reward function)
+            reward_score, _, _ = self._calculate_reward_from_changes(extremism_change, sentiment_change)
             effectiveness_score = self._calculate_simple_effectiveness_score(extremism_change, sentiment_change)
             
             # Calculate change percentages
@@ -6783,7 +6778,8 @@ class SimpleCoordinationSystem:
                 # Effectiveness assessment
                 "effectiveness_assessment": {
                     "overall_score": effectiveness_score,
-                    "score_max": 1.0,  # Effectiveness score max
+                    "reward_score": reward_score,
+                    "score_max": None,  # Reward-scale effectiveness score has no fixed upper bound
                     "score_level": self._convert_effectiveness_to_level(effectiveness_score),
                     "needs_intervention": needs_intervention,
                     "intervention_reasons": self._get_intervention_reasons(
@@ -6812,7 +6808,8 @@ class SimpleCoordinationSystem:
             workflow_logger.info("  📊 Effectiveness brief generated")
             workflow_logger.info(f"     Extremism: {baseline_extremism:.2f} -> {current_extremism:.2f} (change: {extremism_change:+.2f}, {extremism_change_percent:+.1f}%)")
             workflow_logger.info(f"     Sentiment: {baseline_sentiment:.2f} -> {current_sentiment:.2f} (change: {sentiment_change:+.2f}, {sentiment_change_percent:+.1f}%)")
-            workflow_logger.info(f"     Effectiveness score: {effectiveness_score:.2f}/1.0 ({self._convert_effectiveness_to_level(effectiveness_score)})")
+            workflow_logger.info(f"     Reward score: {reward_score:+.4f} (R=-Δv+Δe)")
+            workflow_logger.info(f"     Effectiveness score: {effectiveness_score:.2f} ({self._convert_effectiveness_to_level(effectiveness_score)})")
             workflow_logger.info(f"     Needs intervention: {'yes' if needs_intervention else 'no'}")
             
             return effectiveness_report
@@ -6822,35 +6819,21 @@ class SimpleCoordinationSystem:
             return {"needs_intervention": False}
 
     def _calculate_simple_effectiveness_score(self, extremism_change: float, sentiment_change: float) -> float:
-        """Calculate simplified effectiveness score - revised"""
+        """Calculate effectiveness score, directly using reward value R."""
         try:
-            # Extremism reduction is the primary metric (higher weight)
-            if extremism_change > 0:
-                # Extremism reduction: larger change is better
-                # Extremism range 0-1, use 0.5 reduction as full score baseline
-                extremism_score = min(1.0, extremism_change / 0.5)
-            else:
-                # Extremism increase: negative score, but not too harsh
-                extremism_score = max(0.0, 0.5 + extremism_change / 1.0)  # Deduct up to 0.5
-
-            # Sentiment improvement is secondary
-            if sentiment_change > 0:
-                # Sentiment improvement: larger change is better
-                # Sentiment range 0-1, max change is 1, use 0.5 as full score baseline
-                sentiment_score = min(1.0, sentiment_change / 0.5)  # 0.5 as full score baseline
-            else:
-                # Sentiment worsening: negative score, but not too harsh
-                sentiment_score = max(0.0, 0.5 + sentiment_change / 0.5)  # Deduct up to 0.5
-            
-            # Weighted calculation: 70% extremism reduction, 30% sentiment improvement
-            final_score = (extremism_score * 0.7) + (sentiment_score * 0.3)
-            
-            # Ensure score is within 0-1
-            return max(0.0, min(1.0, final_score))
+            reward_score, _, _ = self._calculate_reward_from_changes(extremism_change, sentiment_change)
+            return reward_score
             
         except Exception as e:
             workflow_logger.info(f"  ⚠️ Effectiveness score calculation failed: {e}")
-            return 0.5  # Default medium score
+            return 0.0
+
+    def _calculate_reward_from_changes(self, extremism_change: float, sentiment_change: float) -> tuple[float, float, float]:
+        """Calculate reward R(s_t,a_t) = -Δv_t + Δe_t from monitoring changes."""
+        delta_vt = -float(extremism_change or 0.0)  # current - baseline
+        delta_et = float(sentiment_change or 0.0)   # current - baseline
+        reward_score = (-1.0 * delta_vt) + (1.0 * delta_et)
+        return reward_score, delta_vt, delta_et
 
     def _convert_extremism_to_level(self, score: float) -> str:
         """Convert extremism score to level description"""

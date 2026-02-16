@@ -81,7 +81,7 @@ class IntelligentLearningSystem:
 
         # Configuration parameters
         self.config = {
-            "success_threshold": 0.7,
+            "success_threshold": 0.8,
             "min_cases_for_pattern": 3,
             "pattern_confidence_threshold": 0.6,
             "learning_rate": 0.1,
