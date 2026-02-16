@@ -1001,27 +1001,28 @@ Please conduct a professional evaluation with focus on the creation angle's stre
     async def _reward_driven_knowledge_refinement(self, 
                                                  best_candidate: Dict, 
                                                  relevant_arguments: List[Dict],
-                                                 effectiveness_score: float) -> None:
+                                                 effectiveness_score: float,
+                                                 reward_score: float) -> None:
         """
         Reward-driven knowledge refinement - update argument scores based on actual intervention effectiveness
         
         Formula: s_i ← s_i + η · R(s_t, a_t) · I[k_i ∈ a_t]
         Where:
         - η = 0.01 (learning rate)
-        - R(s_t, a_t) = actual intervention effectiveness score (from _analyst_monitor_effectiveness)
+        - R(s_t, a_t) = -λ1 · Δv_t + λ2 · Δe_t (calculated in coordinator, λ1=λ2=1)
         - I[k_i ∈ a_t] = indicator function, whether argument k_i was used in action a_t
         """
         try:
             # Set learning rate to 0.01
             learning_rate = 0.01
             
-            # Reward value is the actual effectiveness score (already in 0-1 range)
-            reward = effectiveness_score  # Directly use effectiveness score
+            # Reward value comes from the configured reward function.
+            reward = float(reward_score)
             
             final_content = best_candidate.get('content', '')
             
             workflow_logger.info(f"   Learning rate η = {learning_rate}")
-            workflow_logger.info(f"   Reward value R = {reward:.4f} (based on actual effectiveness score {effectiveness_score:.4f})")
+            workflow_logger.info(f"   Reward value R = {reward:.4f} (effectiveness score={effectiveness_score:.4f})")
             workflow_logger.info(f"   Starting to check usage of {len(relevant_arguments)} arguments...")
             
             # Track update information
@@ -1040,7 +1041,7 @@ Please conduct a professional evaluation with focus on the creation angle's stre
                     # Calculate new score: s_i ← s_i + η · R · I[k_i ∈ a_t]
                     # When argument is used, I[k_i ∈ a_t] = 1
                     score_update = learning_rate * reward
-                    new_score = min(1.0, old_score + score_update)  # Upper limit 1.0
+                    new_score = max(0.0, min(1.0, old_score + score_update))  # Clamp to [0,1]
                     
                     updated_arguments.append({
                         'id': arg_id,
@@ -1056,7 +1057,7 @@ Please conduct a professional evaluation with focus on the creation angle's stre
                     )
                     
                     # Update score in database
-                    self._update_argument_score_in_db(arg_id, new_score, 'used', effectiveness_score)
+                    self._update_argument_score_in_db(arg_id, new_score, 'used', reward)
                 else:
                     # When argument not used, I[k_i ∈ a_t] = 0, no score update
                     unused_arguments.append({

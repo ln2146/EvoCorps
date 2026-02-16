@@ -6380,8 +6380,26 @@ class SimpleCoordinationSystem:
             # Get effectiveness score
             effectiveness_assessment = effectiveness_report.get('effectiveness_assessment', {})
             effectiveness_score = effectiveness_assessment.get('overall_score', 0.0)
+            change_metrics = effectiveness_report.get('change_metrics', {})
+            extremism_change = float(change_metrics.get('extremism_change', 0.0) or 0.0)  # baseline - current
+            sentiment_change = float(change_metrics.get('sentiment_change', 0.0) or 0.0)  # current - baseline
+
+            # Reward function:
+            # R(s_t, a_t) = -λ1 * Δv_t + λ2 * Δe_t
+            # where:
+            #   Δv_t = current_extremism - baseline_extremism = -extremism_change
+            #   Δe_t = current_sentiment - baseline_sentiment = sentiment_change
+            lambda_1 = 1.0
+            lambda_2 = 1.0
+            delta_vt = -extremism_change
+            delta_et = sentiment_change
+            reward_score = (-lambda_1 * delta_vt) + (lambda_2 * delta_et)
             
             workflow_logger.info(f"   📊 Actual effectiveness score: {effectiveness_score:.4f}/1.0")
+            workflow_logger.info(
+                f"   🎯 Reward score R = -{lambda_1:.1f}*Δv_t + {lambda_2:.1f}*Δe_t = {reward_score:.4f} "
+                f"(Δv_t={delta_vt:.4f}, Δe_t={delta_et:.4f})"
+            )
             
             # Get leader-generated content information from monitoring task
             leader_content = monitoring_task.get("leader_content", {})
@@ -6405,7 +6423,8 @@ class SimpleCoordinationSystem:
                 await self.leader._reward_driven_knowledge_refinement(
                     best_candidate,
                     relevant_arguments,
-                    effectiveness_score
+                    effectiveness_score,
+                    reward_score
                 )
                 workflow_logger.info(f"   ✅ Argument score update completed")
             else:
