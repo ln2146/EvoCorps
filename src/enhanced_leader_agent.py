@@ -1175,14 +1175,21 @@ Is the argument used or reflected in the final content? Respond with only YES or
             
             # If the evidence system has an update method, use it
             if hasattr(self.evidence_system, 'update_argument_score'):
-                self.evidence_system.update_argument_score(
+                persisted = self.evidence_system.update_argument_score(
                     arg_id=arg_id,
                     new_score=new_score,
                     usage_status=usage_status,
                     reward=reward,
                     timestamp=datetime.now()
                 )
-                workflow_logger.info(f"   📝 Database updated: {arg_id} = {new_score:.4f}")
+                if persisted:
+                    workflow_logger.info(
+                        f"   📝 Argument score persisted: arg_id={arg_id}, new_score={new_score:.4f}, reward={reward:.4f}, usage={usage_status}"
+                    )
+                else:
+                    workflow_logger.info(
+                        f"   ℹ️  Argument score not persisted (non-DB or missing arg): arg_id={arg_id}"
+                    )
             else:
                 workflow_logger.warning(f"   ⚠️  Evidence system does not support score update method")
         

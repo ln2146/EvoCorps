@@ -603,6 +603,19 @@ class EnhancedOpinionSystem:
                     FOREIGN KEY (viewpoint_id) REFERENCES viewpoints (id)
                 )
             ''')
+
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS evidence_score_updates (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    evidence_id INTEGER NOT NULL,
+                    old_score REAL NOT NULL,
+                    new_score REAL NOT NULL,
+                    usage_status TEXT,
+                    reward REAL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (evidence_id) REFERENCES evidence (id)
+                )
+            ''')
             
             conn.commit()
             conn.close()
@@ -1950,6 +1963,73 @@ Example:
         except Exception as e:
             print(f"❌ Failed to save to the database: {e}")
             return -1
+
+    def update_argument_score(
+        self,
+        arg_id: str,
+        new_score: float,
+        usage_status: str,
+        reward: float,
+        timestamp: Optional[datetime] = None,
+    ) -> bool:
+        """Persist argument score updates for DB-backed evidence rows.
+
+        Returns:
+            bool: True if an evidence row was updated, False if skipped/not found.
+        """
+        evidence_id: Optional[int] = None
+        if isinstance(arg_id, int):
+            evidence_id = arg_id
+        elif isinstance(arg_id, str) and arg_id.strip().isdigit():
+            evidence_id = int(arg_id.strip())
+        else:
+            print(f"ℹ️ Skip argument score update for non-DB argument id: {arg_id!r}")
+            return False
+
+        if evidence_id is None or evidence_id <= 0:
+            print(f"⚠️ Invalid evidence id for score update: {arg_id!r}")
+            return False
+
+        target_score = max(0.0, min(1.0, float(new_score)))
+        update_time = (
+            timestamp.isoformat(sep=" ", timespec="seconds")
+            if isinstance(timestamp, datetime)
+            else datetime.now().isoformat(sep=" ", timespec="seconds")
+        )
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "SELECT acceptance_rate FROM evidence WHERE id = ?",
+                (evidence_id,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                print(f"ℹ️ Evidence not found for score update: id={evidence_id}")
+                return False
+
+            old_score = float(row[0])
+            cursor.execute(
+                "UPDATE evidence SET acceptance_rate = ? WHERE id = ?",
+                (target_score, evidence_id),
+            )
+            cursor.execute(
+                """
+                INSERT INTO evidence_score_updates
+                (evidence_id, old_score, new_score, usage_status, reward, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (evidence_id, old_score, target_score, usage_status, float(reward), update_time),
+            )
+            conn.commit()
+            print(
+                f"✅ Updated evidence score: id={evidence_id}, "
+                f"{old_score:.4f}->{target_score:.4f}, usage_status={usage_status}, reward={float(reward):.4f}"
+            )
+            return True
+        finally:
+            conn.close()
 
 # Usage example
 def main():

@@ -6351,11 +6351,10 @@ class SimpleCoordinationSystem:
             )
             
             # ===== Step 4: Update argument scores based on effectiveness evaluation (reward-driven knowledge refinement) =====
-            if not is_baseline:
-                # Only update argument scores during non-baseline monitoring (i.e., when actual effectiveness data is available)
-                await self._update_argument_scores_based_on_effectiveness(
-                    effectiveness_report, monitoring_task
-                )
+            # Sync update as soon as an effectiveness report is available (including baseline round).
+            await self._update_argument_scores_based_on_effectiveness(
+                effectiveness_report, monitoring_task
+            )
 
             return effectiveness_report
 
