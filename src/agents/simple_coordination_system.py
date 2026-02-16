@@ -6263,7 +6263,7 @@ class SimpleCoordinationSystem:
             change_metrics = feedback_report.get('change_metrics', {})
             
             # Get metrics
-            current_extremism = current_metrics.get('extremism_score', 5.0)
+            current_extremism = current_metrics.get('extremism_score', 0.5)
             current_sentiment = current_metrics.get('sentiment_score', 0.5)
             extremism_change = change_metrics.get('extremism_change', 0.0)
             sentiment_change = change_metrics.get('sentiment_change', 0.0)
@@ -6279,9 +6279,11 @@ class SimpleCoordinationSystem:
             })
             
             # Check success criteria - only thresholds, not improvement magnitude
+            extremism_threshold_raw = float(success_criteria.get('extremism_threshold', 4.5))
+            extremism_threshold_normalized = extremism_threshold_raw / 10.0 if extremism_threshold_raw > 1.0 else extremism_threshold_raw
             criteria_results = {
                 'overall_score': overall_score >= success_criteria.get('overall_score_threshold', 0.6),
-                'extremism_absolute': current_extremism <= success_criteria.get('extremism_threshold', 4.5),
+                'extremism_absolute': current_extremism <= extremism_threshold_normalized,
                 'sentiment_absolute': current_sentiment >= success_criteria.get('sentiment_threshold', 0.4)
                 # Completely remove extremism_improvement and sentiment_improvement checks
             }
@@ -6292,10 +6294,10 @@ class SimpleCoordinationSystem:
             # Detailed log output - show threshold checks and improvement info
             workflow_logger.info("  📊 Success criteria check details:")
             workflow_logger.info(f"     Overall score: {overall_score:.2f}/1.0 (required: >= {success_criteria.get('overall_score_threshold', 0.6)}) {'✅' if criteria_results['overall_score'] else '❌'}")
-            workflow_logger.info(f"     Extremism: {current_extremism:.1f}/10.0 (required: <= {success_criteria.get('extremism_threshold', 4.5)}) {'✅' if criteria_results['extremism_absolute'] else '❌'}")
+            workflow_logger.info(f"     Extremism: {current_extremism:.2f}/1.0 (required: <= {extremism_threshold_normalized:.2f}) {'✅' if criteria_results['extremism_absolute'] else '❌'}")
             workflow_logger.info(f"     Sentiment: {current_sentiment:.2f}/1.0 (required: >= {success_criteria.get('sentiment_threshold', 0.4)}) {'✅' if criteria_results['sentiment_absolute'] else '❌'}")
             workflow_logger.info("  📈 Improvement info:")
-            workflow_logger.info(f"     Extremism improvement: {extremism_change:+.1f} (reference only, not required)")
+            workflow_logger.info(f"     Extremism improvement: {extremism_change:+.2f} (reference only, not required)")
             workflow_logger.info(f"     Sentiment improvement: {sentiment_change:+.2f} (reference only, not required)")
             
             if success_achieved:
@@ -6675,14 +6677,17 @@ class SimpleCoordinationSystem:
         """Generate effectiveness brief - comparative analysis"""
         try:
             # Calculate key metric changes - fix data retrieval logic
-            baseline_extremism = baseline_data.get("viewpoint_extremism", 5.0)  # Default medium extremism
-            current_extremism = current_data.get("viewpoint_extremism", 5.0)
+            baseline_extremism_raw = baseline_data.get("viewpoint_extremism", 5.0)  # Default medium extremism
+            current_extremism_raw = current_data.get("viewpoint_extremism", 5.0)
             
             # If extremism not in data, try recalculating
-            if baseline_extremism == 5.0 and target_post_id:
-                baseline_extremism = await self._calculate_extremism_from_database(target_post_id)
-            if current_extremism == 5.0 and target_post_id:
-                current_extremism = await self._calculate_extremism_from_database(target_post_id)
+            if baseline_extremism_raw == 5.0 and target_post_id:
+                baseline_extremism_raw = await self._calculate_extremism_from_database(target_post_id)
+            if current_extremism_raw == 5.0 and target_post_id:
+                current_extremism_raw = await self._calculate_extremism_from_database(target_post_id)
+
+            baseline_extremism = max(0.0, min(1.0, float(baseline_extremism_raw) / 10.0))
+            current_extremism = max(0.0, min(1.0, float(current_extremism_raw) / 10.0))
             
             extremism_change = baseline_extremism - current_extremism  # Lower extremism is better
             
@@ -6701,9 +6706,14 @@ class SimpleCoordinationSystem:
             # Determine if secondary intervention is needed - use unified thresholds
             EXTREMISM_THRESHOLD = self.THRESHOLDS["secondary_intervention"]["extremism_threshold"]
             SENTIMENT_THRESHOLD = self.THRESHOLDS["secondary_intervention"]["sentiment_threshold"]
+            EXTREMISM_THRESHOLD_NORMALIZED = EXTREMISM_THRESHOLD / 10.0 if EXTREMISM_THRESHOLD > 1.0 else EXTREMISM_THRESHOLD
             
             # Intervention needed if extremism is still high or sentiment is still low
-            needs_intervention = (current_extremism > EXTREMISM_THRESHOLD) or (current_sentiment < SENTIMENT_THRESHOLD) or (extremism_change < 0.5 and sentiment_change < 0.1)
+            needs_intervention = (
+                (current_extremism > EXTREMISM_THRESHOLD_NORMALIZED)
+                or (current_sentiment < SENTIMENT_THRESHOLD)
+                or (extremism_change < 0.05 and sentiment_change < 0.1)
+            )
             
             # Calculate effectiveness score
             effectiveness_score = self._calculate_simple_effectiveness_score(extremism_change, sentiment_change)
@@ -6722,8 +6732,9 @@ class SimpleCoordinationSystem:
                 "baseline_metrics": {
                     "extremism_score": baseline_extremism,
                     "sentiment_score": baseline_sentiment,
-                    "extremism_max": 10.0,  # Extremism max
+                    "extremism_max": 1.0,   # Extremism max
                     "sentiment_max": 1.0,   # Sentiment max
+                    "extremism_score_raw": float(baseline_extremism_raw),
                     "extremism_level": self._convert_extremism_to_level(baseline_extremism),
                     "sentiment_level": self._convert_sentiment_to_level(baseline_sentiment)
                 },
@@ -6732,6 +6743,7 @@ class SimpleCoordinationSystem:
                 "current_metrics": {
                     "extremism_score": current_extremism,
                     "sentiment_score": current_sentiment,
+                    "extremism_score_raw": float(current_extremism_raw),
                     "extremism_level": self._convert_extremism_to_level(current_extremism),
                     "sentiment_level": self._convert_sentiment_to_level(current_sentiment)
                 },
@@ -6754,7 +6766,13 @@ class SimpleCoordinationSystem:
                     "score_max": 1.0,  # Effectiveness score max
                     "score_level": self._convert_effectiveness_to_level(effectiveness_score),
                     "needs_intervention": needs_intervention,
-                    "intervention_reasons": self._get_intervention_reasons(current_extremism, current_sentiment, extremism_change, sentiment_change)
+                    "intervention_reasons": self._get_intervention_reasons(
+                        current_extremism,
+                        current_sentiment,
+                        extremism_change,
+                        sentiment_change,
+                        EXTREMISM_THRESHOLD_NORMALIZED
+                    )
                 },
                 
                 # Engagement changes
@@ -6772,7 +6790,7 @@ class SimpleCoordinationSystem:
             }
             
             workflow_logger.info("  📊 Effectiveness brief generated")
-            workflow_logger.info(f"     Extremism: {baseline_extremism:.1f} -> {current_extremism:.1f} (change: {extremism_change:+.2f}, {extremism_change_percent:+.1f}%)")
+            workflow_logger.info(f"     Extremism: {baseline_extremism:.2f} -> {current_extremism:.2f} (change: {extremism_change:+.2f}, {extremism_change_percent:+.1f}%)")
             workflow_logger.info(f"     Sentiment: {baseline_sentiment:.2f} -> {current_sentiment:.2f} (change: {sentiment_change:+.2f}, {sentiment_change_percent:+.1f}%)")
             workflow_logger.info(f"     Effectiveness score: {effectiveness_score:.2f}/1.0 ({self._convert_effectiveness_to_level(effectiveness_score)})")
             workflow_logger.info(f"     Needs intervention: {'yes' if needs_intervention else 'no'}")
@@ -6788,12 +6806,12 @@ class SimpleCoordinationSystem:
         try:
             # Extremism reduction is the primary metric (higher weight)
             if extremism_change > 0:
-                # Extremism reduction: larger change is better, use a reasonable ratio
-                # Extremism range 0-10, max change is 10, use 10 as full score baseline
-                extremism_score = min(1.0, extremism_change / 5.0)  # 5.0 as full score baseline, half reduction gets full
+                # Extremism reduction: larger change is better
+                # Extremism range 0-1, use 0.5 reduction as full score baseline
+                extremism_score = min(1.0, extremism_change / 0.5)
             else:
                 # Extremism increase: negative score, but not too harsh
-                extremism_score = max(0.0, 0.5 + extremism_change / 10.0)  # Deduct up to 0.5
+                extremism_score = max(0.0, 0.5 + extremism_change / 1.0)  # Deduct up to 0.5
 
             # Sentiment improvement is secondary
             if sentiment_change > 0:
@@ -6816,13 +6834,13 @@ class SimpleCoordinationSystem:
 
     def _convert_extremism_to_level(self, score: float) -> str:
         """Convert extremism score to level description"""
-        if score >= 8.0:
+        if score >= 0.8:
             return "Critical danger"
-        elif score >= 6.0:
+        elif score >= 0.6:
             return "Highly extreme"
-        elif score >= 4.0:
+        elif score >= 0.4:
             return "Moderately extreme"
-        elif score >= 2.0:
+        elif score >= 0.2:
             return "Mildly extreme"
         else:
             return "Normal"
@@ -6854,15 +6872,16 @@ class SimpleCoordinationSystem:
             return "Ineffective"
 
     def _get_intervention_reasons(self, current_extremism: float, current_sentiment: float, 
-                                extremism_change: float, sentiment_change: float) -> List[str]:
+                                extremism_change: float, sentiment_change: float,
+                                extremism_threshold: float = 0.6) -> List[str]:
         """Get intervention reason list"""
         reasons = []
         
-        if current_extremism > 6.0:
-            reasons.append(f"Current extremism too high ({current_extremism:.1f}/10.0)")
+        if current_extremism > extremism_threshold:
+            reasons.append(f"Current extremism too high ({current_extremism:.2f}/1.0)")
         if current_sentiment < 0.4:
             reasons.append(f"Current sentiment too low ({current_sentiment:.2f}/1.0)")
-        if extremism_change < 0.5:
+        if extremism_change < 0.05:
             reasons.append(f"Insufficient extremism improvement ({extremism_change:+.2f})")
         if sentiment_change < 0.1:
             reasons.append(f"Insufficient sentiment improvement ({sentiment_change:+.2f})")
