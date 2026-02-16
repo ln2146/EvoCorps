@@ -114,41 +114,6 @@ Return a single number between 0.0 and 1.0 with no explanation.
     return _parse_llm_score(content)
 
 
-def llm_generate_fallback_evidence(
-    llm_client: Any,
-    llm_model_name: str,
-    viewpoint: str,
-    seed_evidence: str,
-) -> str:
-    prompt = f"""
-You are generating a fallback evidence statement for an opinion system.
-
-Goal: produce a single, clear, concise evidence statement that supports the viewpoint.
-Constraints:
-- MUST be based ONLY on the seed evidence (no new facts, numbers, studies, or entities).
-- You may rewrite, summarize, and improve clarity, but do not change meaning.
-- Output plain text only. No markdown, no quotes, no bullet points.
-- Keep it under 280 characters.
-
-Viewpoint: "{viewpoint}"
-Seed evidence: "{seed_evidence}"
-
-Rewrite the seed evidence into one suitable evidence statement.
-"""
-    response = llm_client.chat.completions.create(
-        model=llm_model_name,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.2,
-    )
-    content = response.choices[0].message.content
-    if content is None:
-        raise ValueError("LLM returned empty fallback evidence")
-    text = str(content).strip()
-    if not text:
-        raise ValueError("LLM returned blank fallback evidence")
-    return text
-
-
 def llm_generate_fallback_evidence_list(
     llm_client: Any,
     llm_model_name: str,
@@ -160,22 +125,34 @@ def llm_generate_fallback_evidence_list(
     seed_part = f'Seed evidence: "{seed_text}"' if seed_text else "Seed evidence: (none)"
 
     prompt = f"""
-You are generating fallback evidence statements for an opinion system.
+You are generating high-quality fallback evidence statements for an opinion system.
 
-Goal: produce {count} distinct evidence statements that support the viewpoint.
-Constraints:
-- If seed evidence is provided, you MUST base statements ONLY on that seed (no new facts, numbers, studies, or entities).
-- If seed evidence is not provided, do NOT introduce specific factual claims; use general reasoning and non-factual support.
-- Make them SPECIFIC and directly tied to the viewpoint; avoid vague filler like "policies are based on goals".
-- Prefer concrete, checkable phrasing derived from the seed (names, entities, causal links present in the seed).
+Task:
+- Produce exactly {count} distinct evidence statements supporting the viewpoint.
+
+Hard constraints:
+- If seed evidence exists: every statement MUST be grounded ONLY in seed information. Do NOT add new facts, numbers, studies, names, places, dates, or events.
+- If seed evidence does not exist: do NOT fabricate concrete facts. Use rigorous, viewpoint-aligned reasoning only.
+- Each statement must be specific, argument-ready, and tightly linked to the viewpoint (not abstract slogans).
+- Each statement must contain a clear claim and a concrete reason/mechanism/implication.
+- Maximize practical persuasive quality for comment drafting.
+- Avoid weak or generic templates, including phrases like "based on goals", "shows commitment", "important to note", "generally speaking".
+- Statements must be mutually non-duplicate with different angles (e.g., mechanism, risk, governance process, public impact).
 - Output MUST be valid JSON: a list of {count} strings.
 - Each string: plain text only, no markdown, no quotes, no bullet points inside the string.
-- Each string under 280 characters.
+- Length per string: 80-240 characters.
+
+Quality checklist (must satisfy all):
+1) Directly supports the viewpoint.
+2) Contains concrete argumentative value (claim + reason).
+3) No empty rhetoric.
+4) No invented facts.
 
 Viewpoint: "{viewpoint}"
 {seed_part}
 
 Generate {count} fallback evidence statements as JSON.
+Return only JSON.
 """
     response = llm_client.chat.completions.create(
         model=llm_model_name,
