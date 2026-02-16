@@ -487,6 +487,8 @@ class EnhancedLeaderAgent:
                     return f"3. LLM evidence generation: count={count}, low_confidence={low_conf}"
 
                 def _llm_preview_lines() -> List[str]:
+                    if not isinstance(llm_step, dict):
+                        return []
                     llm_items = []
                     for item in evidence_list:
                         if not isinstance(item, dict):
