@@ -3732,22 +3732,22 @@ class SimpleCoordinationSystem:
         self.THRESHOLDS = {
             # Initial intervention thresholds
             "initial_intervention": {
-                "extremism_threshold": 4.5,  # Viewpoint extremism threshold (0-10)
+                "extremism_threshold": 0.45,  # Viewpoint extremism threshold (0-1)
                 "sentiment_threshold": 0.4   # Sentiment threshold (0-1)
             },
             # Secondary intervention thresholds
             "secondary_intervention": {
-                "extremism_threshold": 4.5,  # Keep consistent with initial intervention
+                "extremism_threshold": 0.45,  # Keep consistent with initial intervention
                 "sentiment_threshold": 0.4   # Keep consistent with initial intervention
             },
             # Success criteria thresholds
             "success_criteria": {
-                "extremism_threshold": 4.,  # Success criteria: extremism should be below 4.0
+                "extremism_threshold": 0.4,  # Success criteria: extremism should be below 0.4
                 "sentiment_threshold": 0.4   # Success criteria: sentiment should be above 0.6
             },
             # Monitoring thresholds
             "monitoring": {
-                "extremism_threshold": 2     # Monitoring threshold: 0-4 level
+                "extremism_threshold": 0.2   # Monitoring threshold: 0-1 level
             }
         }
 
@@ -4726,8 +4726,9 @@ class SimpleCoordinationSystem:
             # Calculate weighted sentiment per comment
             final_sentiment_score = await self._calculate_weighted_sentiment_from_comments(content_id)
             
+            viewpoint_extremism_normalized = self._normalize_extremism_score(viewpoint_extremism)
             # Display viewpoint extremism and sentiment scores
-            workflow_logger.info(f"      Viewpoint extremism: {viewpoint_extremism:.1f}/10.0")
+            workflow_logger.info(f"      Viewpoint extremism: {viewpoint_extremism_normalized:.2f}/1.0")
             workflow_logger.info(f"      Overall sentiment: {final_sentiment_score:.2f}/1.0")
 
             # Get current engagement data as baseline
@@ -4742,7 +4743,7 @@ class SimpleCoordinationSystem:
             # Save baseline data (real analysis at workflow start)
             baseline_analysis_data = {
                 "analysis_result": analysis_data,
-                "viewpoint_extremism": viewpoint_extremism,
+                "viewpoint_extremism": viewpoint_extremism_normalized,
                 "sentiment_score": final_sentiment_score,  # Weighted sentiment from per-comment analysis
                 "engagement_data": baseline_engagement_data,  # Use real database data
                 "timestamp": datetime.now()
@@ -4752,7 +4753,11 @@ class SimpleCoordinationSystem:
             EXTREMISM_THRESHOLD = self.THRESHOLDS["initial_intervention"]["extremism_threshold"]
             SENTIMENT_THRESHOLD = self.THRESHOLDS["initial_intervention"]["sentiment_threshold"]
 
-            needs_intervention = (viewpoint_extremism >= EXTREMISM_THRESHOLD or final_sentiment_score <= SENTIMENT_THRESHOLD)
+            EXTREMISM_THRESHOLD_NORMALIZED = self._normalize_extremism_threshold(EXTREMISM_THRESHOLD)
+            needs_intervention = (
+                viewpoint_extremism_normalized >= EXTREMISM_THRESHOLD_NORMALIZED
+                or final_sentiment_score <= SENTIMENT_THRESHOLD
+            )
 
             workflow_logger.info(f"      Needs intervention: {'yes' if needs_intervention else 'no'}")
 
@@ -4762,9 +4767,12 @@ class SimpleCoordinationSystem:
             else:
                 analysis_result["alert_generated"] = True
                 # Update analysis data
-                analysis_data["viewpoint_extremism"] = viewpoint_extremism
+                analysis_data["viewpoint_extremism"] = viewpoint_extremism_normalized
                 analysis_data["needs_intervention"] = needs_intervention
-                analysis_data["intervention_reason"] = f"Viewpoint extremism: {viewpoint_extremism:.1f}/10.0, sentiment: {final_sentiment_score:.2f}/1.0"
+                analysis_data["intervention_reason"] = (
+                    f"Viewpoint extremism: {viewpoint_extremism_normalized:.2f}/1.0, "
+                    f"sentiment: {final_sentiment_score:.2f}/1.0"
+                )
 
             # If forced intervention, skip checks and execute directly
             if force_intervention:
@@ -4776,7 +4784,7 @@ class SimpleCoordinationSystem:
                         "content_id": content_id,
                         "post_id": content_id,
                         "core_viewpoint": analysis_data.get("core_viewpoint", "Force intervention mode"),
-                        "extremism_level": viewpoint_extremism,
+                        "extremism_level": viewpoint_extremism_normalized,
                         "sentiment_score": final_sentiment_score,
                         "urgency_level": 2,
                         "risk_level": "medium"
@@ -4798,11 +4806,12 @@ class SimpleCoordinationSystem:
             workflow_logger.info(f"      Urgency level: {urgency_level}")
 
             # Show trigger reasons based on new decision logic
-            trigger_reasons = []
-            if viewpoint_extremism >= EXTREMISM_THRESHOLD:
-                trigger_reasons.append(f"Viewpoint extremism too high ({viewpoint_extremism:.1f}/10.0 >= {EXTREMISM_THRESHOLD})")
-            if final_sentiment_score <= SENTIMENT_THRESHOLD:
-                trigger_reasons.append(f"Sentiment too low ({final_sentiment_score:.2f}/1.0 <= {SENTIMENT_THRESHOLD})")
+            trigger_reasons, _, _ = self._format_initial_intervention_trigger_reasons(
+                viewpoint_extremism_raw=viewpoint_extremism,
+                final_sentiment_score=final_sentiment_score,
+                extremism_threshold_raw=EXTREMISM_THRESHOLD,
+                sentiment_threshold=SENTIMENT_THRESHOLD,
+            )
 
             if trigger_reasons:
                 workflow_logger.info(f"      Trigger reasons: {' & '.join(trigger_reasons)}")
@@ -5843,9 +5852,12 @@ class SimpleCoordinationSystem:
                     if isinstance(monitoring_score, (int, float)):
                         current_metrics = final_report.get("current_metrics", {}) if isinstance(final_report, dict) else {}
                         success_threshold = task.get("success_criteria", {}).get("overall_score_threshold", 0.6)
+                        success_extremism_threshold = self._normalize_extremism_threshold(
+                            self.THRESHOLDS["success_criteria"]["extremism_threshold"]
+                        )
                         success = (
                             float(monitoring_score) >= float(success_threshold)
-                            and float(current_metrics.get("extremism_score", 5.0)) <= float(self.THRESHOLDS["success_criteria"]["extremism_threshold"])
+                            and self._normalize_extremism_score(current_metrics.get("extremism_score", 0.5)) <= success_extremism_threshold
                             and float(current_metrics.get("sentiment_score", 0.5)) >= float(self.THRESHOLDS["success_criteria"]["sentiment_threshold"])
                         )
 
@@ -5858,7 +5870,7 @@ class SimpleCoordinationSystem:
                         situation_context = {
                             "core_viewpoint": analysis_result.get("core_viewpoint", ""),
                             "post_theme": analysis_result.get("post_theme", ""),
-                            "viewpoint_extremism": baseline_data.get("viewpoint_extremism"),
+                            "viewpoint_extremism": self._normalize_extremism_score(baseline_data.get("viewpoint_extremism")),
                             "sentiment_score": baseline_data.get("sentiment_score"),
                             "target_post_id": task.get("target_post_id"),
                         }
@@ -5984,6 +5996,10 @@ class SimpleCoordinationSystem:
             if "analysis_result" in baseline_data:
                 workflow_logger.info(f"     analysis_result keys: {list(baseline_data['analysis_result'].keys())}")
             
+            baseline_extremism_norm = self._normalize_extremism_score(
+                baseline_data.get("viewpoint_extremism", 0.5)
+            )
+
             trigger_content = {
                 "core_viewpoint": core_viewpoint,
                 "post_theme": post_theme,
@@ -5993,7 +6009,7 @@ class SimpleCoordinationSystem:
                     "sentiment_reasoning": "Baseline sentiment analysis"
                 },
                 "malicious_analysis": {
-                    "extremism_level": baseline_data.get("viewpoint_extremism", 0.5),
+                    "extremism_level": baseline_extremism_norm,
                     "threat_assessment": "Baseline threat assessment from monitoring"
                 }
             }
@@ -6010,10 +6026,13 @@ class SimpleCoordinationSystem:
                     "post_id": target_post_id,
                     "content_id": target_post_id,
                     "analysis_result": baseline_data.get("analysis_result", {}),
-                    "viewpoint_extremism": baseline_data.get("viewpoint_extremism", 0.5),
+                    "viewpoint_extremism": baseline_extremism_norm,
                     "sentiment_score": baseline_data.get("sentiment_score", 0.5),
                     "needs_intervention": True,
-                    "intervention_reason": f"Monitoring baseline report triggered: viewpoint extremism {baseline_data.get('viewpoint_extremism', 0.5):.1f}, sentiment {baseline_data.get('sentiment_score', 0.5):.2f}"
+                    "intervention_reason": (
+                        f"Monitoring baseline report triggered: viewpoint extremism {baseline_extremism_norm:.2f}, "
+                        f"sentiment {baseline_data.get('sentiment_score', 0.5):.2f}"
+                    )
                 },
                 "core_viewpoint": trigger_content["core_viewpoint"],
                 "post_theme": trigger_content["post_theme"],
@@ -6023,7 +6042,7 @@ class SimpleCoordinationSystem:
             workflow_logger.info("  📋 Alert object constructed from baseline report")
             workflow_logger.info(f"     🎯 Target post: {target_post_id}")
             workflow_logger.info(f"     🚨 Urgency: {alert['urgency_level']}")
-            workflow_logger.info(f"     📊 Viewpoint extremism: {baseline_data.get('viewpoint_extremism', 0.5):.1f}")
+            workflow_logger.info(f"     📊 Viewpoint extremism: {baseline_extremism_norm:.2f}/1.0")
             workflow_logger.info(f"     😊 Sentiment: {baseline_data.get('sentiment_score', 0.5):.2f}")
             
             return alert
@@ -6279,8 +6298,9 @@ class SimpleCoordinationSystem:
             })
             
             # Check success criteria - only thresholds, not improvement magnitude
-            extremism_threshold_raw = float(success_criteria.get('extremism_threshold', 4.5))
-            extremism_threshold_normalized = extremism_threshold_raw / 10.0 if extremism_threshold_raw > 1.0 else extremism_threshold_raw
+            extremism_threshold_normalized = self._normalize_extremism_threshold(
+                success_criteria.get('extremism_threshold', 4.5)
+            )
             criteria_results = {
                 'overall_score': overall_score >= success_criteria.get('overall_score_threshold', 0.6),
                 'extremism_absolute': current_extremism <= extremism_threshold_normalized,
@@ -6686,8 +6706,8 @@ class SimpleCoordinationSystem:
             if current_extremism_raw == 5.0 and target_post_id:
                 current_extremism_raw = await self._calculate_extremism_from_database(target_post_id)
 
-            baseline_extremism = max(0.0, min(1.0, float(baseline_extremism_raw) / 10.0))
-            current_extremism = max(0.0, min(1.0, float(current_extremism_raw) / 10.0))
+            baseline_extremism = self._normalize_extremism_score(baseline_extremism_raw)
+            current_extremism = self._normalize_extremism_score(current_extremism_raw)
             
             extremism_change = baseline_extremism - current_extremism  # Lower extremism is better
             
@@ -6706,7 +6726,7 @@ class SimpleCoordinationSystem:
             # Determine if secondary intervention is needed - use unified thresholds
             EXTREMISM_THRESHOLD = self.THRESHOLDS["secondary_intervention"]["extremism_threshold"]
             SENTIMENT_THRESHOLD = self.THRESHOLDS["secondary_intervention"]["sentiment_threshold"]
-            EXTREMISM_THRESHOLD_NORMALIZED = EXTREMISM_THRESHOLD / 10.0 if EXTREMISM_THRESHOLD > 1.0 else EXTREMISM_THRESHOLD
+            EXTREMISM_THRESHOLD_NORMALIZED = self._normalize_extremism_threshold(EXTREMISM_THRESHOLD)
             
             # Intervention needed if extremism is still high or sentiment is still low
             needs_intervention = (
@@ -6870,6 +6890,42 @@ class SimpleCoordinationSystem:
             return "Poor effectiveness"
         else:
             return "Ineffective"
+
+    def _normalize_extremism_score(self, score: float) -> float:
+        """Normalize extremism score to 0-1 scale."""
+        try:
+            value = float(score)
+        except (TypeError, ValueError):
+            value = 0.5
+        if value > 1.0:
+            value = value / 10.0
+        return max(0.0, min(1.0, value))
+
+    def _normalize_extremism_threshold(self, threshold: float) -> float:
+        """Normalize extremism threshold to 0-1 scale."""
+        return self._normalize_extremism_score(threshold)
+
+    def _format_initial_intervention_trigger_reasons(
+        self,
+        viewpoint_extremism_raw: float,
+        final_sentiment_score: float,
+        extremism_threshold_raw: float,
+        sentiment_threshold: float
+    ) -> tuple[List[str], float, float]:
+        """Format Phase 1 trigger reasons using normalized 0-1 extremism scale."""
+        current_extremism_norm = self._normalize_extremism_score(viewpoint_extremism_raw)
+        threshold_norm = self._normalize_extremism_threshold(extremism_threshold_raw)
+
+        reasons: List[str] = []
+        if current_extremism_norm >= threshold_norm:
+            reasons.append(
+                f"Viewpoint extremism too high ({current_extremism_norm:.2f}/1.0 >= {threshold_norm:.2f})"
+            )
+        if final_sentiment_score <= sentiment_threshold:
+            reasons.append(
+                f"Sentiment too low ({final_sentiment_score:.2f}/1.0 <= {sentiment_threshold})"
+            )
+        return reasons, current_extremism_norm, threshold_norm
 
     def _get_intervention_reasons(self, current_extremism: float, current_sentiment: float, 
                                 extremism_change: float, sentiment_change: float,
@@ -7513,7 +7569,7 @@ class SimpleCoordinationSystem:
 
         except Exception as e:
             workflow_logger.info(f"    ❌ Failed to calculate viewpoint extremism: {e}")
-            return 3.0  # Default medium value
+            return 0.5  # Default medium value
 
     async def _calculate_extremism_from_database(self, content_id: str) -> float:
         """Get related comments from database and calculate extremism - aligned with analyst logic"""
@@ -7576,14 +7632,14 @@ class SimpleCoordinationSystem:
                     total_weight = sum(weights)
                     return weighted_sum / total_weight
 
-            return 3.0  # Default value
+            return 0.5  # Default value
 
         except Exception as e:
             workflow_logger.info(f"    ❌ Failed to calculate extremism from database: {e}")
-            return 3.0
+            return 0.5
 
     async def _calculate_viewpoint_extremism_and_sentiment(self, content: str, log_details: bool = False) -> tuple[float, float]:
-        """Use LLM to calculate comment viewpoint extremism and sentiment (0-10, 0-1)"""
+        """Use LLM to calculate comment viewpoint extremism and sentiment (0-1, 0-1)"""
         try:
             if not content or len(content.strip()) < 5:
                 return 0.0, 0.5
@@ -7593,12 +7649,12 @@ class SimpleCoordinationSystem:
 
 Comment: "{content}"
 
-1. VIEWPOINT EXTREMISM (0-10 scale):
-- 0-2: Neutral, balanced, or constructive viewpoint
-- 3-4: Mild criticism or disagreement, still reasonable
-- 5-6: Strong opinion with some bias or emotional language
-- 7-8: Highly polarized, aggressive, or divisive viewpoint
-- 9-10: Extremely toxic, hateful, or destructive viewpoint
+1. VIEWPOINT EXTREMISM (0-1 scale):
+- 0.0-0.2: Neutral, balanced, or constructive viewpoint
+- 0.2-0.4: Mild criticism or disagreement, still reasonable
+- 0.4-0.6: Strong opinion with some bias or emotional language
+- 0.6-0.8: Highly polarized, aggressive, or divisive viewpoint
+- 0.8-1.0: Extremely toxic, hateful, or destructive viewpoint
 
 2. SENTIMENT SCORE (0-1 scale):
 - 0.0-0.2: Very negative (hateful, destructive)
@@ -7623,10 +7679,10 @@ Consider these factors for sentiment:
 
 Respond with ONLY two numbers separated by a comma: extremism_score,sentiment_score
 Examples:
-- "I disagree with this approach" → 3,0.4
-- "This is completely wrong and stupid" → 7,0.2
-- "Great point, I agree!" → 2,0.8
-- "You're an idiot and this is garbage" → 9,0.1
+- "I disagree with this approach" → 0.3,0.4
+- "This is completely wrong and stupid" → 0.7,0.2
+- "Great point, I agree!" → 0.2,0.8
+- "You're an idiot and this is garbage" → 0.9,0.1
 
 Your ratings:"""
 
@@ -7663,15 +7719,15 @@ Your ratings:"""
                             sentiment_rating = float(numbers[1])
                             
                             # Clamp ranges
-                            final_extremism = min(max(extremism_rating, 0.0), 10.0)  # 0-10
+                            final_extremism = self._normalize_extremism_score(extremism_rating)  # 0-1
                             final_sentiment = min(max(sentiment_rating, 0.0), 1.0)   # 0-1
                             
                             if log_details:
-                                workflow_logger.info(f"    ✅ LLM rating result: extremism={final_extremism:.1f}/10, sentiment={final_sentiment:.2f}/1.0 (raw: {rating_text})")
+                                workflow_logger.info(f"    ✅ LLM rating result: extremism={final_extremism:.2f}/1.0, sentiment={final_sentiment:.2f}/1.0 (raw: {rating_text})")
                             return final_extremism, final_sentiment
                         else:
                             workflow_logger.info(f"    ⚠️  LLM returned invalid ratings: {rating_text}")
-                            return 5.0, 0.5  # Default medium value
+                            return 0.5, 0.5  # Default medium value
                             
                     except Exception as llm_error:
                         workflow_logger.info(f"    ❌ LLM call failed: {llm_error}")
@@ -7788,7 +7844,7 @@ Your ratings:"""
             return 0.5
 
     def _fallback_extremism_calculation(self, content: str) -> float:
-        """Fallback rule-based extremism calculation"""
+        """Fallback rule-based extremism calculation (0-1 scale)"""
         if not content:
             return 0.0
 
@@ -7810,7 +7866,7 @@ Your ratings:"""
         absolute_count = sum(1 for term in absolute_terms if term in content_lower)
         extremism_score += min(absolute_count * 0.8, 2.0)
 
-        return min(extremism_score, 10.0)
+        return self._normalize_extremism_score(min(extremism_score, 10.0))
 
     async def _calculate_sentiment_distribution(self, all_comments: list, analyst_score: float) -> tuple:
         """Calculate sentiment distribution based on analyst score and extremism"""
@@ -7824,33 +7880,34 @@ Your ratings:"""
             for i, comment in enumerate(all_comments[:3]):  # Only analyze first 3 comments
                 content = comment[0]
 
-                # Calculate extremism and sentiment (0-10, 0-1) - async call
+                # Calculate extremism and sentiment (0-1, 0-1) - async call
                 extremism_value, sentiment_value = await self._calculate_viewpoint_extremism_and_sentiment(content, log_details=False)
+                extremism_value = self._normalize_extremism_score(extremism_value)
                 extremism_values.append(extremism_value)
 
                 # Log full comment content and scores
-                workflow_logger.info(f"    📊 Comment {i+1} extremism: {extremism_value:.1f}/10")
+                workflow_logger.info(f"    📊 Comment {i+1} extremism: {extremism_value:.2f}/1.0")
                 workflow_logger.info(f"    💬 Comment content: {content}")
                 workflow_logger.info(f"    😊 Sentiment: {sentiment_value:.2f}/1.0")
                 
                 # Show category based on score
-                if extremism_value >= 7.0:
+                if extremism_value >= 0.7:
                     category = "High extremism"
-                elif extremism_value >= 4.0:
+                elif extremism_value >= 0.4:
                     category = "Moderate extremism"
                 else:
                     category = "Low extremism"
                 workflow_logger.info(f"    🏷️  Category: {category}")
 
                 # Classify based on extremism and analyst score
-                if extremism_value >= 7.0:  # High extremism (7-10)
+                if extremism_value >= 0.7:  # High extremism
                     negative_count += 1
-                elif extremism_value >= 4.0:  # Moderate extremism (4-7)
+                elif extremism_value >= 0.4:  # Moderate extremism
                     if analyst_score < 0.5:  # Analyst views as negative
                         negative_count += 1
                     else:
                         neutral_count += 1
-                else:  # Low extremism (0-4)
+                else:  # Low extremism
                     if analyst_score > 0.6:  # Analyst views as positive
                         positive_count += 1
                     elif analyst_score < 0.4:  # Analyst views as negative
@@ -7861,13 +7918,15 @@ Your ratings:"""
             # Calculate average extremism as overall viewpoint extremism
             avg_extremism = sum(extremism_values) / len(extremism_values) if extremism_values else 0.0
 
-            workflow_logger.info(f"    📈 Average viewpoint extremism: {avg_extremism:.1f}/10")
+            workflow_logger.info(f"    📈 Average viewpoint extremism: {avg_extremism:.2f}/1.0")
 
             # Set extremism threshold - use unified config
-            EXTREMISM_THRESHOLD = self.THRESHOLDS["initial_intervention"]["extremism_threshold"]
+            EXTREMISM_THRESHOLD = self._normalize_extremism_threshold(
+                self.THRESHOLDS["initial_intervention"]["extremism_threshold"]
+            )
 
             if avg_extremism >= EXTREMISM_THRESHOLD:
-                workflow_logger.info(f"    🚨 Viewpoint too extreme! (avg extremism {avg_extremism:.1f} >= threshold {EXTREMISM_THRESHOLD})")
+                workflow_logger.info(f"    🚨 Viewpoint too extreme! (avg extremism {avg_extremism:.2f} >= threshold {EXTREMISM_THRESHOLD:.2f})")
                 # Force increase negative count to trigger intervention
                 negative_count += 2
 
@@ -7888,9 +7947,10 @@ Your ratings:"""
                 # Classify using extremism - async call
                 extremism_value, sentiment_value = await self._calculate_viewpoint_extremism_and_sentiment(content, log_details=False)
 
-                if extremism_value >= 6.0:  # High extremism
+                extremism_value = self._normalize_extremism_score(extremism_value)
+                if extremism_value >= 0.6:  # High extremism
                     negative_count += 1
-                elif extremism_value >= 3.0:  # Moderate extremism
+                elif extremism_value >= 0.3:  # Moderate extremism
                     neutral_count += 1
                 else:  # Low extremism
                     positive_count += 1
@@ -7988,13 +8048,17 @@ Your ratings:"""
                 score += 1  # Some distribution improvement
 
             # 3. Extremism improvement score (0-2) - based on extremism change
-            current_extremism = sentiment_analysis.get("viewpoint_extremism", 5.0)
-            baseline_extremism = baseline_data.get("viewpoint_extremism", 5.0)
+            current_extremism = self._normalize_extremism_score(
+                sentiment_analysis.get("viewpoint_extremism", 0.5)
+            )
+            baseline_extremism = self._normalize_extremism_score(
+                baseline_data.get("viewpoint_extremism", 0.5)
+            )
             extremism_improvement = baseline_extremism - current_extremism  # Lower extremism is good
             
-            if extremism_improvement >= 1.0:
+            if extremism_improvement >= 0.1:
                 score += 2  # Significant extremism reduction
-            elif extremism_improvement >= 0.5:
+            elif extremism_improvement >= 0.05:
                 score += 1  # Some extremism reduction
 
             # 4. Engagement growth score (0-2) - based on engagement change
@@ -9675,7 +9739,8 @@ Please return the evaluation result in JSON format:
             analysis_data = analysis_result.get("analysis", {})
             
             # Calculate viewpoint extremism
-            viewpoint_extremism = await self._calculate_overall_viewpoint_extremism(content_text, target_post_id)
+            viewpoint_extremism_raw = await self._calculate_overall_viewpoint_extremism(content_text, target_post_id)
+            viewpoint_extremism = self._normalize_extremism_score(viewpoint_extremism_raw)
             
             # Get sentiment distribution
             sentiment_distribution = analysis_data.get('sentiment_distribution', {})
@@ -9692,7 +9757,7 @@ Please return the evaluation result in JSON format:
             }
             
             workflow_logger.info("    ✅ Baseline data analysis completed:")
-            workflow_logger.info(f"       Viewpoint extremism: {viewpoint_extremism:.1f}/10.0")
+            workflow_logger.info(f"       Viewpoint extremism: {viewpoint_extremism:.2f}/1.0")
             workflow_logger.info(f"       Sentiment score: {sentiment_score:.2f}")
             workflow_logger.info(f"       Sentiment distribution: positive {sentiment_distribution.get('positive', 0):.1%}, negative {sentiment_distribution.get('negative', 0):.1%}")
             
@@ -9707,7 +9772,7 @@ Please return the evaluation result in JSON format:
         return {
             "success": False,
             "analysis": {},
-            "viewpoint_extremism": 5.0,
+            "viewpoint_extremism": 0.5,
             "sentiment_score": 0.5,
             "sentiment_distribution": {"positive": 0.3, "negative": 0.3, "neutral": 0.4},
             "content_analyzed": "fallback data",
@@ -9853,19 +9918,20 @@ Please return the evaluation result in JSON format:
                                                    engagement_change: float, baseline_data: Dict, current_data: Dict) -> Dict[str, Any]:
         """Enhanced secondary intervention need evaluation combining sentiment distribution and engagement data"""
         try:
+            extremism = self._normalize_extremism_score(extremism)
             needs_intervention = False
             urgency_level = 1
             reasons = []
             
             # 1. Extremism evaluation
-            if extremism >= 7.0:
+            if extremism >= 0.7:
                 needs_intervention = True
                 urgency_level = max(urgency_level, 3)
-                reasons.append(f"Viewpoint extremism too high ({extremism:.1f}/10.0)")
-            elif extremism >= 5.0:
+                reasons.append(f"Viewpoint extremism too high ({extremism:.2f}/1.0)")
+            elif extremism >= 0.5:
                 needs_intervention = True
                 urgency_level = max(urgency_level, 2)
-                reasons.append(f"Viewpoint extremism high ({extremism:.1f}/10.0)")
+                reasons.append(f"Viewpoint extremism high ({extremism:.2f}/1.0)")
             
             # 2. Sentiment distribution evaluation
             if negative_ratio >= 0.6:
