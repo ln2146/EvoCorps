@@ -31,7 +31,7 @@ TOPICS = [
 
 ## Similarity threshold configuration
 KEYWORD_SIMILARITY_THRESHOLD = 0.7
-VIEWPOINT_SIMILARITY_THRESHOLD = 0.8
+VIEWPOINT_SIMILARITY_THRESHOLD = 0.7
 
 ## Wikipedia search configuration
 MAX_WIKIPEDIA_RESULTS = 15

@@ -31,7 +31,7 @@ class PerfectOpinionProcessor:
         print("  2. Keyword extraction (store the most central word)")
         print("  3. Theme matching check")
         print("  4. FAISS vector search for keywords (threshold=0.7)")
-        print("     (1) Similarity >= threshold -> FAISS viewpoint search (threshold=0.8)")
+        print("     (1) Similarity >= threshold -> FAISS viewpoint search (threshold=0.7)")
         print("         1. similarity >= threshold -> return top 5 by acceptance_rate")
         print("         2. similarity < threshold -> new viewpoint, existing keywords, fetch 15 Wikipedia entries")
         print("     (2) similarity < threshold -> new keywords, fetch 15 Wikipedia entries")
