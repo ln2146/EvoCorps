@@ -225,14 +225,11 @@ We welcome researchers and developers to use these datasets. Please cite our pap
 If you use this project in your research, please cite our paper:
 
 ```bibtex
-@misc{lin2026evocorpsevolutionarymultiagentframework,
-      title={EvoCorps: An Evolutionary Multi-Agent Framework for Depolarizing Online Discourse}, 
-      author={Ning Lin and Haolun Li and Mingshu Liu and Chengyun Ruan and Kaibo Huang and Yukun Wei and Zhongliang Yang and Linna Zhou},
-      year={2026},
-      eprint={2602.08529},
-      archivePrefix={arXiv},
-      primaryClass={cs.MA},
-      url={https://arxiv.org/abs/2602.08529}, 
+@article{lin2026evocorps,
+  title={EvoCorps: An Evolutionary Multi-Agent Framework for Depolarizing Online Discourse},
+  author={Lin, Ning and Li, Haolun and Liu, Mingshu and Ruan, Chengyun and Huang, Kaibo and Wei, Yukun and Yang, Zhongliang and Zhou, Linna},
+  journal={arXiv preprint arXiv:2602.08529},
+  year={2026}
 }
 ```
 
