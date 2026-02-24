@@ -961,24 +961,37 @@ class EnhancedOpinionSystem:
         
         try:
             prompt = f"""
-Please analyze the following opinion:
-Opinion: "{opinion}"
+                You are a strict classifier and discriminative keyword generator.
 
-Complete two tasks:
-1. Choose the best matching topic from the list below:
-{', '.join(self.topics)}
+                Analyze the following opinion:
+                Opinion: "{opinion}"
 
-2. Identify the keyword that best represents the opinion in two steps:
-   - First list 2-4 related keywords.
-   - Then select the single core keyword among them.
+                Task 1) Topic classification
+                Choose exactly ONE best-matching topic from the list below. The returned theme MUST be an exact string from the list:
+                {', '.join(self.topics)}
 
-Return the result as JSON:
-{{"theme": "selected topic", "keywords_full": "2-4 keywords", "keyword": "core keyword"}}
+                Task 2) Discriminative keyword generation
+                Generate ONE concise keyword/phrase that accurately captures the specific meaning of the opinion and distinguishes it from other opinions that may share the same common term(s).
 
-Example:
-- Opinion: "Artificial intelligence will change medical diagnosis"
-- Return: {{"theme": "Technology & Future", "keywords_full": "artificial intelligence healthcare diagnosis", "keyword": "intelligence"}}
-"""
+                Keyword rules (must follow all):
+                - The keyword may be a short phrase or a short sentence (not just a single word).
+                - It must be specific and descriptive, not a generic label.
+                - If the opinion mentions a broad subject (e.g., "AI", "artificial intelligence"), the keyword MUST include the distinguishing target/aspect.
+                - Do NOT output only generic terms such as: "AI", "artificial intelligence", "technology", "innovation".
+                - Keep it concise but informative: usually 6–14 words in English.
+                - Do not use quotation marks. Avoid unnecessary punctuation.
+
+                Return ONLY valid JSON (no markdown, no explanations, no extra text):
+                {{"theme":"<one topic from the list>","keyword":"<one concise, discriminative description>"}}
+
+                Example1:
+                Opinion: "Artificial intelligence will reshape education over the next decade by personalizing lessons for each student, automating grading and feedback, and helping teachers identify learning gaps earlier."
+                Return: {{"theme":"Technology & Future","keyword":"AI persArtificial intelligence will change education"}}
+
+                Example2:
+                Opinion: "Artificial intelligence is likely to transform medical diagnosis by detecting subtle patterns in imaging and lab data, assisting clinicians with differential diagnoses, and reducing missed or late detections."
+                Return: {{"theme":"Technology & Future","keyword":"AI enhances diagnostic accuracy through data pattern detection"}}
+                """   
             
             response = self.llm_client.chat.completions.create(
                 model=self.llm_model_name,
@@ -999,18 +1012,11 @@ Example:
                     content = content.strip()
                     
                     classification = json.loads(content)
-                    # Prefer the single keyword if present; otherwise derive one from the full list.
+                    # Extract the single keyword
                     single_keyword = (classification.get('keyword') or '').strip()
                     if not single_keyword:
-                        keywords_full = (classification.get('keywords_full') or '').strip()
-                        # Pick the first token as a stable fallback (avoids empty keyword causing downstream "unknown").
-                        first = keywords_full.split()[0] if keywords_full else ''
-                        if first:
-                            print(f"⚠️ LLM returned empty 'keyword'; falling back to first token from 'keywords_full': {first}")
-                            single_keyword = first
-                        else:
-                            print("⚠️ LLM returned empty 'keyword' and 'keywords_full'; falling back to 'general'")
-                            single_keyword = 'general'
+                        print("⚠️ LLM returned empty 'keyword'; falling back to 'general'")
+                        single_keyword = 'general'
                     
                     # Confirm the returned theme matches the predefined list
                     theme = classification.get('theme', 'Society & Ethics')
