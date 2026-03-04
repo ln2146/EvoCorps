@@ -23,6 +23,14 @@ try:
         MIN_EVIDENCE_ACCEPTANCE_RATE,
         FALLBACK_EVIDENCE_COUNT,
         DEFAULT_DB_PATH,
+        WIKIPEDIA_MEDIAWIKI_API_URL,
+        WIKIPEDIA_MAX_PAGES_PER_QUERY,
+        WIKIPEDIA_MAX_QUERIES,
+        WIKIPEDIA_PARA_MIN_LENGTH,
+        WIKIPEDIA_PARA_MAX_LENGTH,
+        WIKIPEDIA_PARA_SIM_THRESHOLD,
+        WIKIPEDIA_REQUEST_TIMEOUT,
+        WIKIPEDIA_INTER_QUERY_DELAY,
     )
 except ImportError:
     from config import (
@@ -33,6 +41,14 @@ except ImportError:
         MIN_EVIDENCE_ACCEPTANCE_RATE,
         FALLBACK_EVIDENCE_COUNT,
         DEFAULT_DB_PATH,
+        WIKIPEDIA_MEDIAWIKI_API_URL,
+        WIKIPEDIA_MAX_PAGES_PER_QUERY,
+        WIKIPEDIA_MAX_QUERIES,
+        WIKIPEDIA_PARA_MIN_LENGTH,
+        WIKIPEDIA_PARA_MAX_LENGTH,
+        WIKIPEDIA_PARA_SIM_THRESHOLD,
+        WIKIPEDIA_REQUEST_TIMEOUT,
+        WIKIPEDIA_INTER_QUERY_DELAY,
     )
 
 
@@ -873,9 +889,11 @@ class EnhancedOpinionSystem:
             classification_result = self._llm_classify_and_extract(opinion)
             theme = classification_result['theme']
             keyword = classification_result['keyword']
-            
+            queries = classification_result['queries']
+
             print(f"📂 Classified theme: {theme}")
             print(f"🔑 Extracted keyword: {keyword}")
+            print(f"🔎 Generated queries: {queries}")
             
             # Step 2: Theme match check
             theme_matched = self._check_theme_match(theme)
@@ -885,7 +903,7 @@ class EnhancedOpinionSystem:
                 trace["retrieval_path"].append(
                     {"step": "theme_match", "matched": False, "theme": theme}
                 )
-                result = self._handle_completely_new_opinion(opinion, theme, keyword)
+                result = self._handle_completely_new_opinion(opinion, theme, keyword, queries=queries)
                 return _attach_trace(result)
 
             trace["retrieval_path"].append(
@@ -940,13 +958,13 @@ class EnhancedOpinionSystem:
                     print(f"❌ Viewpoint match failed (similarity: {viewpoint_match_result['similarity']:.3f})")
                     # Case 1.2: new viewpoint but keywords exist
                     result = self._handle_new_viewpoint_existing_keywords(
-                        opinion, theme, matched_keywords
+                        opinion, theme, matched_keywords, queries=queries
                     )
                     return _attach_trace(result)
             else:
                 print(f"❌ Keyword match failed (similarity: {keyword_match_result['similarity']:.3f})")
                 # Case (2): similarity below threshold, new keyword flow
-                result = self._handle_completely_new_opinion(opinion, theme, keyword)
+                result = self._handle_completely_new_opinion(opinion, theme, keyword, queries=queries)
                 return _attach_trace(result)
         
         except Exception as e:
@@ -961,37 +979,28 @@ class EnhancedOpinionSystem:
         
         try:
             prompt = f"""
-                You are a strict classifier and discriminative keyword generator.
+Please analyze the following opinion:
+Opinion: "{opinion}"
 
-                Analyze the following opinion:
-                Opinion: "{opinion}"
+Complete three tasks:
+1. Choose the best matching topic from the list below:
+{', '.join(self.topics)}
 
-                Task 1) Topic classification
-                Choose exactly ONE best-matching topic from the list below. The returned theme MUST be an exact string from the list:
-                {', '.join(self.topics)}
+2. Identify the single core keyword (1-4 words, English noun, for database archiving).
 
-                Task 2) Discriminative keyword generation
-                Generate ONE concise keyword/phrase that accurately captures the specific meaning of the opinion and distinguishes it from other opinions that may share the same common term(s).
+3. Generate 3-6 English search queries for Wikipedia full-text search. Requirements:
+   - Each query: 3-12 words
+   - Must contain a domain word (education/health/economy/environment/technology/society/law/culture) or an impact word (impact/effect/change/improve/risk/challenge/benefit)
+   - Propositional structure (not just noun phrases)
+   - If the opinion is in Chinese, translate queries to English
 
-                Keyword rules (must follow all):
-                - The keyword may be a short phrase or a short sentence (not just a single word).
-                - It must be specific and descriptive, not a generic label.
-                - If the opinion mentions a broad subject (e.g., "AI", "artificial intelligence"), the keyword MUST include the distinguishing target/aspect.
-                - Do NOT output only generic terms such as: "AI", "artificial intelligence", "technology", "innovation".
-                - Keep it concise but informative: usually 6–14 words in English.
-                - Do not use quotation marks. Avoid unnecessary punctuation.
+Return the result as JSON:
+{{"theme": "selected topic", "keyword": "core keyword", "queries": ["query1", "query2", "query3"]}}
 
-                Return ONLY valid JSON (no markdown, no explanations, no extra text):
-                {{"theme":"<one topic from the list>","keyword":"<one concise, discriminative description>"}}
-
-                Example1:
-                Opinion: "Artificial intelligence will reshape education over the next decade by personalizing lessons for each student, automating grading and feedback, and helping teachers identify learning gaps earlier."
-                Return: {{"theme":"Technology & Future","keyword":"AI persArtificial intelligence will change education"}}
-
-                Example2:
-                Opinion: "Artificial intelligence is likely to transform medical diagnosis by detecting subtle patterns in imaging and lab data, assisting clinicians with differential diagnoses, and reducing missed or late detections."
-                Return: {{"theme":"Technology & Future","keyword":"AI enhances diagnostic accuracy through data pattern detection"}}
-                """   
+Example:
+- Opinion: "人工智能将改变教育方式"
+- Return: {{"theme": "Education & Humanities", "keyword": "artificial intelligence", "queries": ["artificial intelligence impact on education methods", "AI personalized learning effectiveness", "intelligent tutoring systems learning outcomes", "AI tools transforming classroom teaching"]}}
+"""
             
             response = self.llm_client.chat.completions.create(
                 model=self.llm_model_name,
@@ -1012,32 +1021,50 @@ class EnhancedOpinionSystem:
                     content = content.strip()
                     
                     classification = json.loads(content)
-                    # Extract the single keyword
+                    # Prefer the single keyword if present; otherwise derive one from the full list.
                     single_keyword = (classification.get('keyword') or '').strip()
                     if not single_keyword:
-                        print("⚠️ LLM returned empty 'keyword'; falling back to 'general'")
-                        single_keyword = 'general'
-                    
+                        keywords_full = (classification.get('keywords_full') or '').strip()
+                        # Pick the first token as a stable fallback (avoids empty keyword causing downstream "unknown").
+                        first = keywords_full.split()[0] if keywords_full else ''
+                        if first:
+                            print(f"⚠️ LLM returned empty 'keyword'; falling back to first token from 'keywords_full': {first}")
+                            single_keyword = first
+                        else:
+                            print("⚠️ LLM returned empty 'keyword' and 'keywords_full'; falling back to 'general'")
+                            single_keyword = 'general'
+
                     # Confirm the returned theme matches the predefined list
                     theme = classification.get('theme', 'Society & Ethics')
                     if theme not in self.topics:
                         print(f"⚠️ Theme '{theme}' not in the predefined list; defaulting to Society & Ethics")
                         theme = 'Society & Ethics'
-                    
+
+                    # Parse and validate queries
+                    queries = classification.get('queries', [])
+                    if not isinstance(queries, list):
+                        queries = []
+                    queries = [q.strip() for q in queries if isinstance(q, str) and q.strip()]
+                    queries = [q for q in queries if len(q.split()) >= 3]
+                    if not queries:
+                        print("⚠️ LLM returned no valid queries; using fallback template")
+                        queries = self._build_fallback_queries(single_keyword)
+
                     return {
                         'theme': theme,
-                        'keyword': single_keyword
+                        'keyword': single_keyword,
+                        'queries': queries[:6],
                     }
                 except json.JSONDecodeError as e:
                     print(f"⚠️ Failed to parse LLM response: {e}")
                     print(f"Original response snippet: {content[:200]}...")
-                    return {'theme': 'Society & Ethics', 'keyword': 'general'}
+                    return {'theme': 'Society & Ethics', 'keyword': 'general', 'queries': self._build_fallback_queries('general')}
             print(f"⚠️ LLM API request failed: empty response")
-            return {'theme': 'Society & Ethics', 'keyword': 'general'}
-                
+            return {'theme': 'Society & Ethics', 'keyword': 'general', 'queries': self._build_fallback_queries('general')}
+
         except Exception as e:
             print(f"⚠️ LLM request exception: {e}")
-            return {'theme': 'Society & Ethics', 'keyword': 'general'}
+            return {'theme': 'Society & Ethics', 'keyword': 'general', 'queries': self._build_fallback_queries('general')}
     
 
     
@@ -1273,21 +1300,22 @@ class EnhancedOpinionSystem:
             # If DB contains no acceptable evidence, try Wikipedia retrieval for this existing viewpoint.
             if not db_selected:
                 keywords = (viewpoint_info[2] or "").strip()
-                search_keyword = keywords.split(",")[0].strip() if "," in keywords else keywords
+                scoring_viewpoint = (
+                    requested_viewpoint.strip()
+                    if isinstance(requested_viewpoint, str) and requested_viewpoint.strip()
+                    else viewpoint_info[0]
+                )
+                refresh_queries: List[str] = []
 
-                if search_keyword:
+                if keywords:
                     print(
-                        f"🛟 Existing viewpoint has no acceptable DB evidence (>= {MIN_EVIDENCE_ACCEPTANCE_RATE}); trying Wikipedia refresh: {search_keyword}"
+                        f"🛟 Existing viewpoint has no acceptable DB evidence (>= {MIN_EVIDENCE_ACCEPTANCE_RATE}); trying Wikipedia refresh: {keywords}"
                     )
-                    evidence_snippets = self._search_wikipedia_evidence_15(search_keyword)
+                    refresh_queries = self._build_fallback_queries(keywords, context_viewpoint=scoring_viewpoint)
+                    evidence_snippets = self._search_wikipedia_evidence_by_queries(refresh_queries, scoring_viewpoint)
                     print(f"🔍 Wikipedia returned {len(evidence_snippets)} evidences")
 
                     if evidence_snippets:
-                        scoring_viewpoint = (
-                            requested_viewpoint.strip()
-                            if isinstance(requested_viewpoint, str) and requested_viewpoint.strip()
-                            else viewpoint_info[0]
-                        )
                         scored_wiki = self._llm_score_evidence(scoring_viewpoint, evidence_snippets)
                         wiki_selected = select_top_evidence(scored_wiki)
                         if wiki_selected:
@@ -1320,7 +1348,7 @@ class EnhancedOpinionSystem:
                                     },
                                     {
                                         "step": "wikipedia_refresh",
-                                        "keyword": search_keyword,
+                                        "queries": refresh_queries,
                                         "retrieved_count": len(evidence_snippets),
                                         "selected_count": len(wiki_selected),
                                     },
@@ -1374,8 +1402,8 @@ class EnhancedOpinionSystem:
                         },
                         {
                             "step": "wikipedia_refresh",
-                            "keyword": search_keyword,
-                            "retrieved_count": 0 if not search_keyword else None,
+                            "queries": refresh_queries,
+                            "retrieved_count": None,
                             "selected_count": 0,
                         },
                         {
@@ -1424,7 +1452,7 @@ class EnhancedOpinionSystem:
             print(f"❌ Failed to retrieve top 5 evidences: {e}")
             return {'error': str(e)}
     
-    def _handle_new_viewpoint_existing_keywords(self, opinion: str, theme: str, keywords: str) -> Dict[str, Any]:
+    def _handle_new_viewpoint_existing_keywords(self, opinion: str, theme: str, keywords: str, queries: List[str] = None) -> Dict[str, Any]:
         """Handle a new viewpoint when the keywords already exist."""
         print("🆕 New viewpoint detected; using existing keywords")
 
@@ -1433,11 +1461,9 @@ class EnhancedOpinionSystem:
             print("❌ Keywords empty; cannot perform Wikipedia search")
             return {'error': 'keywords required'}
 
-        # Use the first keyword for the Wikipedia search if multiple are provided
-        search_keyword = keywords.split(',')[0].strip() if ',' in keywords else keywords.strip()
-
-        # Retrieve 15 evidence pieces via the Wikipedia API
-        evidence_list = self._search_wikipedia_evidence_15(search_keyword)
+        # Search Wikipedia using propositional queries
+        effective_queries = queries if queries else self._build_fallback_queries(keywords)
+        evidence_list = self._search_wikipedia_evidence_by_queries(effective_queries, opinion)
         print(f"🔍 Wikipedia returned {len(evidence_list)} evidences")
         
         if not evidence_list:
@@ -1476,7 +1502,7 @@ class EnhancedOpinionSystem:
                 'fallback_reason': 'wikipedia_empty',
                 'trace': {
                     'retrieval_path': [
-                        {'step': 'wikipedia', 'keyword': search_keyword, 'retrieved_count': 0},
+                        {'step': 'wikipedia', 'queries': effective_queries, 'retrieved_count': 0},
                         {'step': 'llm_fallback', 'count': len(fallback_items)},
                     ],
                     'min_acceptance_rate': MIN_EVIDENCE_ACCEPTANCE_RATE,
@@ -1493,7 +1519,7 @@ class EnhancedOpinionSystem:
                     for i, item in enumerate(fallback_items)
                 ],
             }
-        
+
         # Score via the LLM
         scored_evidence = self._llm_score_evidence(opinion, evidence_list)
         print(f"📊 LLM scored {len(scored_evidence)} evidences")
@@ -1540,7 +1566,7 @@ class EnhancedOpinionSystem:
                 'fallback_reason': 'below_threshold',
                 'trace': {
                     'retrieval_path': [
-                        {'step': 'wikipedia', 'keyword': search_keyword, 'retrieved_count': len(evidence_list), 'selected_count': 0},
+                        {'step': 'wikipedia', 'queries': effective_queries, 'retrieved_count': len(evidence_list), 'selected_count': 0},
                         {'step': 'llm_fallback', 'count': len(fallback_items)},
                     ],
                     'min_acceptance_rate': MIN_EVIDENCE_ACCEPTANCE_RATE,
@@ -1557,7 +1583,7 @@ class EnhancedOpinionSystem:
                     for i, item in enumerate(fallback_items)
                 ],
             }
-        
+
         # Store the entries in the database
         viewpoint_id = self._save_to_database(opinion, theme, keywords, top_evidence)
         
@@ -1588,7 +1614,7 @@ class EnhancedOpinionSystem:
         
         return result
     
-    def _handle_completely_new_opinion(self, opinion: str, theme: str, keyword: str) -> Dict[str, Any]:
+    def _handle_completely_new_opinion(self, opinion: str, theme: str, keyword: str, queries: List[str] = None) -> Dict[str, Any]:
         """Handle a completely new viewpoint and keyword pair."""
         print("🆕 Completely new viewpoint and keyword")
 
@@ -1597,11 +1623,9 @@ class EnhancedOpinionSystem:
             print("❌ Keyword empty; cannot perform Wikipedia search")
             return {'error': 'keywords required'}
 
-        # Clean the keyword
-        search_keyword = keyword.strip()
-
-        # Retrieve 15 evidence snippets via Wikipedia API
-        evidence_list = self._search_wikipedia_evidence_15(search_keyword)
+        # Search Wikipedia using propositional queries
+        effective_queries = queries if queries else self._build_fallback_queries(keyword)
+        evidence_list = self._search_wikipedia_evidence_by_queries(effective_queries, opinion)
         print(f"🔍 Wikipedia returned {len(evidence_list)} evidences")
         
         if not evidence_list:
@@ -1640,7 +1664,7 @@ class EnhancedOpinionSystem:
                 'fallback_reason': 'wikipedia_empty',
                 'trace': {
                     'retrieval_path': [
-                        {'step': 'wikipedia', 'keyword': search_keyword, 'retrieved_count': 0},
+                        {'step': 'wikipedia', 'queries': effective_queries, 'retrieved_count': 0},
                         {'step': 'llm_fallback', 'count': len(fallback_items)},
                     ],
                     'min_acceptance_rate': MIN_EVIDENCE_ACCEPTANCE_RATE,
@@ -1657,7 +1681,7 @@ class EnhancedOpinionSystem:
                     for i, item in enumerate(fallback_items)
                 ],
             }
-        
+
         # Score using the LLM
         scored_evidence = self._llm_score_evidence(opinion, evidence_list)
         print(f"📊 LLM scored {len(scored_evidence)} evidences")
@@ -1704,7 +1728,7 @@ class EnhancedOpinionSystem:
                 'fallback_reason': 'below_threshold',
                 'trace': {
                     'retrieval_path': [
-                        {'step': 'wikipedia', 'keyword': search_keyword, 'retrieved_count': len(evidence_list), 'selected_count': 0},
+                        {'step': 'wikipedia', 'queries': effective_queries, 'retrieved_count': len(evidence_list), 'selected_count': 0},
                         {'step': 'llm_fallback', 'count': len(fallback_items)},
                     ],
                     'min_acceptance_rate': MIN_EVIDENCE_ACCEPTANCE_RATE,
@@ -1721,7 +1745,7 @@ class EnhancedOpinionSystem:
                     for i, item in enumerate(fallback_items)
                 ],
             }
-        
+
         # Store into the database
         viewpoint_id = self._save_to_database(opinion, theme, keyword, top_evidence)
         
@@ -1752,8 +1776,227 @@ class EnhancedOpinionSystem:
         
         return result
     
-    def _search_wikipedia_evidence_15(self, keyword: str) -> List[str]:
-        """Search the Wikipedia API for supporting evidence."""
+    def _build_fallback_queries(self, keyword: str, context_viewpoint: str = "") -> List[str]:
+        """Build fallback search queries from keyword when LLM-generated queries are unavailable."""
+        keyword = keyword.strip()
+        if not keyword:
+            keyword = "general"
+        queries = [
+            f"{keyword} impact effects",
+            f"{keyword} research study evidence",
+        ]
+        if context_viewpoint and len(context_viewpoint) > 10:
+            domain_match = re.search(
+                r'\b(education|health|economy|environment|technology|society|law|culture|'
+                r'learning|medical|political|social|economic|scientific|digital)\b',
+                context_viewpoint.lower()
+            )
+            if domain_match:
+                domain_word = domain_match.group(1)
+                queries.append(f"{keyword} {domain_word} application")
+            else:
+                queries.append(f"{keyword} benefits challenges")
+        else:
+            queries.append(f"{keyword} benefits challenges")
+        # Deduplicate while preserving order
+        seen: set = set()
+        result = []
+        for q in queries:
+            if q not in seen:
+                seen.add(q)
+                result.append(q)
+        return result[:4]
+
+    def _search_wikipedia_evidence_by_queries(
+        self,
+        queries: List[str],
+        opinion: str,
+        *,
+        max_results: int = MAX_WIKIPEDIA_RESULTS,
+    ) -> List[str]:
+        """Search Wikipedia using MediaWiki Action API with propositional queries,
+        then filter candidates by embedding similarity to the opinion."""
+        import hashlib
+        try:
+            from .network_config import create_robust_session
+        except ImportError:
+            try:
+                from network_config import create_robust_session
+            except ImportError:
+                import requests
+                from requests.adapters import HTTPAdapter
+                from urllib3.util.retry import Retry
+                def create_robust_session():
+                    _session = requests.Session()
+                    _retry = Retry(total=3, status_forcelist=[429, 500, 502, 503, 504], backoff_factor=1)
+                    _adapter = HTTPAdapter(max_retries=_retry)
+                    _session.mount("http://", _adapter)
+                    _session.mount("https://", _adapter)
+                    return _session
+
+        headers = {"User-Agent": "EnhancedEvidenceDatabase/2.0 (contact@example.com)"}
+        session = create_robust_session()
+
+        # Step 2: Search for candidate pages for each query
+        unique_pageids: set = set()
+        effective_queries = queries[:WIKIPEDIA_MAX_QUERIES]
+        print(f"🔍 Starting Wikipedia search with {len(effective_queries)} queries")
+
+        for q in effective_queries:
+            try:
+                params = {
+                    "action": "query",
+                    "list": "search",
+                    "srsearch": q,
+                    "srlimit": WIKIPEDIA_MAX_PAGES_PER_QUERY,
+                    "srprop": "snippet|size|wordcount",
+                    "format": "json",
+                    "utf8": 1,
+                }
+                resp = session.get(
+                    WIKIPEDIA_MEDIAWIKI_API_URL,
+                    params=params,
+                    headers=headers,
+                    timeout=WIKIPEDIA_REQUEST_TIMEOUT,
+                    verify=False,
+                )
+                data = resp.json()
+                hits = data.get("query", {}).get("search", [])
+                for hit in hits:
+                    unique_pageids.add(hit["pageid"])
+                print(f"   🔍 Query '{q[:50]}': {len(hits)} pages found")
+            except Exception as e:
+                print(f"   ⚠️ Search query failed: {e}")
+                continue
+            time.sleep(WIKIPEDIA_INTER_QUERY_DELAY)
+
+        if not unique_pageids:
+            print("⚠️ No pages found for any query")
+            return []
+
+        print(f"📄 Total unique candidate pages: {len(unique_pageids)}")
+
+        # Step 3: Fetch page extracts in batches
+        def _fetch_extracts(pageids, exintro=True):
+            extracts = {}
+            pageid_list = list(pageids)
+            for i in range(0, len(pageid_list), 20):
+                batch = pageid_list[i:i + 20]
+                try:
+                    params = {
+                        "action": "query",
+                        "prop": "extracts",
+                        "pageids": "|".join(str(pid) for pid in batch),
+                        "explaintext": 1,
+                        "exintro": 1 if exintro else 0,
+                        "exsectionformat": "plain",
+                        "format": "json",
+                        "utf8": 1,
+                    }
+                    resp = session.get(
+                        WIKIPEDIA_MEDIAWIKI_API_URL,
+                        params=params,
+                        headers=headers,
+                        timeout=WIKIPEDIA_REQUEST_TIMEOUT,
+                        verify=False,
+                    )
+                    data = resp.json()
+                    pages = data.get("query", {}).get("pages", {})
+                    for pid_str, page in pages.items():
+                        extract = page.get("extract", "").strip()
+                        if extract:
+                            extracts[int(pid_str)] = extract
+                except Exception as e:
+                    print(f"   ⚠️ Failed to fetch extracts: {e}")
+                    continue
+                time.sleep(0.1)
+            return extracts
+
+        page_extracts = _fetch_extracts(unique_pageids, exintro=True)
+        if not page_extracts:
+            print("⚠️ No extracts retrieved from pages")
+            return []
+        print(f"📄 Retrieved extracts from {len(page_extracts)} pages")
+
+        # Step 4: Split into paragraphs and apply basic filtering + dedup
+        def _build_candidates(extracts):
+            seen_hashes: set = set()
+            candidates = []
+            for extract in extracts.values():
+                for paragraph in extract.split("\n\n"):
+                    cleaned = self._clean_wikipedia_text(paragraph)
+                    if len(cleaned) < WIKIPEDIA_PARA_MIN_LENGTH:
+                        continue
+                    if len(cleaned) > WIKIPEDIA_PARA_MAX_LENGTH:
+                        continue
+                    if cleaned.count(" ") < 10:
+                        continue
+                    h = hashlib.md5(cleaned.lower().strip().encode()).hexdigest()
+                    if h in seen_hashes:
+                        continue
+                    seen_hashes.add(h)
+                    candidates.append(cleaned)
+            return candidates
+
+        candidates = _build_candidates(page_extracts)
+        print(f"📝 Candidate paragraphs after basic filtering: {len(candidates)}")
+
+        # If intro paragraphs are empty, re-fetch full page text (top 3 pages)
+        if not candidates:
+            print("⚠️ No candidate paragraphs from intro; re-fetching full page extracts")
+            top_pageids = list(unique_pageids)[:3]
+            full_extracts = _fetch_extracts(top_pageids, exintro=False)
+            candidates = _build_candidates(full_extracts)
+            if not candidates:
+                print("⚠️ No candidate paragraphs even from full pages")
+                return []
+            print(f"📝 Candidate paragraphs from full pages: {len(candidates)}")
+
+        candidates = candidates[:50]  # Limit for embedding efficiency
+
+        # Step 5: Embedding similarity filter
+        try:
+            opinion_emb = self._get_embedding(opinion)
+            opinion_norm = np.linalg.norm(opinion_emb)
+            if not np.isfinite(opinion_norm) or opinion_norm <= 0:
+                raise ValueError(f"Invalid opinion embedding norm: {opinion_norm}")
+            opinion_emb_normalized = opinion_emb / opinion_norm
+
+            scored_candidates = []
+            for para in candidates:
+                try:
+                    para_emb = self._get_embedding(para)
+                    para_norm = np.linalg.norm(para_emb)
+                    if not np.isfinite(para_norm) or para_norm <= 0:
+                        continue
+                    sim = float(np.dot(opinion_emb_normalized, para_emb / para_norm))
+                    scored_candidates.append((sim, para))
+                except Exception as e:
+                    print(f"   ⚠️ Embedding failed for paragraph: {e}")
+                    continue
+
+            scored_candidates.sort(key=lambda x: x[0], reverse=True)
+
+            # Apply threshold filter
+            filtered = [(s, p) for s, p in scored_candidates if s >= WIKIPEDIA_PARA_SIM_THRESHOLD]
+            print(f"✅ Paragraphs passing similarity threshold ({WIKIPEDIA_PARA_SIM_THRESHOLD}): {len(filtered)}")
+
+            # Step 6: Fallback if threshold yields nothing
+            if not filtered:
+                print("⚠️ No paragraphs passed similarity threshold; using top-N by similarity")
+                filtered = scored_candidates[:max_results]
+
+            top_paragraphs = [para for _, para in filtered[:max_results * 2]]
+            result = top_paragraphs[:max_results]
+            print(f"✅ Wikipedia search complete; returning {len(result)} evidence candidates")
+            return result
+
+        except Exception as e:
+            print(f"⚠️ Embedding filter failed: {e}; returning unfiltered candidates")
+            return candidates[:max_results]
+
+    def _search_wikipedia_evidence_15_legacy(self, keyword: str) -> List[str]:
+        """Legacy Wikipedia search (title matching). Kept for emergency fallback."""
         evidence_list = []
 
         try:

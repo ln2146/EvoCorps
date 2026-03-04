@@ -41,3 +41,13 @@ FALLBACK_EVIDENCE_COUNT = 3
 
 ## Database configuration
 DEFAULT_DB_PATH = "opinion_database.db"
+
+## Wikipedia MediaWiki API configuration（V2 升级新增）
+WIKIPEDIA_MEDIAWIKI_API_URL = "https://en.wikipedia.org/w/api.php"
+WIKIPEDIA_MAX_PAGES_PER_QUERY = 5       # 每条 query search 返回的候选页面数
+WIKIPEDIA_MAX_QUERIES = 6               # 最多使用的 queries 条数
+WIKIPEDIA_PARA_MIN_LENGTH = 20         # 段落最小字符数（低于此值丢弃）
+WIKIPEDIA_PARA_MAX_LENGTH = 1000        # 段落最大字符数（超过此值丢弃）
+WIKIPEDIA_PARA_SIM_THRESHOLD = 0.25     # 段落 embedding 与观点相似度阈值（调参入口）
+WIKIPEDIA_REQUEST_TIMEOUT = (5, 15)     # (connect_timeout, read_timeout) 秒
+WIKIPEDIA_INTER_QUERY_DELAY = 0.2       # 每条 query 请求后的节流间隔（秒）
