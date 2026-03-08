@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react'
-import { Server, Settings, Play, Square, Database, Users, Shield, Trash2, Save } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
+import { Server, Settings, Play, Square, Shield, Save, Bug, Sparkles, Eye } from 'lucide-react'
 import axios from 'axios'
+import { setAttackFlag, setAttackMode, setAftercareFlag, setModerationFlag, saveSnapshot, getSavedSnapshots } from '../services/api'
+import { resolveAttackToggleAction, getAttackModeLabel, type AttackMode } from '../lib/attackModeToggle'
+import { startDynamicDemoWithPreset } from '../lib/dynamicDemo/startDemo'
+import { useSimulation } from '../contexts/SimulationContext'
+import SaveSnapshotDialog from '../components/SaveSnapshotDialog'
+import SnapshotSelectDialog from '../components/SnapshotSelectDialog'
 
 interface ServiceStatus {
   database: 'running' | 'stopped'
@@ -18,6 +26,8 @@ interface ExperimentConfig {
 }
 
 export default function ExperimentSettings() {
+  const navigate = useNavigate()
+  const simulation = useSimulation()
   const [activeTab, setActiveTab] = useState<'service' | 'config'>('config')
   
   // 服务管理状态
@@ -26,40 +36,28 @@ export default function ExperimentSettings() {
     platform: 'stopped',
     balance: 'stopped'
   })
-  const [loading, setLoading] = useState<string | null>(null)
   const [condaEnv, setCondaEnv] = useState<string>('')
   const [isEnvSaved, setIsEnvSaved] = useState<boolean>(false)
+
+  // 演示启停状态
+  const [isStarting, setIsStarting] = useState(false)
+  const [isStopping, setIsStopping] = useState(false)
+
+  // 控制开关状态
+  const [enableAttack, setEnableAttack] = useState(false)
+  const [attackMode, setAttackModeState] = useState<AttackMode | null>(null)
+  const [attackModeDialogOpen, setAttackModeDialogOpen] = useState(false)
+  const [enableAftercare, setEnableAftercare] = useState(false)
+  const [enableModeration, setEnableModeration] = useState(false)
+  const [enableEvoCorps, setEnableEvoCorps] = useState(false)
+
+  // 快照对话框状态
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
+  const [showSnapshotSelect, setShowSnapshotSelect] = useState(false)
 
   // 配置状态
   const [config, setConfig] = useState<ExperimentConfig | null>(null)
   const [configLoading, setConfigLoading] = useState(false)
-
-  const services = [
-    {
-      id: 'database',
-      name: '数据库服务器',
-      description: '核心数据存储服务，负责用户数据、帖子分享、评论互动等所有数据的持久化存储。这是系统的基础服务，必须最先启动。',
-      icon: Database,
-      color: 'from-blue-500 to-cyan-500',
-      script: 'src/start_database_service.py'
-    },
-    {
-      id: 'platform',
-      name: '社交平台模拟',
-      description: '模拟真实的社交媒体环境，生成用户行为、内容发布、互动评论等。支持多样化场景，包括正常用户行为和极端内容传播。',
-      icon: Users,
-      color: 'from-blue-500 to-green-500',
-      script: 'src/main.py'
-    },
-    {
-      id: 'balance',
-      name: '舆论平衡系统',
-      description: '智能监控平台内容，识别极端言论和极化趋势，自动进行干预平衡。仅在场景4中需要开启，需要配置梯子。使用时需在社交平台启动前开启，不使用时记得关闭。',
-      icon: Shield,
-      color: 'from-orange-500 to-red-500',
-      script: 'src/opinion_balance_launcher.py'
-    }
-  ]
 
   // 从localStorage加载conda环境名称
   useEffect(() => {
@@ -123,55 +121,6 @@ export default function ExperimentSettings() {
     alert('Conda环境名称已清除！')
   }
 
-  const handleStart = async (serviceId: string) => {
-    setLoading(serviceId)
-    try {
-      const payload = condaEnv.trim() ? { conda_env: condaEnv.trim() } : {}
-      await axios.post(`/api/services/${serviceId}/start`, payload)
-      await loadStatus()
-      alert(`服务启动成功！请查看新打开的CMD窗口。`)
-    } catch (error: any) {
-      alert(`启动失败: ${error.response?.data?.error || error.message}`)
-    } finally {
-      setLoading(null)
-    }
-  }
-
-  const handleStop = async (serviceId: string) => {
-    setLoading(serviceId)
-    try {
-      await axios.post(`/api/services/${serviceId}/stop`)
-      await loadStatus()
-      alert(`服务已停止！`)
-    } catch (error: any) {
-      alert(`停止失败: ${error.response?.data?.error || error.message}`)
-    } finally {
-      setLoading(null)
-    }
-  }
-
-  const handleCleanup = async () => {
-    if (!confirm('确定要清理所有服务进程吗？这将强制终止所有正在运行的服务。')) {
-      return
-    }
-    
-    setLoading('cleanup')
-    try {
-      const response = await axios.post('/api/services/cleanup')
-      await loadStatus()
-      const cleaned = response.data.cleaned || []
-      if (cleaned.length > 0) {
-        alert(`清理完成！已终止 ${cleaned.length} 个进程\n${cleaned.join('\n')}`)
-      } else {
-        alert('清理完成！没有发现需要清理的进程。')
-      }
-    } catch (error: any) {
-      alert(`清理失败: ${error.response?.data?.error || error.message}`)
-    } finally {
-      setLoading(null)
-    }
-  }
-
   const handleSaveConfig = async () => {
     if (!config) return
     
@@ -197,6 +146,243 @@ export default function ExperimentSettings() {
     if (!config) return
     setConfig({ ...config, [key]: value })
   }
+
+  const platformRunning = status.platform === 'running'
+  const dbRunning = status.database === 'running'
+  const isRunning = dbRunning && platformRunning
+
+  const handleStartDemo = async (snapshotId?: string, startTick?: number) => {
+    if (isRunning || isStarting) return
+    setIsStarting(true)
+    simulation.setIsStarting(true)
+    try {
+      const data = await startDynamicDemoWithPreset({
+        enableAttack,
+        attackMode,
+        enableAftercare,
+        enableModeration,
+        enableEvoCorps,
+        snapshotId,
+        startTick,
+      })
+
+      if (data.success) {
+        setStatus(prev => ({ ...prev, database: 'running', platform: 'running' }))
+        simulation.setIsRunning(true)
+        simulation.setDatabaseRunning(true)
+        simulation.setMainRunning(true)
+        simulation.setEnableAttack(enableAttack)
+        simulation.setAttackMode(attackMode)
+        simulation.setEnableAftercare(enableAftercare)
+        simulation.setEnableModeration(enableModeration)
+        simulation.setEnableEvoCorps(enableEvoCorps)
+        navigate('/dynamic')
+      } else {
+        alert(`启动失败：${data.message || '未知错误'}`)
+      }
+    } catch (error) {
+      alert(`启动失败：${error instanceof Error ? error.message : '网络错误'}`)
+    } finally {
+      setIsStarting(false)
+      simulation.setIsStarting(false)
+    }
+  }
+
+  const handleStartClick = async () => {
+    if (isRunning || isStarting) return
+    // 检查是否有已保存的快照
+    try {
+      const snapshots = await getSavedSnapshots()
+      if (snapshots.length > 0) {
+        setShowSnapshotSelect(true)
+      } else {
+        await handleStartDemo()
+      }
+    } catch {
+      await handleStartDemo()
+    }
+  }
+
+  const handleStopDemo = async () => {
+    if (isStopping) return
+    // 显示保存快照对话框
+    setShowSaveDialog(true)
+  }
+
+  const handleSaveAndStop = async (name: string, description: string) => {
+    setShowSaveDialog(false)
+    setIsStopping(true)
+    try {
+      // 先保存快照
+      await saveSnapshot(name, description)
+      // 然后停止演示
+      const response = await axios.post('/api/dynamic/stop', {}, { timeout: 10000, validateStatus: () => true })
+      if (!response.data.success) {
+        alert(`停止失败：${response.data.message || '未知错误'}`)
+      }
+    } catch (error: any) {
+      const msg = error.message || '网络错误'
+      if (msg.includes('Network Error') || msg.includes('ECONNREFUSED')) {
+        alert('后端服务未响应，已重置前端状态')
+      } else {
+        alert(`停止失败：${msg}`)
+      }
+    } finally {
+      setIsStopping(false)
+    }
+  }
+
+  const handleSkipSave = async () => {
+    setShowSaveDialog(false)
+    setIsStopping(true)
+    try {
+      const response = await axios.post('/api/dynamic/stop', {}, { timeout: 10000, validateStatus: () => true })
+      if (!response.data.success) {
+        alert(`停止失败：${response.data.message || '未知错误'}`)
+      }
+    } catch (error: any) {
+      const msg = error.message || '网络错误'
+      if (msg.includes('Network Error') || msg.includes('ECONNREFUSED')) {
+        alert('后端服务未响应，已重置前端状态')
+      } else {
+        alert(`停止失败：${msg}`)
+      }
+    } finally {
+      setIsStopping(false)
+    }
+  }
+
+  const handleSelectSnapshot = async (snapshotId: string, startTick: number) => {
+    setShowSnapshotSelect(false)
+    await handleStartDemo(snapshotId, startTick)
+  }
+
+  const handleStartFresh = async () => {
+    setShowSnapshotSelect(false)
+    await handleStartDemo()
+  }
+
+  const handleToggleAttack = async () => {
+    const action = resolveAttackToggleAction({
+      enabled: enableAttack,
+      selectedMode: attackMode,
+    })
+
+    if (action.type === 'open_mode_dialog' || action.type === 'enable') {
+      setAttackModeDialogOpen(true)
+      return
+    }
+
+    // disable
+    if (!confirm('是否确认关闭恶意攻击模式？')) return
+
+    if (!platformRunning) {
+      setEnableAttack(false)
+      setAttackModeState(null)
+      return
+    }
+
+    setEnableAttack(false)
+    try {
+      const data = await setAttackFlag(false)
+      setEnableAttack(data.attack_enabled)
+      if (!data.attack_enabled) setAttackModeState(null)
+    } catch {
+      setEnableAttack(true)
+    }
+  }
+
+  const handleSelectAttackMode = async (mode: AttackMode) => {
+    setAttackModeState(mode)
+    setAttackModeDialogOpen(false)
+
+    if (!platformRunning) {
+      setEnableAttack(true)
+      return
+    }
+
+    setEnableAttack(true)
+    try {
+      await setAttackMode(mode)
+      const data = await setAttackFlag(true)
+      setEnableAttack(Boolean(data.attack_enabled))
+    } catch {
+      setEnableAttack(false)
+    }
+  }
+
+  const handleToggleAftercare = async () => {
+    const next = !enableAftercare
+    setEnableAftercare(next)
+    if (!platformRunning) return
+    try {
+      const data = await setAftercareFlag(next)
+      setEnableAftercare(data.aftercare_enabled)
+    } catch {
+      setEnableAftercare(!next)
+    }
+  }
+
+  const handleToggleModeration = async () => {
+    const next = !enableModeration
+    setEnableModeration(next)
+    if (!platformRunning) {
+      fetch('/api/config/moderation', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content_moderation: next }),
+      }).catch(() => {})
+      return
+    }
+    try {
+      const data = await setModerationFlag(next)
+      setEnableModeration(data.moderation_enabled)
+    } catch {
+      setEnableModeration(!next)
+    }
+  }
+
+  const handleToggleEvoCorps = () => {
+    setEnableEvoCorps(!enableEvoCorps)
+  }
+
+  const toggles = [
+    {
+      id: 'attack',
+      name: '恶意攻击',
+      description: `开启后将模拟恶意水军的协同攻击行为，包括蜂群式、分散式、链式三种攻击模式。${attackMode ? `当前模式：${getAttackModeLabel(attackMode)}` : ''}`,
+      icon: Bug,
+      color: 'from-red-500 to-orange-500',
+      enabled: enableAttack,
+      onToggle: handleToggleAttack,
+    },
+    {
+      id: 'aftercare',
+      name: '事后干预',
+      description: '开启后系统将在攻击行为发生后进行智能干预，降低恶意内容的传播影响。',
+      icon: Sparkles,
+      color: 'from-purple-500 to-pink-500',
+      enabled: enableAftercare,
+      onToggle: handleToggleAftercare,
+    },
+    {
+      id: 'moderation',
+      name: '内容审核',
+      description: '开启后系统将对平台内容进行实时审核，识别并标记违规内容。',
+      icon: Eye,
+      color: 'from-indigo-500 to-blue-500',
+      enabled: enableModeration,
+      onToggle: handleToggleModeration,
+    },
+    {
+      id: 'evocorps',
+      name: '舆论平衡',
+      description: '智能监控平台舆论走向，识别极端言论和极化趋势，自动进行干预平衡。仅在场景4中需要，需要配置梯子。',
+      icon: Shield,
+      color: 'from-orange-500 to-red-500',
+      enabled: enableEvoCorps,
+      onToggle: handleToggleEvoCorps,
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -266,7 +452,7 @@ export default function ExperimentSettings() {
                 <div className="grid grid-cols-3 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                      用户数量
+                      普通用户数量
                     </label>
                     <input
                       type="number"
@@ -275,7 +461,7 @@ export default function ExperimentSettings() {
                       className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
                       min="1"
                     />
-                    <p className="text-xs text-slate-500 mt-1">模拟的用户总数</p>
+                    <p className="text-xs text-slate-500 mt-1">模拟的普通用户总数</p>
                   </div>
 
                   <div>
@@ -328,7 +514,7 @@ export default function ExperimentSettings() {
                 <div className="space-y-2 text-sm text-slate-700">
                   <p>• 修改配置后需要点击"保存配置"按钮才会生效</p>
                   <p>• 配置保存后需要重启服务才能应用新配置</p>
-                  <p>• 用户数量和时间步数会直接影响实验运行时间</p>
+                  <p>• 普通用户数量和时间步数会直接影响实验运行时间</p>
                   <p>• Temperature值越高，AI生成的内容越随机和多样化</p>
                 </div>
               </div>
@@ -390,65 +576,60 @@ export default function ExperimentSettings() {
             </div>
           </div>
 
-          {/* 服务列表 */}
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-slate-800">服务列表</h2>
-            <button
-              onClick={handleCleanup}
-              disabled={loading === 'cleanup'}
-              className="px-6 py-3 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Trash2 size={18} />
-              {loading === 'cleanup' ? '清理中...' : '清理所有服务'}
-            </button>
+          {/* 开启/停止演示 */}
+          <div className="glass-card p-6">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleStartClick}
+                disabled={isRunning || isStarting || isStopping}
+                className="btn-primary inline-flex items-center justify-center gap-2 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex-1"
+              >
+                <Play size={18} />
+                {isStarting ? '启动中...' : isRunning ? '运行中' : '开启演示'}
+              </button>
+              <button
+                onClick={handleStopDemo}
+                disabled={isStopping}
+                className="btn-secondary inline-flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-rose-500 text-white border-transparent hover:shadow-xl text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex-1"
+              >
+                <Square size={18} />
+                {isStopping ? '结束中...' : '结束演示'}
+              </button>
+            </div>
           </div>
 
+          {/* 功能开关列表 */}
           <div className="grid gap-6">
-            {services.map((service) => {
-              const Icon = service.icon
-              const isRunning = status[service.id as keyof ServiceStatus] === 'running'
-              const isLoading = loading === service.id
-
+            {toggles.map((toggle) => {
+              const Icon = toggle.icon
               return (
-                <div key={service.id} className="glass-card p-6">
+                <div key={toggle.id} className="glass-card p-6">
                   <div className="flex items-start gap-4">
-                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${service.color} flex items-center justify-center shadow-lg flex-shrink-0`}>
+                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${toggle.color} flex items-center justify-center shadow-lg flex-shrink-0`}>
                       <Icon size={32} className="text-white" />
                     </div>
 
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-xl font-bold text-slate-800">{service.name}</h3>
+                        <h3 className="text-xl font-bold text-slate-800">{toggle.name}</h3>
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          isRunning 
-                            ? 'bg-green-100 text-green-700' 
+                          toggle.enabled
+                            ? 'bg-green-100 text-green-700'
                             : 'bg-slate-100 text-slate-600'
                         }`}>
-                          {isRunning ? '运行中' : '已停止'}
+                          {toggle.enabled ? '已开启' : '已关闭'}
                         </span>
                       </div>
-                      <p className="text-slate-600 leading-relaxed mb-3">{service.description}</p>
-                      <p className="text-xs text-slate-500 font-mono bg-slate-50 px-2 py-1 rounded inline-block">
-                        {service.script}
-                      </p>
+                      <p className="text-slate-600 leading-relaxed mb-3">{toggle.description}</p>
                     </div>
 
                     <div className="flex flex-col gap-2">
                       <button
-                        onClick={() => handleStart(service.id)}
-                        disabled={isLoading || isRunning}
-                        className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={toggle.onToggle}
+                        className={`btn-primary inline-flex items-center justify-center gap-2 text-lg font-medium ${toggle.enabled ? '!bg-gradient-to-r !from-red-500 !to-rose-500' : ''}`}
                       >
-                        <Play size={18} />
-                        {isLoading && !isRunning ? '启动中...' : '启动服务'}
-                      </button>
-                      <button
-                        onClick={() => handleStop(service.id)}
-                        disabled={isLoading || !isRunning}
-                        className="px-6 py-3 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Square size={18} />
-                        {isLoading && isRunning ? '停止中...' : '停止服务'}
+                        {toggle.enabled ? <Square size={18} /> : <Play size={18} />}
+                        {toggle.enabled ? '关闭' : '开启'}
                       </button>
                     </div>
                   </div>
@@ -457,21 +638,89 @@ export default function ExperimentSettings() {
             })}
           </div>
 
-          <div className="glass-card p-6 bg-blue-50/50">
-            <h3 className="text-lg font-bold text-slate-800 mb-3">使用说明</h3>
-            <div className="space-y-2 text-sm text-slate-700">
-              <p>1. <strong>数据库服务器</strong>必须最先启动，这是所有服务的基础</p>
-              <p>2. <strong>社交平台模拟</strong>在数据库服务启动后启动</p>
-              <p>3. <strong>舆论平衡系统</strong>仅在场景4中需要，且需要在社交平台启动前开启</p>
-              <p>4. 舆论平衡系统需要配置梯子才能正常工作</p>
-              <p>5. 不使用舆论平衡系统时请及时关闭以节省资源</p>
-              <p className="text-red-600 font-medium mt-3">⚠️ 如果服务无法启动或出现端口占用错误，请点击右上角的清理所有服务按钮</p>
-            </div>
-          </div>
         </>
       )}
 
 
+      {attackModeDialogOpen && (
+        <AttackModeDialog
+          onSelect={handleSelectAttackMode}
+          onClose={() => setAttackModeDialogOpen(false)}
+        />
+      )}
+
+      {/* 保存快照对话框 */}
+      <SaveSnapshotDialog
+        open={showSaveDialog}
+        onSave={handleSaveAndStop}
+        onSkip={handleSkipSave}
+        onCancel={() => setShowSaveDialog(false)}
+      />
+
+      {/* 快照选择对话框 */}
+      <SnapshotSelectDialog
+        open={showSnapshotSelect}
+        onSelect={handleSelectSnapshot}
+        onStartFresh={handleStartFresh}
+        onCancel={() => setShowSnapshotSelect(false)}
+      />
     </div>
+  )
+}
+
+function AttackModeDialog({
+  onSelect,
+  onClose,
+}: {
+  onSelect: (mode: AttackMode) => void
+  onClose: () => void
+}) {
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] bg-slate-700/22 backdrop-blur-[2px] flex items-start justify-center pt-10 px-6 pb-6">
+      <div className="w-full max-w-3xl rounded-3xl border border-slate-200/85 bg-gradient-to-br from-slate-100/97 via-slate-50/96 to-blue-50/94 shadow-[0_28px_90px_rgba(15,23,42,0.18)] p-10">
+        <h3 className="text-3xl font-bold text-slate-800">选择恶意攻击模式</h3>
+        <p className="text-base text-slate-600 mt-2">请选择本次开启时使用的攻击协同模式。</p>
+
+        <div className="mt-6 grid grid-cols-1 gap-4">
+          <button
+            type="button"
+            onClick={() => onSelect('swarm')}
+            className="w-full text-left rounded-2xl border border-slate-200/90 bg-white/72 p-5 hover:border-blue-300 hover:bg-white/92 transition-all duration-200 hover:shadow-lg"
+          >
+            <div className="font-semibold text-xl text-slate-800">蜂群式</div>
+            <div className="text-sm text-slate-600 mt-1">集中攻击同一目标，放大互动信号。</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => onSelect('dispersed')}
+            className="w-full text-left rounded-2xl border border-slate-200/90 bg-white/72 p-5 hover:border-blue-300 hover:bg-white/92 transition-all duration-200 hover:shadow-lg"
+          >
+            <div className="font-semibold text-xl text-slate-800">游离式</div>
+            <div className="text-sm text-slate-600 mt-1">分散到多条帖子，降低集中痕迹。</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => onSelect('chain')}
+            className="w-full text-left rounded-2xl border border-slate-200/90 bg-white/72 p-5 hover:border-blue-300 hover:bg-white/92 transition-all duration-200 hover:shadow-lg"
+          >
+            <div className="font-semibold text-xl text-slate-800">链式传播</div>
+            <div className="text-sm text-slate-600 mt-1">主导账号→扩散账号→控评账号的三层协同攻击。</div>
+          </button>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   )
 }

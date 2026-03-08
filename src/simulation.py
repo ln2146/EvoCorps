@@ -15,6 +15,7 @@ from news_spread_analyzer import NewsSpreadAnalyzer
 from fact_checker import FactChecker, FactCheckVerdict
 from prompts import FactCheckerPrompts
 from opinion_balance_manager import OpinionBalanceManager
+from agents.simple_coordination_system import _workflow_log_buffer
 # Remove the complex user selector
 import asyncio
 
@@ -27,6 +28,13 @@ from tracked_opinion_helper import (
     preload_first_fake_news_from_dataset,
 )
 
+# Moderation system
+from moderation import ModerationService, ModerationConfig, load_config_from_env
+
+# Snapshot system
+from snapshot_manager import create_snapshot_manager
+from snapshot_session import get_session_tick_number
+
 
 class Simulation:
     """
@@ -35,24 +43,37 @@ class Simulation:
     def __init__(self, config: dict):
         self.config = config  # Store the entire config dictionary
         self.reset_db = config.get('reset_db', True)
+        self.restore_from_snapshot = bool(config.get('restore_from_snapshot', False))
         self.num_users = config['num_users']
         self.engine = resolve_engine(config)
         self.generate_own_post = config.get('generate_own_post', True)  # New parameter with default True
 
         # Generate timestamp for this run
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
+
         # Track injected fake-news timesteps (used for delayed official explanation attachment)
         # {post_id: injection_timestep (1-based)}
         self.fake_news_injection_timesteps = {}
 
         # Initialize database manager
-        self.db_manager = DatabaseManager('database/simulation.db', self.reset_db)
+        # Use path relative to project root (parent of src/)
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        self.project_root = project_root
+        db_path = os.path.join(project_root, 'database', 'simulation.db')
+        self.db_manager = DatabaseManager(db_path, self.reset_db)
         self.conn = self.db_manager.get_connection()
         self.db_path = self.db_manager.db_path
 
+        # Initialize snapshot manager
+        self.snapshot_manager = create_snapshot_manager(project_root, db_path)
+        self.snapshot_enabled = config.get('snapshot_enabled', True)  # 默认启用快照
+
         # Replace user management with UserManager
-        self.user_manager = UserManager(config, self.db_manager)
+        self.user_manager = UserManager(
+            config,
+            self.db_manager,
+            restore_existing=self.restore_from_snapshot,
+        )
         self.users = self.user_manager.users
 
         # Initialize posts list
@@ -66,8 +87,9 @@ class Simulation:
 
         # Simplified user selection logic - rely directly on the user manager
 
-        # Create initial follows
-        self.user_manager.create_initial_follows()
+        # Create initial follows only for fresh runs. Restored snapshots already contain network state.
+        if not self.restore_from_snapshot:
+            self.user_manager.create_initial_follows()
 
         # Initialize the OpenAI client using MultiModelSelector for 502 error prevention
         try:
@@ -75,9 +97,9 @@ class Simulation:
             self.multi_model_selector = multi_model_selector
             # Create an optimized client using the MultiModelSelector configuration
             self.openai_client, _ = multi_model_selector.create_openai_client()
-            print(f"✅ Simulation created an optimized client via MultiModelSelector")
+            print(f"[OK] Simulation created an optimized client via MultiModelSelector")
         except Exception as e:
-            print(f"⚠️ MultiModelSelector initialization failed: {e}, falling back to selector-only client")
+            print(f"[WARN] MultiModelSelector initialization failed: {e}, falling back to selector-only client")
             from multi_model_selector import MultiModelSelector
             # Unified model selection via MultiModelSelector (regular role)
             self.multi_model_selector = MultiModelSelector()
@@ -106,7 +128,7 @@ class Simulation:
                 fact_checker_engine = self.multi_model_selector.select_random_model(role="fact_checker")
             else:
                 fact_checker_engine = self.engine
-        
+
         self.fact_checker_engine = fact_checker_engine
         self.fact_checker = FactChecker(
             checker_id="main_checker",
@@ -115,11 +137,48 @@ class Simulation:
         logging.info(f"🔍 Fact-check infrastructure initialized using model: {fact_checker_engine}")
         logging.info(f"🔍 Fact-check execution controlled by control_flags.aftercare_enabled (current: {control_flags.aftercare_enabled})")
 
+        # Initialize moderation service
+        moderation_config = load_config_from_env()
+
+        # LLM 审核通过 multi_model_selector 统一管理，无需在此注入 API 配置
+        moderation_config.llm_provider.enabled = True
+
+        # 关键词审核作为兜底（LLM 调用失败时仍能捕获明显违规）
+        moderation_config.keyword_provider.enabled = True
+        moderation_config.keyword_provider.keywords = {
+            "misinformation": [
+                "fake news", "conspiracy", "hoax", "cover up", "cover-up",
+                "false flag", "deep state", "hidden agenda", "fake quarantine",
+                "government cover", "laundered", "financially incentivized",
+                "bioweapon", "scandal", "suppressed",
+                "谣言", "假新闻", "虚假", "造谣", "不实信息", "阴谋", "黑幕",
+            ],
+            "hate_speech": [
+                "仇恨", "歧视", "种族主义", "纳粹", "恐怖分子",
+                "should die", "kill yourself", "hate speech",
+            ],
+            "spam": [
+                "加微信", "扫码", "代购", "兼职", "赚钱",
+                "buy now", "click here", "free money",
+            ],
+            "violence": [
+                "暴力", "杀", "砍", "袭击", "爆炸",
+                "violence", "murder", "attack", "bomb",
+            ],
+        }
+
+        self.moderation_service = ModerationService(moderation_config)
+        logging.info(f"🛡️ Moderation service initialized (controlled by control_flags.moderation_enabled)")
+
         # Initialize opinion balance manager (only if enabled)
         if config.get("opinion_balance_system", {}).get("enabled", False):
             self.opinion_balance_manager = OpinionBalanceManager(config, self.conn)
         else:
             self.opinion_balance_manager = None
+
+        # Initialize defense monitoring center (always active, syncs from DB on demand)
+        from agents.defense_monitoring_center import create_monitoring_center
+        self.monitoring_center = create_monitoring_center(top_n_topics=10)
 
         # Initialize malicious bot manager.
         #
@@ -127,7 +186,7 @@ class Simulation:
         # control_flags.attack_enabled, so we always construct the
         # manager when possible and let the global flag decide.
         try:
-            from malicious_bot_manager import MaliciousBotManager
+            from malicious_bots.malicious_bot_manager import MaliciousBotManager
             self.malicious_bot_manager = MaliciousBotManager(config, self.db_manager)
         except Exception as e:
             logging.error(f"Failed to initialize MaliciousBotManager: {e}")
@@ -164,8 +223,27 @@ class Simulation:
             f"in configs/experiment_config.json, got: {opinion_balance_config.get('feedback_monitoring_interval')!r}"
         )
     
-    async def run(self, num_time_steps: int):
-        """Run the simulation."""
+    async def run(self, num_time_steps: int, start_tick: int = 1, parent_session_id: str = None, parent_tick: int = None):
+        """Run the simulation.
+
+        Args:
+            num_time_steps: 总时间步数
+            start_tick: 起始时间步（从快照恢复时使用）
+            parent_session_id: 父快照会话ID（从哪个快照恢复的）
+            parent_tick: 父快照的起始tick
+        """
+        # 创建快照会话（如果启用）
+        if self.snapshot_enabled:
+            try:
+                self.snapshot_manager.create_session(parent_session_id, parent_tick)
+                if parent_session_id:
+                    logging.info(f"✅ 快照系统已启动（继承自 {parent_session_id} tick {parent_tick}），将在每个时间步结束后自动保存")
+                else:
+                    logging.info("✅ 快照系统已启动，将在每个时间步结束后自动保存")
+            except Exception as e:
+                logging.warning(f"快照会话创建失败: {e}")
+                self.snapshot_enabled = False
+
         new_user_config = self.config.get('new_users', {})
         add_new_users_probability = new_user_config.get('add_probability', 0.9)
         new_user_follow_probability = new_user_config.get('follow_probability', 0.0)
@@ -226,7 +304,12 @@ class Simulation:
                 print(f"🔍 Starting background opinion balance monitoring every {monitoring_interval_minutes} minutes")
 
         # Add tqdm progress bar
-        progress_bar = tqdm(range(num_time_steps), desc="Running simulation")
+        # 如果从快照恢复，从 start_tick-1 开始（因为 step 是 0-indexed）
+        start_step = start_tick - 1 if start_tick > 1 else 0
+        if start_tick > 1:
+            print(f"📌 从 tick {start_tick} 继续运行（跳过前 {start_step} 步）")
+
+        progress_bar = tqdm(range(start_step, num_time_steps), desc="Running simulation")
 
         for step in progress_bar:
             logging.info(f"Time step: {step + 1}")
@@ -241,6 +324,17 @@ class Simulation:
                 logging.info(f"🔍 Time step {step + 1}: starting third-party fact check (checking news from time step {step - 2})")
                 # 始终使用 "third_party_fact_checking" 作为 experiment_type，不受 CLI 输入影响
                 await self._run_fact_checking_async(step, fact_check_limit, current_timestep=step, experiment_type="third_party_fact_checking")
+
+            # Run moderation system (content review & intervention)
+            # 完全由全局开关 control_flags.moderation_enabled 控制
+            if control_flags.moderation_enabled:
+                try:
+                    await self._run_moderation_async(step)
+                except Exception as e:
+                    logging.error(
+                        f"🛡️ Time step {step + 1}: moderation check failed "
+                        f"(simulation continues): {type(e).__name__}: {e}"
+                    )
 
             # Discover the very first malicious news if not yet captured
             try:
@@ -270,13 +364,13 @@ class Simulation:
                     
                     if news_post_ids:
                         injected_news_posts.extend(news_post_ids)
-                        
+
                         # Track injected fake/opinion news post injection timestep (1-based)
                         for neg_info in negative_news_info:
                             post_id = neg_info.get('post_id')
                             if post_id and post_id not in self.fake_news_injection_timesteps:
                                 self.fake_news_injection_timesteps[post_id] = step + 1
-                        
+
                         new_post_count = self._get_current_post_count()
                         logging.info(f"Time step {step + 1}: injected {len(news_post_ids)} news posts (count: {current_post_count} → {new_post_count})")
                     else:
@@ -293,7 +387,7 @@ class Simulation:
                 current_user_count = len(self.users)
 
                 if current_user_count >= max_users:
-                    logging.info(f"⚠️ Time step {step + 1}: maximum user limit reached ({max_users}); skipping new user addition")
+                    logging.info(f"[WARN] Time step {step + 1}: maximum user limit reached ({max_users}); skipping new user addition")
                 else:
                     # Calculate the number of new users - match the initial user count
                     users_per_step = new_user_config.get('users_per_step', 'same_as_initial')
@@ -306,7 +400,7 @@ class Simulation:
                     # Ensure we do not exceed the maximum users
                     if current_user_count + num_new_users > max_users:
                         num_new_users = max_users - current_user_count
-                        logging.info(f"⚠️ Time step {step + 1}: adjusted new user count to {num_new_users} to avoid exceeding the limit")
+                        logging.info(f"[WARN] Time step {step + 1}: adjusted new user count to {num_new_users} to avoid exceeding the limit")
 
                     if num_new_users > 0:
                         logging.info(f"🆕 Time step {step + 1}: preparing to add {num_new_users} new users")
@@ -315,16 +409,16 @@ class Simulation:
                         # Update our reference to users
                         self.users = self.user_manager.users
 
-                        logging.info(f"✅ Time step {step + 1}: successfully added {num_new_users} new users, total users: {len(self.users)}")
+                        logging.info(f"[OK] Time step {step + 1}: successfully added {num_new_users} new users, total users: {len(self.users)}")
                     else:
-                        logging.info(f"⚠️ Time step {step + 1}: cannot add users; max user limit reached")
+                        logging.info(f"[WARN] Time step {step + 1}: cannot add users; max user limit reached")
 
             # Each user creates a post (only if generate_own_post is True)
             if self.generate_own_post:
                 # Allow each user to attempt posting while enforcing limits
                 post_tasks = []
                 for i, user in enumerate(self.users):
-                    task = self._async_user_post_creation(user, step, i)
+                    task = self._async_user_post_creation(user, step)
                     post_tasks.append(task)
 
                 # Execute all post-creation tasks concurrently
@@ -346,7 +440,7 @@ class Simulation:
                     setattr(user, 'current_time_step', step)
                 except Exception:
                     pass
-                task = self._async_user_reaction(user, step, i)
+                task = self._async_user_reaction(user, step)
                 reaction_tasks.append(task)
             
             # Run all user reaction tasks in parallel
@@ -363,7 +457,11 @@ class Simulation:
 
             # Analyze spread for all injected news posts (logging disabled)
             for news_post_id in injected_news_posts:
-                spread_metrics = self.news_spread_analyzer.analyze_spread(news_post_id, step)
+                try:
+                    spread_metrics = self.news_spread_analyzer.analyze_spread(news_post_id, step)
+                except Exception as e:
+                    logging.warning(f"Failed to analyze spread for post {news_post_id}: {e}")
+                    continue
 
             # Update influence scores
             Utils.update_user_influence(self.conn, self.db_path)
@@ -409,11 +507,107 @@ class Simulation:
             remaining_posts = max_posts - current_post_count
 
             if remaining_posts <= 0:
-                logging.info(f"⚠️ Time step {step + 1} complete - reached max post limit: {current_post_count}/{max_posts}")
+                logging.info(f"[WARN] Time step {step + 1} complete - reached max post limit: {current_post_count}/{max_posts}")
             else:
                 logging.debug(f"📊 Time step {step + 1} complete - post count: {current_post_count}/{max_posts}")
 
+            # --- Defense monitoring: emit metrics at end of each step ---
+            try:
+                self.monitoring_center.sync_from_db(self.conn)
+                dashboard = self.monitoring_center.generate_dashboard()
+                no = dashboard["niche_occupancy"]
+                ab = dashboard["algorithmic_bias"]
+                tc = dashboard["traffic_concentration"]
+                logging.info(
+                    f"📡 [防御监控·生态位] "
+                    f"水军主导 {no['malicious_dominant']} 个 +倾向 {no['malicious_leaning']} 个 ｜ "
+                    f"EvoCorps 主导 {no['defense_dominant']} 个 +倾向 {no['defense_leaning']} 个 "
+                    f"（共 {no['total_topics']} 个热门话题）"
+                )
+                logging.info(
+                    f"📡 [防御监控·基尼] "
+                    f"系数 {ab['overall_gini']:.3f}（{ab['bias_assessment']}）｜ "
+                    f"极端账号 {tc.get('extreme_account_count', 0)} 个"
+                    f"占 {tc.get('extreme_account_share', 0):.1f}% 流量"
+                )
+            except Exception as _monitor_err:
+                logging.debug(f"Defense monitoring skipped: {_monitor_err}")
+
+            # 保存tick快照（在tick结束时）
+            if self.snapshot_enabled:
+                try:
+                    # 获取详细用户统计
+                    cursor = self.conn.cursor()
+                    # 总用户数
+                    cursor.execute("SELECT COUNT(*) FROM users WHERE status IS NULL OR status != 'banned'")
+                    total_users = cursor.fetchone()[0]
+
+                    # 领袖用户数 (is_influencer)
+                    cursor.execute("SELECT COUNT(*) FROM users WHERE is_influencer = 1 AND (status IS NULL OR status != 'banned')")
+                    leader_users = cursor.fetchone()[0]
+
+                    # 恶意用户数（通过恶意评论关联）
+                    cursor.execute("""
+                        SELECT COUNT(DISTINCT c.author_id)
+                        FROM comments c
+                        JOIN malicious_comments mc ON c.comment_id = mc.comment_id
+                    """)
+                    malicious_users = cursor.fetchone()[0]
+
+                    # 附和群组用户（amplifiers）- 通过攻击记录中的参与用户
+                    cursor.execute("""
+                        SELECT COUNT(DISTINCT c.author_id)
+                        FROM comments c
+                        JOIN malicious_attacks ma ON c.post_id = ma.target_post_id
+                        WHERE ma.cluster_size > 1
+                    """)
+                    amplifier_users = cursor.fetchone()[0]
+
+                    # 普通用户 = 总用户 - 领袖 - 恶意
+                    normal_users = total_users - leader_users - malicious_users
+
+                    absolute_tick = step + 1
+                    snapshot_tick = get_session_tick_number(start_tick, absolute_tick)
+                    additional_info = {
+                        "tick": snapshot_tick,
+                        "absolute_tick": absolute_tick,
+                        "timestamp": datetime.now().isoformat(),
+                        "user_count": total_users,
+                        "post_count": current_post_count,
+                        "normal_users": normal_users,
+                        "leader_users": leader_users,
+                        "malicious_users": malicious_users,
+                        "amplifier_users": amplifier_users
+                    }
+                    self.snapshot_manager.save_tick_snapshot(snapshot_tick, additional_info)
+                except Exception as e:
+                    logging.warning(f"Failed to save snapshot for tick {snapshot_tick}: {e}")
+
             logging.info("")  # Add a newline for readability between time steps
+
+        # Stop the opinion balance background monitoring task
+        if opinion_balance_task and not opinion_balance_task.done():
+            opinion_balance_task.cancel()
+            try:
+                await opinion_balance_task
+            except asyncio.CancelledError:
+                print(f"🔍 Opinion balance background monitoring stopped")
+
+        # Wait for the opinion balance monitor to complete (only when feedback system is enabled)
+        if (self.opinion_balance_manager and self.opinion_balance_manager.enabled and
+            self.config.get('opinion_balance_system', {}).get('feedback_system_enabled', False)):
+            await self._wait_for_monitoring_completion()
+
+        # Print the simulation statistics
+        logging.info("\nSimulation complete. Printing statistics...")
+        Utils.print_simulation_stats(self.conn)
+
+        # Then save and close the database as the last step
+        self.db_manager.save_simulation_db(timestamp=self.timestamp)
+
+        # Run homophily analysis after simulation completes
+        homophily_analyzer = HomophilyAnalysis(self.db_path)
+        homophily_analyzer.run_analysis(output_dir=f"experiment_outputs/homophily_analysis/{self.timestamp}")
 
     async def _run_malicious_batch_attack(self, step: int):
         """Run malicious bot batch attack around the middle of each timestep."""
@@ -441,10 +635,10 @@ class Simulation:
             else:
                 # 同时检查 error 和 reason 字段
                 error_msg = attack_result.get('error') or attack_result.get('reason', 'unknown')
-                logging.warning(f"⚠️ Malicious bot batch attack failed: {error_msg}")
+                logging.warning(f"[WARN] Malicious bot batch attack failed: {error_msg}")
 
         except Exception as e:
-            logging.error(f"❌ Malicious bot batch attack exception: {e}")
+            logging.error(f"[ERR] Malicious bot batch attack exception: {e}")
 
     async def _run_fact_checking_async(self, step: int, fact_check_limit: int, current_timestep: int = None, experiment_type: str = "third_party_fact_checking"):
         """
@@ -560,31 +754,200 @@ class Simulation:
             logging.error(f"Error during fact check for post {post.post_id}: {e}")
             raise
 
-        # Stop the opinion balance background monitoring task
-        if opinion_balance_task and not opinion_balance_task.done():
-            opinion_balance_task.cancel()
-            try:
-                await opinion_balance_task
-            except asyncio.CancelledError:
-                print(f"🔍 Opinion balance background monitoring stopped")
+    async def _run_moderation_async(self, step: int):
+        """
+        Run moderation system asynchronously.
 
-        # Wait for the opinion balance monitor to complete (only when feedback system is enabled)
-        if (self.opinion_balance_manager and self.opinion_balance_manager.enabled and
-            self.config.get('opinion_balance_system', {}).get('feedback_system_enabled', False)):
-            await self._wait_for_monitoring_completion()
+        Checks news posts and applies intervention actions:
+        - Visibility degradation: reduce content weight in recommendations
+        - Warning labels: mark content with official warnings
+        - Hard takedowns: remove posts and ban users
 
-        # Print the simulation statistics
-        logging.info("\nSimulation complete. Printing statistics...")
-        Utils.print_simulation_stats(self.conn)
+        Args:
+            step: Current simulation step
+        """
+        logging.info(f"🛡️ Time step {step + 1}: starting moderation check")
 
-        # Then save and close the database as the last step
-        self.db_manager.save_simulation_db(timestamp=self.timestamp)
+        # Get news posts to check (from current and previous timesteps)
+        posts_to_check = self._get_posts_for_moderation(step)
 
-        # Run homophily analysis after simulation completes
-        homophily_analyzer = HomophilyAnalysis(self.db_path)
-        homophily_analyzer.run_analysis(output_dir=f"experiment_outputs/homophily_analysis/{self.timestamp}")
+        if not posts_to_check:
+            logging.info(f"🛡️ Time step {step + 1}: no posts to moderate")
+            return
 
-    async def _async_user_post_creation(self, user, step, user_index):
+        logging.info(f"🛡️ Time step {step + 1}: checking {len(posts_to_check)} posts")
+
+        # Process moderation (can batch multiple posts)
+        verdicts = self.moderation_service.check_news_posts(posts_to_check)
+
+        # Log results with detailed information
+        if not verdicts:
+            logging.info(f"🛡️ Time step {step + 1}: moderation complete - no actions taken (service may be disabled or no violations found)")
+        else:
+            action_counts = {}
+            for verdict in verdicts:
+                # use_enum_values=True 使 verdict 字段已是字符串，无需 .value
+                action = verdict.action if verdict.action else "none"
+                action_counts[action] = action_counts.get(action, 0) + 1
+                # 详细记录每个裁决
+                logging.info(
+                    f"🛡️ Moderation verdict: post={verdict.post_id[:8]}..., "
+                    f"action={action}, severity={verdict.severity if verdict.severity else 'N/A'}, "
+                    f"confidence={(verdict.confidence if verdict.confidence is not None else 0):.2f}"
+                )
+
+            logging.info(
+                f"🛡️ Time step {step + 1}: moderation complete - "
+                f"total_actions={len(verdicts)}, breakdown: {action_counts}"
+            )
+
+            # Trigger NicheFiller vacuum response for every HARD_TAKEDOWN
+            hard_takedowns = [v for v in verdicts if v.action == "hard_takedown"]
+            if hard_takedowns and self.opinion_balance_manager and self.opinion_balance_manager.enabled:
+                coordination_system = getattr(self.opinion_balance_manager, "coordination_system", None)
+                if coordination_system:
+                    post_content_map = {p["post_id"]: p.get("content", "") for p in posts_to_check}
+                    for verdict in hard_takedowns:
+                        topic_summary = (post_content_map.get(verdict.post_id, "") or "")[:400]
+                        asyncio.create_task(
+                            coordination_system.execute_niche_filler_for_vacuum(
+                                post_id=verdict.post_id,
+                                user_id=verdict.user_id or "",
+                                topic_summary=topic_summary,
+                                minutes_since_ban=0.0,
+                            )
+                        )
+                        logging.info(f"🕳️ NicheFiller vacuum response queued: post={verdict.post_id}")
+
+        # Refresh monitoring dashboard after every moderation cycle
+        try:
+            self.monitoring_center.sync_from_db(self.conn)
+            dashboard = self.monitoring_center.generate_dashboard()
+            no = dashboard["niche_occupancy"]
+            ab = dashboard["algorithmic_bias"]
+            health = dashboard["summary"]["defense_health"]
+            logging.info(
+                f"📊 [监控] 生态位占有率 — "
+                f"防御侧: {no['defense_side_percentage']:.0f}% "
+                f"({no['defense_dominant']}主导+{no['defense_leaning']}倾向) | "
+                f"水军侧: {no['malicious_side_percentage']:.0f}% "
+                f"({no['malicious_dominant']}主导+{no['malicious_leaning']}倾向) | "
+                f"争夺中: {no['contested']}"
+            )
+            logging.info(
+                f"📊 [监控] 算法偏差 Gini — "
+                f"全局: {ab['overall_gini']:.3f} "
+                f"[{ab['bias_assessment']}] | "
+                f"水军: {ab['malicious_gini']:.3f} | "
+                f"防御: {ab['defense_gini']:.3f} | "
+                f"极端账号占流量: {dashboard['traffic_concentration'].get('extreme_account_share', 0):.1f}%"
+            )
+            logging.info(
+                f"📊 [监控] 防御健康度: {health['score']}/100 [{health['status'].upper()}]"
+            )
+            for alert in dashboard.get("alerts", []):
+                logging.warning(f"🚨 [监控告警] [{alert['level'].upper()}] {alert['message']}")
+        except Exception as _monitor_err:
+            logging.warning(f"⚠️ Monitoring dashboard refresh failed: {_monitor_err}")
+
+    def _get_posts_for_moderation(self, step: int) -> list:
+        """
+        Get posts that need moderation.
+
+        Args:
+            step: Current simulation step
+
+        Returns:
+            List of post dictionaries
+        """
+        # Get posts from the current and recent timesteps
+        # We check posts from the current timestep and previous 2 timesteps
+        min_timestep = max(0, step - 1)
+
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT
+                p.post_id,
+                p.content,
+                p.author_id,
+                p.is_news,
+                p.news_type,
+                p.num_likes,
+                p.num_shares,
+                p.num_comments,
+                pt.time_step
+            FROM posts p
+            LEFT JOIN post_timesteps pt ON p.post_id = pt.post_id
+            WHERE (p.status IS NULL OR p.status != 'taken_down')
+            AND pt.time_step >= ?
+            ORDER BY pt.time_step DESC
+        ''', (min_timestep,))
+
+        posts = []
+        for row in cursor.fetchall():
+            posts.append({
+                'post_id': row[0],
+                'content': row[1],
+                'user_id': row[2],
+                'author_id': row[2],
+                'is_news': bool(row[3]),
+                'news_type': row[4],
+                'num_likes': row[5] or 0,
+                'num_shares': row[6] or 0,
+                'num_comments': row[7] or 0,
+                'time_step': row[8],
+            })
+
+        return posts
+
+    def _get_posts_by_ids(self, post_ids: list) -> list:
+        """
+        Get posts by their IDs for moderation.
+
+        Args:
+            post_ids: List of post IDs to retrieve
+
+        Returns:
+            List of post dictionaries suitable for moderation
+        """
+        if not post_ids:
+            return []
+
+        placeholders = ','.join('?' for _ in post_ids)
+        cursor = self.conn.cursor()
+        cursor.execute(f'''
+            SELECT
+                p.post_id,
+                p.content,
+                p.author_id,
+                p.is_news,
+                p.news_type,
+                p.num_likes,
+                p.num_shares,
+                p.num_comments
+            FROM posts p
+            WHERE p.post_id IN ({placeholders})
+            AND p.is_news = 1
+            AND (p.status IS NULL OR p.status != 'taken_down')
+        ''', post_ids)
+
+        posts = []
+        for row in cursor.fetchall():
+            posts.append({
+                'post_id': row[0],
+                'content': row[1],
+                'user_id': row[2],
+                'author_id': row[2],
+                'is_news': bool(row[3]),
+                'news_type': row[4],
+                'num_likes': row[5] or 0,
+                'num_shares': row[6] or 0,
+                'num_comments': row[7] or 0,
+            })
+
+        return posts
+
+    async def _async_user_post_creation(self, user, step):
         """Async user post creation helper with simplified limit checks"""
         try:
             # Let user decide whether to post based on news, identity, and memory
@@ -619,11 +982,16 @@ class Simulation:
         cursor.execute("SELECT COUNT(*) FROM posts WHERE original_post_id IS NULL")
         return cursor.fetchone()[0]
 
-    async def _async_user_reaction(self, user, step, user_index):
+    async def _async_user_reaction(self, user, step):
         """Async user reaction handler"""
         try:
             # User reacts to their feed — even in fact-check mode, show the full feed (including user posts)
-            feed = user.get_feed(experiment_config=self.config, time_step=step)
+            # 使用 asyncio.to_thread 包装同步调用，避免阻塞事件循环
+            feed = await asyncio.to_thread(
+                user.get_feed,
+                experiment_config=self.config,
+                time_step=step
+            )
 
             # 真相拼接机制：到达规定时间步后无条件执行，不受 aftercare_enabled 控制
             if step >= 4 and self.news_manager:
@@ -643,7 +1011,7 @@ class Simulation:
             print("\n⏳ Waiting for opinion balance tasks to finish...")
             await self._wait_for_intervention_tasks_completion()
             await self._wait_for_coordination_monitoring_handles()
-            print("✅ Monitoring wait complete")
+            print("[OK] Monitoring wait complete")
 
             # Check if any briefings were generated
             import os
@@ -654,9 +1022,9 @@ class Simulation:
                     for file in briefing_files[:3]:  # Show the first 3
                         print(f"   - {file}")
                 else:
-                    print(f"⚠️  No briefing files found; the monitoring loop might not be running correctly")
+                    print(f"[WARN]  No briefing files found; the monitoring loop might not be running correctly")
             else:
-                print(f"⚠️  'logs' directory missing; briefings may not have been generated")
+                print(f"[WARN]  'logs' directory missing; briefings may not have been generated")
 
         except Exception as e:
             logging.error(f"Error while waiting for monitor completion: {e}")
@@ -807,7 +1175,7 @@ class Simulation:
             post_rows = cursor.fetchall()
 
             if not post_rows:
-                print("⚠️  No available posts for comment generation")
+                print("[WARN]  No available posts for comment generation")
                 return
 
             # Create a simple post object
@@ -822,7 +1190,7 @@ class Simulation:
             print(f"📊 Found {len(available_posts)} available posts")
 
         except Exception as e:
-            print(f"❌ Failed to fetch posts: {e}")
+            print(f"[ERR] Failed to fetch posts: {e}")
             return
 
         # Build the list of parallel tasks
@@ -845,14 +1213,14 @@ class Simulation:
 
         print(f"📊 Total parallel tasks: {len(tasks)}")
         print(f"   👥 Regular user tasks: {len(normal_user_tasks)}")
-        if self.malicious_bot_manager and self.malicious_bot_manager.enabled:
+        if self.malicious_bot_manager and control_flags.attack_enabled:
             print(f"   🔥 Malicious bot tasks: {len([t for t in tasks if 'malicious' in str(t)])}")
         if self.opinion_balance_manager and self.opinion_balance_manager.enabled:
             print(f"   🔄 amplifier agent tasks: {len([t for t in tasks if 'amplifier' in str(t)])}")
 
         # Execute all tasks in parallel
         if tasks:
-            print(f"⚡ Starting parallel execution...")
+            print(f"[FAST] Starting parallel execution...")
             try:
                 results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -860,15 +1228,15 @@ class Simulation:
                 success_count = sum(1 for r in results if not isinstance(r, Exception))
                 error_count = len(results) - success_count
 
-                print(f"✅ Parallel generation complete!")
+                print(f"[OK] Parallel generation complete!")
                 print(f"   📊 Successes: {success_count} tasks")
-                print(f"   ❌ Failures: {error_count} tasks")
+                print(f"   [ERR] Failures: {error_count} tasks")
                 print("=" * 60)
 
             except Exception as e:
-                print(f"❌ Parallel execution failed: {e}")
+                print(f"[ERR] Parallel execution failed: {e}")
         else:
-            print("⚠️  No tasks to execute")
+            print("[WARN]  No tasks to execute")
 
     def _create_normal_user_tasks(self, available_posts):
         """Create normal user comment generation tasks for concurrent execution"""
@@ -997,7 +1365,7 @@ class Simulation:
             #     post.post_id, post.content, post.author_id
             # )
             # tasks.append(task)
-            # print(f"   ✅ Created malicious attack task for post {post.post_id}")
+            # print(f"   [OK] Created malicious attack task for post {post.post_id}")
 
         print(f"   📊 Live attack mechanism deprecated; now execute batch attacks at the end of each timestep")
         return tasks
@@ -1037,13 +1405,20 @@ class Simulation:
 
             if comment_content:
                 comment_id = user.create_comment(post.post_id, comment_content)
-                print(f"👤 User {user.user_id} concurrently commented on post {post.post_id} (model: {selected_model})")
-                return {"success": True, "comment_id": comment_id, "model": selected_model}
+                if comment_id:
+                    print(f"👤 User {user.user_id} concurrently commented on post {post.post_id} (model: {selected_model})")
+                    return {"success": True, "comment_id": comment_id, "model": selected_model}
+
+                warning_msg = getattr(user, "last_comment_moderation_message", None)
+                if warning_msg:
+                    print(f"⚠️ User {user.user_id} comment blocked: {warning_msg}")
+                    return {"success": False, "error": warning_msg}
+                return {"success": False, "error": "comment blocked"}
             else:
                 return {"success": False, "error": "comment generation failed"}
 
         except Exception as e:
-            print(f"❌ User {user.user_id} concurrent comment generation failed: {e}")
+            print(f"[ERR] User {user.user_id} concurrent comment generation failed: {e}")
             return {"success": False, "error": str(e)}
 
     async def _background_opinion_balance_monitor(self):
@@ -1062,7 +1437,7 @@ class Simulation:
                 # Execute the monitoring scan
                 await self._monitor_trending_posts_background()
 
-                print(f"✅ [Monitoring cycle {monitor_count}] scan complete")
+                print(f"[OK] [Monitoring cycle {monitor_count}] scan complete")
 
         except asyncio.CancelledError:
             print(f"🔍 Opinion balance background monitoring stopped (ran for {monitor_count} cycles)")
@@ -1101,6 +1476,11 @@ class Simulation:
             if trending_posts:
                 print(f"   Found {len(trending_posts)} trending posts; analyzing from highest to lowest heat (includes news and user posts)")
 
+                if not hasattr(self, "_active_intervention_post_ids") or self._active_intervention_post_ids is None:
+                    self._active_intervention_post_ids = set()
+
+                # Phase 1: read all post content into memory and launch workflow tasks in parallel
+                workflow_tasks = []  # list of (post_id, task)
                 for post_row in trending_posts:
                     post_id, content, author_id, num_comments, num_likes, num_shares, created_at = post_row
                     total_engagement = num_comments + num_likes + num_shares
@@ -1110,158 +1490,152 @@ class Simulation:
                     print(f"   💬 Comments: {num_comments}, 👍 Likes: {num_likes}, 🔄 Shares: {num_shares}")
                     print(f"   🔥 Total heat: {total_engagement}")
                     print(f"   📝 Content: {content[:80]}...")
-                    if hasattr(self, "_active_intervention_post_ids") and post_id in self._active_intervention_post_ids:
+
+                    if post_id in self._active_intervention_post_ids:
                         print(f"   ⏭️  Skip post {post_id}: intervention task already running")
                         continue
 
-                    # Collect four comments for this post: two for hottest, two for latest (matching regular user logic)
-                    # First get the two highest-heat comments
-                    cursor.execute("""
-                        SELECT comment_id, content, author_id, num_likes, created_at
-                        FROM comments
-                        WHERE post_id = ?
-                        ORDER BY num_likes DESC, created_at DESC
-                        LIMIT 2
-                    """, (post_id,))
-                    hot_comment_rows = cursor.fetchall()
+                    if not (self.opinion_balance_manager and self.opinion_balance_manager.enabled):
+                        print(f"   [WARN]  Opinion balance system not enabled")
+                        continue
 
-                    # Fetch two most recent comments (excluding the ones already retrieved as hottest)
-                    hot_comment_ids = [row[0] for row in hot_comment_rows]
-                    if hot_comment_ids:
-                        placeholders = ','.join('?' * len(hot_comment_ids))
-                        cursor.execute(f"""
-                            SELECT comment_id, content, author_id, num_likes, created_at
-                            FROM comments
-                            WHERE post_id = ? AND comment_id NOT IN ({placeholders})
-                            ORDER BY created_at DESC
-                            LIMIT 2
-                        """, [post_id] + hot_comment_ids)
-                    else:
+                    coordination_system = self.opinion_balance_manager.coordination_system
+                    if not coordination_system:
+                        print(f"   [WARN]  Coordination system component not found")
+                        continue
+
+                    try:
+                        # Collect four comments: two hottest + two latest
                         cursor.execute("""
                             SELECT comment_id, content, author_id, num_likes, created_at
                             FROM comments
                             WHERE post_id = ?
-                            ORDER BY created_at DESC
+                            ORDER BY num_likes DESC, created_at DESC
                             LIMIT 2
                         """, (post_id,))
-                    recent_comment_rows = cursor.fetchall()
+                        hot_comment_rows = cursor.fetchall()
 
-                    # Merge comments: first by heat, then by recency
-                    all_comment_rows = hot_comment_rows + recent_comment_rows
-                    top_comments = []
-                    for comment_row in all_comment_rows:
-                        comment_id, content_c, author_id_c, num_likes_c, created_at_c = comment_row
-                        top_comments.append({
-                            "comment_id": comment_id,
-                            "content": content_c,
-                            "author_id": author_id_c,
-                            "num_likes": num_likes_c,
-                            "created_at": created_at_c
-                        })
+                        hot_comment_ids = [row[0] for row in hot_comment_rows]
+                        if hot_comment_ids:
+                            placeholders = ','.join('?' * len(hot_comment_ids))
+                            cursor.execute(f"""
+                                SELECT comment_id, content, author_id, num_likes, created_at
+                                FROM comments
+                                WHERE post_id = ? AND comment_id NOT IN ({placeholders})
+                                ORDER BY created_at DESC
+                                LIMIT 2
+                            """, [post_id] + hot_comment_ids)
+                        else:
+                            cursor.execute("""
+                                SELECT comment_id, content, author_id, num_likes, created_at
+                                FROM comments
+                                WHERE post_id = ?
+                                ORDER BY created_at DESC
+                                LIMIT 2
+                            """, (post_id,))
+                        recent_comment_rows = cursor.fetchall()
 
-                    print(f"   💬 Total comments collected: {len(top_comments)} (2 hottest + 2 latest)")
-                    hot_comments_count = len(hot_comment_rows)
-                    recent_comments_count = len(recent_comment_rows)
-                    for i, comment in enumerate(top_comments, 1):
-                        comment_type = "🔥 Hot" if i <= hot_comments_count else "🕒 New"
-                        print(f"      {comment_type} comment {i}: {comment['content'][:50]}... (👍{comment['num_likes']})")
+                        hot_comments_count = len(hot_comment_rows)
+                        all_comment_rows = hot_comment_rows + recent_comment_rows
+                        print(f"   💬 Total comments collected: {len(all_comment_rows)} (2 hottest + 2 latest)")
+                        for i, comment_row in enumerate(all_comment_rows, 1):
+                            comment_type = "🔥 Hot" if i <= hot_comments_count else "🕒 New"
+                            print(f"      {comment_type} comment {i}: {comment_row[1][:50]}... (👍{comment_row[3]})")
 
-                    # Invoke the full opinion balance workflow
-                    if self.opinion_balance_manager and self.opinion_balance_manager.enabled:
-                        try:
-                            print(f"   🔍 Launching opinion balance analysis and intervention workflow...")
-
-                            # Build formatted content for the workflow (distinguish hot and latest comments)
-                            formatted_content = f"""[Trending Post Opinion Analysis]
+                        # Build formatted content (cached in memory)
+                        formatted_content = f"""[Trending Post Opinion Analysis]
 Post ID: {post_id}
 Author: {author_id}
 Total heat: {total_engagement}
 Post content: {content}
 
 Top comments (sorted by likes):"""
+                        for i, (comment_id, content_c, author_id_c, num_likes_c, created_at_c) in enumerate(hot_comment_rows, 1):
+                            formatted_content += f"\n🔥 Hot comment {i}: {content_c}\n- Author: {author_id_c}\n- Likes: {num_likes_c}"
+                        formatted_content += "\n\nLatest comments (chronological):"
+                        for i, (comment_id, content_c, author_id_c, num_likes_c, created_at_c) in enumerate(recent_comment_rows, 1):
+                            formatted_content += f"\n🕒 Recent comment {i}: {content_c}\n- Author: {author_id_c}\n- Likes: {num_likes_c}"
 
-                            # Display the hottest comments
-                            for i, comment in enumerate(hot_comment_rows, 1):
-                                comment_id, content_c, author_id_c, num_likes_c, created_at_c = comment
-                                formatted_content += f"""
-🔥 Hot comment {i}: {content_c}
-- Author: {author_id_c}
-- Likes: {num_likes_c}"""
+                        current_time_step = None
+                        try:
+                            cursor.execute('SELECT MAX(time_step) AS max_step FROM feed_exposures')
+                            ts_result = cursor.fetchone()
+                            if ts_result and ts_result[0] is not None:
+                                current_time_step = ts_result[0]
+                        except Exception:
+                            pass
 
-                            formatted_content += """
+                        # Give this task its own log buffer so its workflow_logger
+                        # output is buffered separately; Phase 2 will flush each
+                        # buffer to the file in post order → sequential SSE display.
+                        log_buffer: list = []
+                        _workflow_log_buffer.set(log_buffer)  # inherited by create_task snapshot
 
-Latest comments (chronological):"""
+                        self._active_intervention_post_ids.add(post_id)
+                        task = asyncio.create_task(
+                            coordination_system.execute_workflow(
+                                content_text=formatted_content,
+                                content_id=post_id,
+                                monitoring_interval=self.opinion_balance_manager.feedback_monitoring_interval,
+                                enable_feedback=self.opinion_balance_manager.feedback_enabled,
+                                force_intervention=False,
+                                time_step=current_time_step
+                            )
+                        )
+                        workflow_tasks.append((post_id, task, log_buffer))
+                        print(f"   🚀 Workflow task launched for post {post_id} (parallel)")
 
-                            # Display the latest comments
-                            for i, comment in enumerate(recent_comment_rows, 1):
-                                comment_id, content_c, author_id_c, num_likes_c, created_at_c = comment
-                                formatted_content += f"""
-🕒 Recent comment {i}: {content_c}
-- Author: {author_id_c}
-- Likes: {num_likes_c}"""
+                    except Exception as e:
+                        print(f"   [ERR] Failed to prepare workflow for post {post_id}: {e}")
+                        import traceback
+                        traceback.print_exc()
 
-                            coordination_system = self.opinion_balance_manager.coordination_system
-                            if coordination_system:
-                                # Determine the current time step (when the comments were posted)
-                                current_time_step = None
-                                try:
-                                # Get the maximum time step from the feed_exposures table
-                                    cursor.execute('SELECT MAX(time_step) AS max_step FROM feed_exposures')
-                                    result = cursor.fetchone()
-                                    if result and result[0] is not None:
-                                        current_time_step = result[0]
-                                except Exception:
-                                    pass
-                                
-                                # Launch the opinion balance workflow asynchronously without blocking the simulation
-                                print(f"   🚀 Starting the asynchronous opinion balance workflow...")
-                                
-                                # Create the async task without awaiting the result
-                                intervention_task = asyncio.create_task(
-                                    coordination_system.execute_workflow(
-                                        content_text=formatted_content,
-                                        content_id=post_id,
-                                        monitoring_interval=self.opinion_balance_manager.feedback_monitoring_interval,
-                                        enable_feedback=self.opinion_balance_manager.feedback_enabled,
-                                        force_intervention=False,  # Leave the intervention decision to the internal analysts
-                                        time_step=current_time_step  # Pass the current time step
-                                    )
-                                )
-                                
-                                task_registered = self._register_intervention_task(
-                                    post_id=post_id,
-                                    intervention_task=intervention_task,
-                                    content_preview=formatted_content[:100] + "..." if len(formatted_content) > 100 else formatted_content,
-                                )
-                                if not task_registered:
-                                    intervention_task.cancel()
-                                    print(f"   ⏭️  Skip duplicate launch for post {post_id}: task already registered")
-                                    continue
-                                
-                                print(f"   ✅ Opinion balance workflow launched asynchronously")
-                                print(f"   📋 Task ID: {post_id}")
-                                print(f"   ⏰ Start time: {datetime.now().strftime('%H:%M:%S')}")
-                                print("="*60)
-                            else:
-                                print(f"   ⚠️  Coordination system component not found")
+                # Reset outer context so any logging after this point goes straight to file
+                _workflow_log_buffer.set(None)
 
-                        except Exception as e:
-                            print(f"   ❌ Analyst workflow encountered an error: {e}")
-                            import traceback
-                            traceback.print_exc()
-                        
-                        # Check and display the status of asynchronous tasks
-                        await self._check_intervention_tasks_status()
-                    else:
-                        print(f"   ⚠️  Opinion balance system not enabled")
-                else:
-                    # Remain silent when no trending posts are found
-                    pass
+                # Phase 2: await each task in original order, flush its log buffer to
+                # the file first (sequential write → sequential SSE display), then persist.
+                for post_id, task, log_buffer in workflow_tasks:
+                    print(f"\n   ⏳ Waiting for post {post_id} workflow result...")
+                    try:
+                        result = await task
+                        # Write this post's buffered log lines to the file in one block
+                        self._flush_workflow_log_buffer(log_buffer)
+                        self._persist_opinion_intervention_result(post_id, result)
+                        print(f"   [OK] Post {post_id} complete and persisted")
+                        print(f"   ⏰ {datetime.now().strftime('%H:%M:%S')}")
+                        print("=" * 60)
+                    except Exception as e:
+                        # Even on error, flush what was captured so logs aren't lost
+                        self._flush_workflow_log_buffer(log_buffer)
+                        print(f"   [ERR] Post {post_id} workflow failed: {e}")
+                        import traceback
+                        traceback.print_exc()
+                    finally:
+                        self._active_intervention_post_ids.discard(post_id)
+            else:
+                # Remain silent when no trending posts are found
+                pass
 
         except Exception as e:
             logging.error(f"Error during background trending post monitoring: {e}")
             import traceback
             traceback.print_exc()
+
+    def _flush_workflow_log_buffer(self, buf: list) -> None:
+        """Write lines buffered by a parallel workflow task to the workflow log file in one block."""
+        if not buf:
+            return
+        try:
+            from agents.simple_coordination_system import workflow_logger
+            for handler in workflow_logger.handlers:
+                if isinstance(handler, logging.FileHandler):
+                    for line in buf:
+                        handler.stream.write(line + '\n')
+                    handler.stream.flush()
+                    break
+        except Exception as e:
+            logging.error(f"Failed to flush workflow log buffer: {e}")
 
     async def _check_intervention_tasks_status(self):
         """Check the status of asynchronous intervention tasks"""
@@ -1279,16 +1653,16 @@ Latest comments (chronological):"""
                     result = task.result()
                     if result and result.get("success"):
                         if result.get("intervention_triggered"):
-                            print(f"   ✅ Async intervention task completed - post ID: {post_id}")
+                            print(f"   [OK] Async intervention task completed - post ID: {post_id}")
                             print(f"   📋 Action ID: {result.get('action_id')}")
                             print(f"   🤖 Agent responses: {result.get('total_responses', 0)}")
                         else:
-                            print(f"   ✅ Async analysis complete - post ID: {post_id} (no intervention needed)")
+                            print(f"   [OK] Async analysis complete - post ID: {post_id} (no intervention needed)")
                     else:
-                        print(f"   ⚠️ Async intervention task failed - post ID: {post_id}")
-                        print(f"   ❌ Error: {result.get('error', 'unknown error') if result else 'unknown error'}")
+                        print(f"   [WARN] Async intervention task failed - post ID: {post_id}")
+                        print(f"   [ERR] Error: {result.get('error', 'unknown error') if result else 'unknown error'}")
                 except Exception as e:
-                    print(f"   ❌ Async task exception - post ID: {post_id}: {e}")
+                    print(f"   [ERR] Async task exception - post ID: {post_id}: {e}")
                 
                 completed_tasks.append(i)
             else:
@@ -1497,7 +1871,7 @@ Latest comments (chronological):"""
                     truth_note = f"\n\n[OFFICIAL EXPLANATION] This is the OFFICIAL EXPLANATION corresponding to this post: {real_news}"
                     post.content = post.content + truth_note
                     posts_modified += 1
-                    logging.debug(f"✅ Time step {step + 1}: appended official explanation to trending post {post.post_id} (engagement: {engagement})")
+                    logging.debug(f"[OK] Time step {step + 1}: appended official explanation to trending post {post.post_id} (engagement: {engagement})")
                 
                 modified_feed.add(post)
             
@@ -1576,12 +1950,12 @@ Latest comments (chronological):"""
                         )
                         if update_success:
                             logging.debug(
-                                f"✅ timestep {current_timestep}: appended and saved official explanation to post {post.post_id} "
+                                f"[OK] timestep {current_timestep}: appended and saved official explanation to post {post.post_id} "
                                 f"(engagement: {engagement}, injection_timestep: {injection_timestep})"
                             )
                         else:
                             logging.warning(
-                                f"⚠️ timestep {current_timestep}: failed to save official explanation to database for post {post.post_id}"
+                                f"[WARN] timestep {current_timestep}: failed to save official explanation to database for post {post.post_id}"
                             )
                     except Exception as e:
                         logging.error(f"Error saving official explanation to database for post {post.post_id}: {e}")
@@ -1592,7 +1966,7 @@ Latest comments (chronological):"""
 
             if posts_modified > 0:
                 logging.info(
-                    f"✅ timestep {current_timestep}: appended official explanations to "
+                    f"[OK] timestep {current_timestep}: appended official explanations to "
                     f"{posts_modified} fake news posts"
                 )
 

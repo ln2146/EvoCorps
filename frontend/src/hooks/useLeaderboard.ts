@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 
@@ -52,6 +52,8 @@ export function useLeaderboard(options: UseLeaderboardOptions = {}): UseLeaderbo
     const queryClient = useQueryClient()
     const eventSourceRef = useRef<EventSource | null>(null)
     const lastFingerprintRef = useRef<string | null>(null)
+    // Increment to trigger SSE reconnect after error
+    const [sseEpoch, setSseEpoch] = useState(0)
 
     // 使用 React Query 获取初始数据
     const { data, isLoading, error, refetch } = useQuery<LeaderboardResponse, Error>({
@@ -107,12 +109,15 @@ export function useLeaderboard(options: UseLeaderboardOptions = {}): UseLeaderbo
             }
         })
 
-        // 监听错误事件
+        // 监听协议级错误（连接断开/服务器不可达）
         eventSource.addEventListener('error', (err) => {
             console.error('SSE connection error:', err)
-            // 连接错误时关闭连接
             eventSource.close()
             eventSourceRef.current = null
+            // 3 秒后自动重连（递增 epoch 触发 useEffect 重新执行）
+            setTimeout(() => {
+                setSseEpoch((n) => n + 1)
+            }, 3000)
         })
 
         // 清理函数：组件卸载或 enableSSE 变化时关闭连接
@@ -120,7 +125,7 @@ export function useLeaderboard(options: UseLeaderboardOptions = {}): UseLeaderbo
             eventSource.close()
             eventSourceRef.current = null
         }
-    }, [enableSSE, limit, queryClient])
+    }, [enableSSE, limit, queryClient, sseEpoch])
 
     return {
         data: data?.items,

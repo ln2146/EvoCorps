@@ -1,5 +1,3 @@
-const REAL_STREAM_URL = '/api/opinion-balance/logs/stream?source=workflow&tail=0&follow_latest=true'
-
 // UI default for log replay: slower so users can actually read stages and milestones.
 // If you need faster/slower, change this value and keep tests in sync.
 export const DEFAULT_WORKFLOW_REPLAY_DELAY_MS = 800

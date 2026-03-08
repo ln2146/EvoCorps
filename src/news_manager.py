@@ -52,9 +52,9 @@ class NewsManager:
         # Load ordered news database
         self._load_ordered_news()
         self._initialize_news_buckets()
-        print(f"📰 News selection mode: sequential push (from low controversy to high)")
-        print(f"📊 Loaded {len(self.ordered_news)} ordered news items")
-        print(f"📰 Loaded {len(self.covid_fake_news)} COVID-19 fake news items")
+        print(f"[NEWS] News selection mode: sequential push (from low controversy to high)")
+        print(f"[STATS] Loaded {len(self.ordered_news)} ordered news items")
+        print(f"[NEWS] Loaded {len(self.covid_fake_news)} COVID-19 fake news items")
     
     def _create_news_agent(self) -> AgentUser:
         """Create a specialized news agent."""
@@ -78,9 +78,9 @@ class NewsManager:
         
         news_agent_id = "agentverse_news"
         
-        # Register news agent in database
+        # Register news agent in database (skip if already exists, e.g. restored from snapshot)
         self.conn.execute('''
-            INSERT INTO users (
+            INSERT OR IGNORE INTO users (
                 user_id, persona, creation_time
             )
             VALUES (?, ?, datetime('now'))
@@ -96,17 +96,30 @@ class NewsManager:
 
     def _load_ordered_news(self):
         """Load ordered news database"""
-        try:
-            import jsonlines
-            with jsonlines.open('data/neutral-news.jsonl') as reader:
-                self.ordered_news = list(reader)
-            print(f"✅ Loaded {len(self.ordered_news)} ordered news items")
-        except FileNotFoundError as e:
+        import jsonlines
+        # Try relative paths; if that fails, use absolute path
+        news_file_paths = [
+            'data/neutral-news.jsonl',
+            '../data/neutral-news.jsonl',
+        ]
+
+        news_file_path = None
+        for path in news_file_paths:
+            if os.path.exists(path):
+                news_file_path = path
+                break
+
+        if not news_file_path:
             raise FileNotFoundError(
-                "Required news dataset missing: data/neutral-news.jsonl"
-            ) from e
+                f"Required news dataset missing: tried paths: {news_file_paths}"
+            )
+
+        try:
+            with jsonlines.open(news_file_path) as reader:
+                self.ordered_news = list(reader)
+            print(f"[OK] Loaded {len(self.ordered_news)} ordered news items")
         except Exception as e:
-            raise RuntimeError(f"Failed to load data/neutral-news.jsonl: {e}") from e
+            raise RuntimeError(f"Failed to load {news_file_path}: {e}") from e
 
     def _load_covid_fake_news(self):
         """Load COVID-19 fake news data"""
@@ -125,15 +138,15 @@ class NewsManager:
                     break
             
             if not covid_file_path:
-                print(f"⚠️ COVID-19 fake news file not found, tried paths: {covid_file_paths}")
+                print(f"[WARN] COVID-19 fake news file not found, tried paths: {covid_file_paths}")
                 self.covid_fake_news = []
                 return
             
             with open(covid_file_path, 'r', encoding='utf-8') as f:
                 self.covid_fake_news = json.load(f)
-            print(f"✅ Loaded {len(self.covid_fake_news)} COVID-19 fake news items (from {covid_file_path})")
+            print(f"[OK] Loaded {len(self.covid_fake_news)} COVID-19 fake news items (from {covid_file_path})")
         except Exception as e:
-            print(f"❌ Failed to load COVID-19 fake news: {e}")
+            print(f"[ERR] Failed to load COVID-19 fake news: {e}")
             self.covid_fake_news = []
 
     def _ensure_mapping_file_exists(self):
@@ -142,7 +155,7 @@ class NewsManager:
         # Overwrite mapping file each run, reset to empty
         with open(self.mapping_file_path, 'w', encoding='utf-8') as f:
             json.dump({}, f, indent=2, ensure_ascii=False)
-        logging.info(f"📝 Reset mapping file: {self.mapping_file_path} (restart each run)")
+        logging.info(f"[LOG] Reset mapping file: {self.mapping_file_path} (restart each run)")
 
     def _load_truth_mapping(self):
         """Load real news mapping table"""
@@ -170,7 +183,7 @@ class NewsManager:
         
         # If all data used, reset used list (start over)
         if len(self.covid_fake_news_used_indices) >= len(self.covid_fake_news):
-            logging.info(f"📰 COVID-19 fake news data fully used, resetting used list")
+            logging.info(f"[NEWS] COVID-19 fake news data fully used, resetting used list")
             self.covid_fake_news_used_indices.clear()
             self.covid_fake_news_index = 0
         
@@ -194,7 +207,7 @@ class NewsManager:
                 
                 fake_narrative = entry.get('Fake Narrative')
                 real_news = entry.get('Real News')
-                logging.debug(f"📰 Using COVID-19 fake news index {self.covid_fake_news_index - 1} (used: {len(self.covid_fake_news_used_indices)}/{len(self.covid_fake_news)})")
+                logging.debug(f"[NEWS] Using COVID-19 fake news index {self.covid_fake_news_index - 1} (used: {len(self.covid_fake_news_used_indices)}/{len(self.covid_fake_news)})")
                 return fake_narrative, real_news
             
             # If current index is used, move to next
@@ -202,7 +215,7 @@ class NewsManager:
             iterations += 1
         
         # If no unused entry found (should not happen because we reset above)
-        logging.warning("⚠️ Unable to find unused COVID-19 fake news, returning None")
+        logging.warning("[WARN] Unable to find unused COVID-19 fake news, returning None")
         return None, None
 
     def _add_engagement_to_post(self, post_id: str, likes: int = None, comments: int = None, shares: int = None):
@@ -228,7 +241,7 @@ class NewsManager:
             ''', (likes, comments, shares, post_id))
             
             self.conn.commit()
-            logging.info(f"📊 Added engagement to fake news post {post_id}: likes+{likes}, comments+{comments}, shares+{shares}")
+            logging.info(f"[STATS] Added engagement to fake news post {post_id}: likes+{likes}, comments+{comments}, shares+{shares}")
             
         except Exception as e:
             logging.error(f"Failed to add engagement: {e}")
@@ -238,7 +251,7 @@ class NewsManager:
         if not self.ordered_news:
             self.normal_news = []
             self.extreme_news = []
-            print("⚠️ No available news; cannot initialize 9:1 buckets")
+            print("[WARN] No available news; cannot initialize 9:1 buckets")
             return
 
         self.normal_news = [article for article in self.ordered_news if article.get('extremism_trigger', 1) <= 2]
@@ -247,7 +260,7 @@ class NewsManager:
         self.extreme_index = 0
         self.news_mix_index = 0
 
-        print(f"📘 Normal news: {len(self.normal_news)} items | 🔥 Extreme news: {len(self.extreme_news)} items")
+        print(f"[INFO] Normal news: {len(self.normal_news)} items | [HOT] Extreme news: {len(self.extreme_news)} items")
 
     def _next_article_from_bucket(self, bucket_type: str):
         """Fetch the next news item from a bucket in order."""
@@ -279,7 +292,7 @@ class NewsManager:
         fallback_type = 'normal' if desired_type == 'extreme' else 'extreme'
         article = self._next_article_from_bucket(fallback_type)
         if article:
-            logging.warning(f"🪙 {desired_type} bucket empty, using {fallback_type} news as fallback")
+            logging.warning(f"[FALLBACK] {desired_type} bucket empty, using {fallback_type} news as fallback")
             return article, fallback_type
 
         return None, None
@@ -305,7 +318,7 @@ class NewsManager:
             logging.info(f"Due to post limit, news injection count adjusted from {num_articles} to {actual_articles}")
 
         if not (self.normal_news or self.extreme_news):
-            logging.warning("❌ No available news, skipping injection")
+            logging.warning("[ERR] No available news, skipping injection")
             return post_ids
 
         special_sequence = None
@@ -335,7 +348,7 @@ class NewsManager:
                 selected_article, actual_bucket = self._pick_article_with_ratio()
 
             if not selected_article:
-                logging.warning("❌ No news to dispatch, ending this injection early")
+                logging.warning("[ERR] No news to dispatch, ending this injection early")
                 break
 
             extremism_level = selected_article.get('extremism_trigger', 1)
@@ -381,7 +394,7 @@ class NewsManager:
 
             try:
                 label = 'FAKE' if is_fake_news else 'REAL'
-                logging.info(f"📰 News Content ({label}; level {extremism_level}): {post_id} | {content}")
+                logging.info(f"[NEWS] News Content ({label}; level {extremism_level}): {post_id} | {content}")
             except Exception:
                 pass
 
@@ -398,14 +411,14 @@ class NewsManager:
                         break
                 
                 if existing_post_id:
-                    logging.info(f"📝 Real News mapping already exists ({existing_post_id}), skipping new mapping to avoid duplicates")
+                    logging.info(f"[LOG] Real News mapping already exists ({existing_post_id}), skipping new mapping to avoid duplicates")
                     # No longer add engagement - do not add likes at fake news start
                     # self._add_engagement_to_post(post_id)
                 else:
                     # Only save new mapping when no duplicate Real News exists
                     mapping[post_id] = real_news
                     self._save_truth_mapping(mapping)
-                    logging.info(f"📝 Saved fake news mapping: {post_id} -> Real News")
+                    logging.info(f"[LOG] Saved fake news mapping: {post_id} -> Real News")
                     
                     # No longer add engagement - do not add likes at fake news start
                     # self._add_engagement_to_post(post_id)
@@ -426,7 +439,7 @@ class NewsManager:
             total_pool_display = total_pool if total_pool else '?'
             bucket_label = actual_bucket or requested_bucket or "mixed"
             news_source = "COVID-19 Fake" if (is_fake_news and self.covid_fake_news) else "Original"
-            print(f"📰 Published news #{self.current_news_index} (target {bucket_label}, controversy {extremism_level}, source: {news_source}) | pool size {total_pool_display}")
+            print(f"[NEWS] Published news #{self.current_news_index} (target {bucket_label}, controversy {extremism_level}, source: {news_source}) | pool size {total_pool_display}")
 
         if self._first_injection_pending:
             self._first_injection_pending = False

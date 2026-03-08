@@ -1,0 +1,93 @@
+{
+    "num_users": 3,
+    "num_time_steps": 5,
+    "reset_db": true,
+    "agent_config_generation": "file",
+    "agent_config_path": "separate",
+    "initial_follow_probability": 0.2,
+    "temperature": 0.9,
+    "news_injection": {
+        "start_step": 0,
+        "articles_per_injection": 3
+    },
+    "moderation": {
+        "content_moderation": true,
+        "flag_threshold": 2,
+        "note_threshold": 1
+    },
+    "generate_own_post": true,
+    "experiment": {
+        "type": "no_fact_checking",
+        "settings": {
+            "posts_per_step": 5,
+            "fact_checking_enabled": false
+        }
+    },
+    "opinion_balance_system": {
+        "enabled": false,
+        "monitoring_enabled": false,
+        "intervention_threshold": 1,
+        "feedback_system_enabled": true,
+        "trending_posts_scan_interval": 3,
+        "feedback_monitoring_interval": 1,
+        "feedback_monitoring_cycles": 2
+    },
+    "malicious_bot_system": {
+        "enabled": false
+    },
+    "recommender": {
+        "enabled": true,
+        "scoring": {
+            "w_likes": 1.0,
+            "w_shares": 2.0,
+            "w_comments": 1.0
+        },
+        "freshness": {
+            "decay_rate": 0.1,
+            "min_freshness": 0.1,
+            "bias": 180
+        },
+        "diversity": {
+            "enabled": true,
+            "penalty_factor": 0.7,
+            "max_same_author": 3
+        },
+        "embedding": {
+            "enabled": false,
+            "cache_embeddings": true
+        },
+        "source": {
+            "in_network_ratio": 0.5,
+            "out_network_ratio": 0.5,
+            "max_candidates_per_source": 50
+        },
+        "oon": {
+            "enabled": true,
+            "boost_factor": 1.0,
+            "high_engagement_threshold": 50
+        },
+        "filter": {
+            "filter_taken_down": true,
+            "filter_blocked_authors": true,
+            "filter_self_posts": true,
+            "filter_seen_posts": false
+        },
+        "author_credibility": {
+            "enabled": true,
+            "high_credibility_threshold": 0.7,
+            "low_credibility_threshold": 0.3,
+            "high_credibility_boost": 1.15,
+            "low_credibility_penalty": 0.75,
+            "default_influence_score": 0.5,
+            "max_boost_factor": 1.3,
+            "min_penalty_factor": 0.5
+        },
+        "selection": {
+            "news_top_k": 10,
+            "news_pick_n": 3,
+            "non_news_top_k": 5,
+            "non_news_pick_n": 1,
+            "include_ties": true
+        }
+    }
+}

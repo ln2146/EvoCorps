@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(cmd:*)",
+      "Bash(E:/anaconda3/envs/EvoCorps/python.exe:*)",
+      "Bash(conda run:*)",
+      "Bash(\"E:/Anaconda_envs/envs/EvoCorps/python.exe\":*)",
+      "Bash(E:/Anaconda_envs/envs/EvoCorps/python.exe:*)",
+      "Bash(set PYTHONIOENCODING=utf-8:*)",
+      "Bash(sed:*)",
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx:*)",
+      "Bash(taskkill:*)",
+      "Bash(rm:*)",
+      "Bash(netstat:*)",
+      "Bash(curl:*)",
+      "Bash(powershell:*)",
+      "Bash(findstr \":5001.*LISTENING\")",
+      "Bash(while read pid)",
+      "Bash(do taskkill /F /PID $pid)",
+      "Bash(done)"
+    ]
+  }
+}

@@ -23,7 +23,7 @@ except ImportError:
 
 
 class UserGenerator:
-        """User generator."""
+    """User generator."""
     
     def __init__(self):
         self.generated_users = []

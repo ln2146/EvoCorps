@@ -1,6 +1,7 @@
 ﻿# Sensitive data
 # data/
 data/fake_news_truth_mapping.json
+src/keys.py
 
 # Editors / IDEs
 .vscode/

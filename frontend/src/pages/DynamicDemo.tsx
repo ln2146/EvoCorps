@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ElementType, type ReactNode } from 'react'
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, ArrowLeft, ThumbsUp, Share2, MessageCircle, BarChart3 } from 'lucide-react'
+import { Activity, Play, Square, Shield, Bug, Sparkles, Flame, MessageSquare, ArrowLeft, ThumbsUp, Share2, MessageCircle, BarChart3, Eye, RefreshCw, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { createInitialFlowState, routeLogLine, stripLogPrefix, type FlowState, type Role } from '../lib/interventionFlow/logRouter'
+import { createPortal } from 'react-dom'
+import { createInitialFlowState, routeLogLine, stripLogPrefix, parseLogTimestampMs, type FlowState, type Role } from '../lib/interventionFlow/logRouter'
 import { createEventSourceLogStream, createSimulatedLogStream, type LogStream } from '../lib/interventionFlow/logStream'
 import { computeEffectiveRole, nextSelectedRoleOnTabClick } from '../lib/interventionFlow/selection'
 import { parsePostContent } from '../lib/interventionFlow/postContent'
@@ -21,10 +22,17 @@ import { buildStageStepperModel } from '../lib/interventionFlow/stageStepper'
 import { getLiveBadgeClassName, getStageHeaderContainerClassName, getStageHeaderTextClassName, getStageSegmentClassName } from '../lib/interventionFlow/detailHeaderLayout'
 import { getDynamicDemoGridClassName } from '../lib/interventionFlow/pageGridLayout'
 import { createTimestampSmoothLineQueue } from '../lib/interventionFlow/logRenderQueue'
+import { startDynamicDemoWithPreset } from '../lib/dynamicDemo/startDemo'
 import { useLeaderboard } from '../hooks/useLeaderboard'
 import { usePostDetail } from '../hooks/usePostDetail'
 import { usePostComments } from '../hooks/usePostComments'
 import { usePostAnalysis } from '../hooks/usePostAnalysis'
+import { setModerationFlag, setAttackFlag, setAftercareFlag, detectFactions, getPostFactions, getSavedSnapshots, type FactionReport, type PostFactionsSummary } from '../services/api'
+import { getAttackModeLabel, resolveAttackToggleAction, type AttackMode } from '../lib/attackModeToggle'
+import SaveSnapshotDialog from '../components/SaveSnapshotDialog'
+import SnapshotSelectDialog from '../components/SnapshotSelectDialog'
+import SnapshotManageDialog from '../components/SnapshotManageDialog'
+import { useSimulation } from '../contexts/SimulationContext'
 
 const DEMO_BACKEND_LOG_LINES: string[] = [
   '2026-01-28 21:13:09,286 - INFO - 📊 Phase 1: perception and decision',
@@ -104,6 +112,37 @@ interface MetricsPoint {
   time: string
   emotion: number
   extremity: number
+}
+
+interface DefenseDashboard {
+  timestamp: string
+  niche_occupancy: {
+    total_topics: number
+    malicious_dominant: number
+    malicious_leaning: number
+    defense_dominant: number
+    defense_leaning: number
+    neutral_dominant: number
+    contested: number
+    malicious_side_percentage: number
+    defense_side_percentage: number
+  }
+  traffic_concentration: {
+    gini_coefficient: number
+    extreme_account_share: number
+    extreme_account_count: number
+    total_accounts: number
+  }
+  algorithmic_bias: {
+    overall_gini: number
+    bias_assessment: string
+  }
+  summary: {
+    defense_health: {
+      score: number
+      status: string
+    }
+  }
 }
 
 interface AgentLogItem {
@@ -280,6 +319,7 @@ function useDynamicDemoApi() {
   return {
     data,
     isLoading,
+    leaderboardLoading,
     error,
     selectedPost,
     setSelectedPost: handleSetSelectedPost,
@@ -306,11 +346,50 @@ function useDynamicDemoSSE() {
 
 export default function DynamicDemo() {
   const navigate = useNavigate()
+
+  // 使用全局仿真状态 Context
+  const simulation = useSimulation()
+  const {
+    isRunning,
+    setIsRunning,
+    enableAttack,
+    setEnableAttack,
+    attackMode,
+    setAttackMode,
+    enableAftercare,
+    setEnableAftercare,
+    enableEvoCorps,
+    setEnableEvoCorps,
+    enableModeration,
+    setEnableModeration,
+    selectedPost,
+    setSelectedPost,
+    flowState,
+    setFlowState,
+    opinionBalanceStartMs,
+    setOpinionBalanceStartMs,
+    defenseDashboard,
+    setDefenseDashboard,
+    factionReport,
+    setFactionReport,
+    postFactions,
+    setPostFactions,
+    isStarting,
+    setIsStarting,
+    isStopping,
+    setIsStopping,
+    isTogglingAttack,
+    setIsTogglingAttack,
+    isTogglingAftercare,
+    setIsTogglingAftercare,
+    isTogglingModeration,
+    setIsTogglingModeration,
+  } = simulation
+
   const {
     data,
     error,
-    selectedPost,
-    setSelectedPost,
+    leaderboardLoading,
     commentSort,
     setCommentSort,
     postDetail,
@@ -321,70 +400,19 @@ export default function DynamicDemo() {
   // 集成 usePostAnalysis Hook
   const postAnalysis = usePostAnalysis({ defaultInterval: 60000 })
 
-  const [isRunning, setIsRunning] = useState(false)
-  const [enableAttack, setEnableAttack] = useState(false)
-  const [enableAftercare, setEnableAftercare] = useState(false)
-  const [enableEvoCorps, setEnableEvoCorps] = useState(false)
-
+  // 本地 UI 状态（不需要持久化）
+  const [attackModeDialogOpen, setAttackModeDialogOpen] = useState(false)
   const [analysisOpen, setAnalysisOpen] = useState(false)
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
+  const [showSnapshotSelect, setShowSnapshotSelect] = useState(false)
+  const [showSnapshotManage, setShowSnapshotManage] = useState(false)
 
-  const [isStarting, setIsStarting] = useState(false)
-  const [isStopping, setIsStopping] = useState(false)
-  const [isTogglingAttack, setIsTogglingAttack] = useState(false)
-  const [isTogglingAftercare, setIsTogglingAftercare] = useState(false)
-
-  const [flowState, setFlowState] = useState<FlowState>(() => createInitialFlowState())
-  const [opinionBalanceStartMs, setOpinionBalanceStartMs] = useState<number | null>(null)
   const enableEvoCorpsRef = useRef<boolean>(false)
   const streamRef = useRef<LogStream | null>(null)
   const unsubscribeRef = useRef<null | (() => void)>(null)
   const renderQueueRef = useRef<ReturnType<typeof createTimestampSmoothLineQueue> | null>(null)
-  const hasCheckedInitialStatusRef = useRef(false)
 
-  // 添加状态轮询机制
-  useEffect(() => {
-    const checkStatus = async () => {
-      try {
-        const response = await fetch('/api/dynamic/status')
-        const data = await response.json()
-
-        // 检查 database 和 main 进程状态
-        const dbRunning = data.database?.status === 'running'
-        const mainRunning = data.main?.status === 'running'
-        const bothRunning = dbRunning && mainRunning
-
-        setIsRunning(bothRunning)
-
-        // 只在页面首次加载时，如果系统未运行且有追踪数据，则清除缓存
-        if (!hasCheckedInitialStatusRef.current) {
-          hasCheckedInitialStatusRef.current = true
-          if (!bothRunning && postAnalysis.isTracking) {
-            postAnalysis.stopTracking()
-          }
-        }
-
-        // NOTE: Do not auto-toggle the opinion balance panel based on backend status.
-        // The panel should start streaming only after the user clicks the toggle (so we can
-        // treat that moment as the "start time" for which logs should be shown).
-
-        // 同步恶意攻击和事后干预的状态
-        if (data.control_flags) {
-          setEnableAttack(data.control_flags.attack_enabled ?? false)
-          setEnableAftercare(data.control_flags.aftercare_enabled ?? false)
-        }
-      } catch (error) {
-        console.error('Failed to check status:', error)
-      }
-    }
-
-    // 初始检查
-    checkStatus()
-
-    // 每 2 秒轮询一次
-    const interval = setInterval(checkStatus, 2000)
-
-    return () => clearInterval(interval)
-  }, [])
+  // 注：状态轮询已在 SimulationContext 中统一实现，此处不再重复轮询
 
   useEffect(() => {
     enableEvoCorpsRef.current = enableEvoCorps
@@ -454,7 +482,14 @@ export default function DynamicDemo() {
     const stream = USE_SIMULATED_LOG_STREAM
       ? createSimulatedLogStream({ lines: DEMO_BACKEND_LOG_LINES, intervalMs: 320 })
       : createEventSourceLogStream(streamUrl)
-    const unsubscribe = stream.subscribe((line) => renderQueue.push(line))
+    // Frontend-side time guard: drop any line whose log timestamp is before the
+    // program start time (sinceMs). The backend already filters via since_ms, but
+    // timestamp-less continuation lines can still slip through; this closes that gap.
+    const unsubscribe = stream.subscribe((line) => {
+      const ts = parseLogTimestampMs(line)
+      if (ts !== null && ts < sinceMs) return
+      renderQueue.push(line)
+    })
     stream.start()
 
     streamRef.current = stream
@@ -470,13 +505,50 @@ export default function DynamicDemo() {
     }
   }, [enableEvoCorps, opinionBalanceStartMs])
 
-  // 使用 postAnalysis Hook 的指标数据，如果没有追踪则使用默认数据
-  // 统一字段名：emotion/extremity 用于显示
-  // 默认值固定为 0.5
-  const defaultMetrics = { emotion: 0.5, extremity: 0.5 }
-  const currentMetrics = postAnalysis.isTracking
-    ? { emotion: postAnalysis.currentMetrics.sentiment, extremity: postAnalysis.currentMetrics.extremeness }
-    : defaultMetrics
+  // Defense dashboard state — polls every 10 s while simulation is running
+  // 注：defenseDashboard 状态已在 SimulationContext 中管理
+  const [defenseFetching, setDefenseFetching] = useState(false)
+  useEffect(() => {
+    if (!isRunning) return
+    const fetchDashboard = () => {
+      setDefenseFetching(true)
+      fetch('/api/defense/dashboard')
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => { if (d?.success) setDefenseDashboard(d.dashboard) })
+        .catch(() => {})
+        .finally(() => setDefenseFetching(false))
+    }
+    fetchDashboard()
+    const id = setInterval(fetchDashboard, 10_000)
+    return () => clearInterval(id)
+  }, [isRunning, setDefenseDashboard])
+
+  // ==================== 派系分析数据 ====================
+  // 注：factionReport, postFactions 状态已在 SimulationContext 中管理
+  const [factionLoading, setFactionLoading] = useState(false)
+
+  const fetchFactionData = useCallback(() => {
+    setFactionLoading(true)
+    Promise.all([
+      detectFactions('simulation'),
+      getPostFactions('simulation', 15, 0)
+    ])
+      .then(([report, factions]) => {
+        if (report) setFactionReport(report)
+        if (factions) setPostFactions(factions)
+      })
+      .catch(() => {})
+      .finally(() => setFactionLoading(false))
+  }, [])
+
+  useEffect(() => {
+    // 初始加载一次
+    fetchFactionData()
+    if (!isRunning) return
+    // 运行时每 30 秒轮询
+    const id = setInterval(fetchFactionData, 30_000)
+    return () => clearInterval(id)
+  }, [isRunning, fetchFactionData])
 
   // 使用 postAnalysis Hook 的趋势数据，如果没有追踪或数据为空则使用空数组
   const metricsSeries = postAnalysis.isTracking && postAnalysis.metricsSeries.length > 0
@@ -497,142 +569,187 @@ export default function DynamicDemo() {
     } : null
   }, [postAnalysis.isTracking, postAnalysis.trackedPostId, data.heatPosts])
 
+  // 启动演示的核心函数
+  const handleStartDemo = async (snapshotId?: string, startTick?: number) => {
+    // 设置加载状态
+    setIsStarting(true)
+
+    try {
+      const data = await startDynamicDemoWithPreset({
+        enableAttack,
+        attackMode,
+        enableAftercare,
+        enableModeration,
+        enableEvoCorps,
+        snapshotId,
+        startTick,
+      })
+
+      if (data.success) {
+        // 成功：设置 isRunning 状态，连接 SSE
+        setIsRunning(true)
+        sse.connect()
+        setFlowState(createInitialFlowState())
+
+        // 重置所有状态到初始默认状态
+        // 1. 停止并清除帖子分析追踪
+        postAnalysis.stopTracking()
+
+        // 2. 清除选中的帖子
+        setSelectedPost(null)
+
+        // 3. 刷新热度榜数据
+        await refetchLeaderboard()
+
+      } else {
+        // 失败：显示错误消息
+        alert(`启动失败：${data.message || '未知错误'}`)
+        console.error('Failed to start dynamic demo:', data)
+      }
+    } catch (error) {
+      // 网络错误或其他异常
+      alert(`启动失败：${error instanceof Error ? error.message : '网络错误'}`)
+      console.error('Error starting dynamic demo:', error)
+    } finally {
+      // 清除加载状态
+      setIsStarting(false)
+    }
+  }
+
+  // 点击开始按钮时，检查是否有已保存的快照
+  const handleStartClick = async () => {
+    if (isRunning || isStarting) return
+    try {
+      const snapshots = await getSavedSnapshots()
+      if (snapshots.length > 0) {
+        setShowSnapshotSelect(true)
+      } else {
+        await handleStartDemo()
+      }
+    } catch {
+      await handleStartDemo()
+    }
+  }
+
   return (
     <DynamicDemoPage>
       <DynamicDemoHeader
         isRunning={isRunning}
         isStarting={isStarting}
         isStopping={isStopping}
-        onStart={async () => {
-          // 设置加载状态
-          setIsStarting(true)
-
-          try {
-            // 调用后端 API 启动进程
-            const response = await fetch('/api/dynamic/start', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({}),
-            })
-
-            const data = await response.json()
-
-            if (data.success) {
-              // 成功：设置 isRunning 状态，连接 SSE
-              setIsRunning(true)
-              sse.connect()
-              setFlowState(createInitialFlowState())
-
-              // 重置所有状态到初始默认状态
-              // 1. 停止并清除帖子分析追踪
-              postAnalysis.stopTracking()
-
-              // 2. 清除选中的帖子
-              setSelectedPost(null)
-
-              // 3. 刷新热度榜数据
-              await refetchLeaderboard()
-            } else {
-              // 失败：显示错误消息
-              alert(`启动失败：${data.message || '未知错误'}`)
-              console.error('Failed to start dynamic demo:', data)
-            }
-          } catch (error) {
-            // 网络错误或其他异常
-            alert(`启动失败：${error instanceof Error ? error.message : '网络错误'}`)
-            console.error('Error starting dynamic demo:', error)
-          } finally {
-            // 清除加载状态
-            setIsStarting(false)
-          }
-        }}
-        onStop={async () => {
+        onStart={handleStartClick}
+        onStop={() => {
           // 防止重复点击
           if (isStopping) return
-
-          // 显示确认对话框
-          if (!confirm('是否确认关闭模拟？')) {
-            return
-          }
-
-          setIsStopping(true)
-
-          try {
-            // 调用后端 API 停止进程
-            const response = await fetch('/api/dynamic/stop', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            })
-
-            const data = await response.json()
-
-            if (data.success) {
-              // 成功：设置 isRunning 为 false，断开 SSE
-              setIsRunning(false)
-              sse.disconnect()
-
-              // 暂停帖子分析追踪（保留最后的分析结果）
-              postAnalysis.pauseTracking()
-
-              // 等待 3 秒确保进程完全停止和文件锁释放
-              await new Promise(resolve => setTimeout(resolve, 3000))
-            } else {
-              // 失败：显示错误消息
-              alert(`停止失败：${data.message || '未知错误'}`)
-              console.error('Failed to stop dynamic demo:', data)
-            }
-          } catch (error) {
-            // 网络错误或其他异常
-            alert(`停止失败：${error instanceof Error ? error.message : '网络错误'}`)
-            console.error('Error stopping dynamic demo:', error)
-          } finally {
-            setIsStopping(false)
-          }
+          // 显示保存快照对话框
+          setShowSaveDialog(true)
         }}
         onBack={(path) => navigate(path || '/')}
         enableAttack={enableAttack}
+        attackMode={attackMode}
+        attackModeDialogOpen={attackModeDialogOpen}
         enableAftercare={enableAftercare}
         enableEvoCorps={enableEvoCorps}
+        enableModeration={enableModeration}
+        onSelectAttackMode={(mode) => {
+          setAttackMode(mode)
+          setAttackModeDialogOpen(false)
+          void (async () => {
+            const action = resolveAttackToggleAction({
+              enabled: enableAttack,
+              selectedMode: mode,
+            })
+            if (action.type !== 'enable') return
+
+            // 演示未运行时：仅预置本地状态，启动后同步到后端
+            if (!isRunning) {
+              setEnableAttack(true)
+              return
+            }
+
+            if (isTogglingAttack) return
+            setEnableAttack(true)
+            setIsTogglingAttack(true)
+            try {
+              await setAttackMode(mode)
+              const data = await setAttackFlag(true)
+              if (data.attack_enabled !== undefined) {
+                setEnableAttack(Boolean(data.attack_enabled))
+                alert(`✅ Malicious attack enabled (${getAttackModeLabel(mode)})`)
+              } else {
+                setEnableAttack(false)
+                throw new Error('API 返回异常')
+              }
+            } catch (error) {
+              setEnableAttack(false)
+              alert(`❌ 操作失败：${error instanceof Error ? error.message : '网络错误'}`)
+            } finally {
+              setIsTogglingAttack(false)
+            }
+          })()
+        }}
+        onCloseAttackModeDialog={() => setAttackModeDialogOpen(false)}
         onToggleAttack={async () => {
           if (isTogglingAttack) return
 
-          // 如果当前是启用状态，显示确认弹窗
-          if (enableAttack) {
-            if (!confirm('是否确认关闭恶意水军攻击？')) {
+          const action = resolveAttackToggleAction({
+            enabled: enableAttack,
+            selectedMode: attackMode,
+          })
+
+          if (action.type === 'open_mode_dialog') {
+            setAttackModeDialogOpen(true)
+            return
+          }
+
+          if (action.type === 'enable') {
+            setAttackModeDialogOpen(true)
+            return
+          }
+
+          // 当前为启用状态，二次点击即关闭当前模式
+          if (action.type === 'disable') {
+            if (!confirm('是否确认关闭恶意攻击模式？')) {
+              return
+            }
+            if (!isRunning) {
+              setEnableAttack(false)
+              setAttackMode(null)
               return
             }
           }
 
+          // 乐观更新：先改变状态，让 UI 立即响应
+          const newEnabled = false
+          setEnableAttack(newEnabled)
+
           setIsTogglingAttack(true)
 
           try {
-            const response = await fetch('http://localhost:8000/control/attack', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ enabled: !enableAttack }),
-            })
+            const data = await setAttackFlag(newEnabled)
 
-            const data = await response.json()
-
-            if (response.ok && data.attack_enabled !== undefined) {
+            if (data && data.attack_enabled !== undefined) {
+              // 以服务器返回值为准
               setEnableAttack(data.attack_enabled)
+              if (!data.attack_enabled) {
+                setAttackMode(null)
+              }
 
               // 显示成功提示
               if (data.attack_enabled) {
-                alert('✅ 恶意水军攻击已开启')
+                alert('✅ Malicious attack enabled')
               } else {
-                alert('✅ 恶意水军攻击已关闭')
+                const modeText = attackMode ? ` (${getAttackModeLabel(attackMode)})` : ''
+                alert(`✅ Malicious attack disabled${modeText}`)
               }
             } else {
+              // API 返回异常，回滚
+              setEnableAttack(!newEnabled)
               throw new Error('API 返回异常')
             }
           } catch (error) {
+            // 出错时回滚
+            setEnableAttack(!newEnabled)
             alert(`❌ 操作失败：${error instanceof Error ? error.message : '网络错误'}`)
             console.error('Error toggling attack:', error)
           } finally {
@@ -642,6 +759,12 @@ export default function DynamicDemo() {
         onToggleAftercare={async () => {
           if (isTogglingAftercare) return
 
+          // 演示未运行时：仅预置本地状态，启动后自动同步到后端
+          if (!isRunning) {
+            setEnableAftercare(!enableAftercare)
+            return
+          }
+
           // 如果当前是启用状态，显示确认弹窗
           if (enableAftercare) {
             if (!confirm('是否确认关闭事后干预？')) {
@@ -649,20 +772,17 @@ export default function DynamicDemo() {
             }
           }
 
+          // 乐观更新：先改变状态，让 UI 立即响应
+          const newEnabled = !enableAftercare
+          setEnableAftercare(newEnabled)
+
           setIsTogglingAftercare(true)
 
           try {
-            const response = await fetch('http://localhost:8000/control/aftercare', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ enabled: !enableAftercare }),
-            })
+            const data = await setAftercareFlag(newEnabled)
 
-            const data = await response.json()
-
-            if (response.ok && data.aftercare_enabled !== undefined) {
+            if (data.aftercare_enabled !== undefined) {
+              // 以服务器返回值为准
               setEnableAftercare(data.aftercare_enabled)
 
               // 显示成功提示
@@ -672,16 +792,71 @@ export default function DynamicDemo() {
                 alert('✅ 事后干预已关闭')
               }
             } else {
+              // API 返回异常，回滚
+              setEnableAftercare(!newEnabled)
               throw new Error('API 返回异常')
             }
           } catch (error) {
+            // 出错时回滚
+            setEnableAftercare(!newEnabled)
             alert(`❌ 操作失败：${error instanceof Error ? error.message : '网络错误'}`)
             console.error('Error toggling aftercare:', error)
           } finally {
             setIsTogglingAftercare(false)
           }
         }}
+        onToggleModeration={async () => {
+          if (isTogglingModeration) return
+
+          // 演示未运行时：预置本地状态，同时持久化到配置文件
+          if (!isRunning) {
+            const next = !enableModeration
+            setEnableModeration(next)
+            fetch('/api/config/moderation', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ content_moderation: next }),
+            }).catch(() => {})
+            return
+          }
+
+          // 乐观更新：先改变状态，让 UI 立即响应
+          const newEnabled = !enableModeration
+          setEnableModeration(newEnabled)
+
+          setIsTogglingModeration(true)
+          try {
+            const result = await setModerationFlag(newEnabled)
+            if (result && 'moderation_enabled' in result) {
+              // 以服务器返回值为准（通常和乐观值一致）
+              setEnableModeration(result.moderation_enabled)
+
+              // 显示成功提示
+              if (result.moderation_enabled) {
+                alert('✅ 内容审核已开启')
+              } else {
+                alert('✅ 内容审核已关闭')
+              }
+            } else {
+              // API 返回异常，回滚
+              setEnableModeration(!newEnabled)
+              throw new Error('API 返回异常')
+            }
+          } catch (error) {
+            // 出错时回滚
+            setEnableModeration(!newEnabled)
+            alert(`❌ 操作失败：${error instanceof Error ? error.message : '网络错误'}`)
+            console.error('Error toggling moderation:', error)
+          } finally {
+            setIsTogglingModeration(false)
+          }
+        }}
         onToggleEvoCorps={async () => {
+          // 演示未运行时：仅预置本地状态，启动后自动同步到后端
+          if (!isRunning) {
+            setEnableEvoCorps(!enableEvoCorps)
+            return
+          }
+
           const manageProcess = shouldCallOpinionBalanceProcessApi(USE_WORKFLOW_LOG_REPLAY)
           // 如果当前是禁用状态，则启用并调用 API
           if (!enableEvoCorps) {
@@ -769,6 +944,8 @@ export default function DynamicDemo() {
             <HeatLeaderboardCard
               posts={data.heatPosts}
               onSelect={setSelectedPost}
+              onRefresh={refetchLeaderboard}
+              isRefreshing={leaderboardLoading}
               error={error || undefined}
             />
           ) : (
@@ -780,6 +957,7 @@ export default function DynamicDemo() {
                 error={error || undefined}
                 isTracking={postAnalysis.trackedPostId === (selectedPost.postId || selectedPost.id)}
                 onStartTracking={() => postAnalysis.startTracking(selectedPost.postId || selectedPost.id)}
+                onStopTracking={() => postAnalysis.pauseTracking()}
                 onOpenConfig={() => setAnalysisOpen(true)}
               />
               <CommentsCard
@@ -793,7 +971,7 @@ export default function DynamicDemo() {
         </div>
 
         <div className="space-y-6">
-          <MetricsBarsCard emotion={currentMetrics.emotion} extremity={currentMetrics.extremity} />
+          <DefenseDashboardCard dashboard={defenseDashboard} isLive={isRunning} isFetching={defenseFetching} />
           <MetricsLineChartCard data={metricsSeries} />
         </div>
 
@@ -816,18 +994,120 @@ export default function DynamicDemo() {
         </div>
       </div>
 
-      <CommentaryAnalysisPanel
-        status={postAnalysis.analysisStatus}
-        summary={postAnalysis.summary}
-        trackedPostId={postAnalysis.trackedPostId}
-        trackedPostStats={trackedPostData}
-      />
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <CommentaryAnalysisPanel
+          status={postAnalysis.analysisStatus}
+          summary={postAnalysis.summary}
+          trackedPostId={postAnalysis.trackedPostId}
+          trackedPostStats={trackedPostData}
+        />
+        <FactionOverviewCard report={factionReport} postFactions={postFactions} isLoading={factionLoading} onRefresh={fetchFactionData} />
+      </div>
 
       <AnalysisConfigDialog
         open={analysisOpen}
         onClose={() => setAnalysisOpen(false)}
         interval={postAnalysis.interval}
         onSave={(newInterval) => postAnalysis.setInterval(newInterval)}
+      />
+
+      <SaveSnapshotDialog
+        open={showSaveDialog}
+        onSave={async (name, description) => {
+          setShowSaveDialog(false)
+          setIsStopping(true)
+          try {
+            // 保存快照
+            const saveResponse = await fetch('/api/snapshots/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, description }),
+            })
+            const saveData = await saveResponse.json()
+
+            if (!saveData.success) {
+              alert(`保存快照失败：${saveData.message || '未知错误'}`)
+              return
+            }
+
+            // 停止演示
+            const stopResponse = await fetch('/api/dynamic/stop', { method: 'POST' })
+            const stopData = await stopResponse.json()
+
+            if (stopData.success) {
+              setIsRunning(false)
+              sse.disconnect()
+              postAnalysis.pauseTracking()
+              await new Promise(resolve => setTimeout(resolve, 1000))
+            } else {
+              alert(`停止失败：${stopData.message || '未知错误'}`)
+            }
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : '网络错误'
+            if (errorMsg.includes('Network Error') || errorMsg.includes('ECONNREFUSED')) {
+              setIsRunning(false)
+              sse.disconnect()
+              postAnalysis.pauseTracking()
+              alert('后端服务未响应，已重置前端状态')
+            } else {
+              alert(`操作失败：${errorMsg}`)
+            }
+          } finally {
+            setIsStopping(false)
+          }
+        }}
+        onSkip={async () => {
+          setShowSaveDialog(false)
+          setIsStopping(true)
+          try {
+            const response = await fetch('/api/dynamic/stop', { method: 'POST' })
+            const data = await response.json()
+
+            if (data.success) {
+              setIsRunning(false)
+              sse.disconnect()
+              postAnalysis.pauseTracking()
+              await new Promise(resolve => setTimeout(resolve, 1000))
+            } else {
+              alert(`停止失败：${data.message || '未知错误'}`)
+            }
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : '网络错误'
+            if (errorMsg.includes('Network Error') || errorMsg.includes('ECONNREFUSED')) {
+              setIsRunning(false)
+              sse.disconnect()
+              postAnalysis.pauseTracking()
+              alert('后端服务未响应，已重置前端状态')
+            } else {
+              alert(`停止失败：${errorMsg}`)
+            }
+          } finally {
+            setIsStopping(false)
+          }
+        }}
+        onCancel={() => setShowSaveDialog(false)}
+      />
+
+      <SnapshotSelectDialog
+        open={showSnapshotSelect}
+        onSelect={async (snapshotId, startTick) => {
+          setShowSnapshotSelect(false)
+          await handleStartDemo(snapshotId, startTick)
+        }}
+        onStartFresh={async () => {
+          setShowSnapshotSelect(false)
+          await handleStartDemo()
+        }}
+        onCancel={() => setShowSnapshotSelect(false)}
+        onManageSnapshots={() => setShowSnapshotManage(true)}
+      />
+
+      <SnapshotManageDialog
+        open={showSnapshotManage}
+        onClose={() => setShowSnapshotManage(false)}
+        onDeleted={() => {
+          // 可选：刷新快照列表或显示提示
+        }}
       />
     </DynamicDemoPage>
   )
@@ -851,11 +1131,17 @@ function DynamicDemoHeader({
   onStop,
   onBack,
   enableAttack,
+  attackMode: _attackMode,
+  attackModeDialogOpen,
   enableAftercare,
   enableEvoCorps,
+  enableModeration,
   onToggleAttack,
+  onSelectAttackMode,
+  onCloseAttackModeDialog,
   onToggleAftercare,
   onToggleEvoCorps,
+  onToggleModeration,
 }: {
   isRunning: boolean
   isStarting?: boolean
@@ -864,11 +1150,17 @@ function DynamicDemoHeader({
   onStop: () => void
   onBack: (path?: string) => void
   enableAttack: boolean
+  attackMode: AttackMode | null
+  attackModeDialogOpen: boolean
   enableAftercare: boolean
   enableEvoCorps: boolean
+  enableModeration: boolean
   onToggleAttack: () => void | Promise<void>
+  onSelectAttackMode: (mode: AttackMode) => void
+  onCloseAttackModeDialog: () => void
   onToggleAftercare: () => void | Promise<void>
   onToggleEvoCorps: () => void | Promise<void>
+  onToggleModeration: () => void | Promise<void>
 }) {
   return (
     <div className="glass-card p-6 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
@@ -899,7 +1191,7 @@ function DynamicDemoHeader({
               disabled={isStopping}
             >
               <Square size={18} />
-              {isStopping ? '停止中...' : '停止演示'}
+              {isStopping ? '结束中...' : '结束演示'}
             </button>
           </div>
           <div className="flex flex-wrap gap-3 justify-center">
@@ -914,6 +1206,12 @@ function DynamicDemoHeader({
               label="开启事后干预"
               enabled={enableAftercare}
               onToggle={onToggleAftercare}
+            />
+            <ToggleCard
+              icon={Eye}
+              label="开启内容审核"
+              enabled={enableModeration}
+              onToggle={onToggleModeration}
             />
             <ToggleCard
               icon={Shield}
@@ -942,17 +1240,85 @@ function DynamicDemoHeader({
           </button>
         </div>
       </div>
+
+      {attackModeDialogOpen && (
+        <AttackModeDialog
+          onSelect={onSelectAttackMode}
+          onClose={onCloseAttackModeDialog}
+        />
+      )}
     </div>
+  )
+}
+
+function AttackModeDialog({
+  onSelect,
+  onClose,
+}: {
+  onSelect: (mode: AttackMode) => void
+  onClose: () => void
+}) {
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] bg-slate-700/22 backdrop-blur-[2px] flex items-start justify-center pt-10 px-6 pb-6">
+      <div className="w-full max-w-3xl rounded-3xl border border-slate-200/85 bg-gradient-to-br from-slate-100/97 via-slate-50/96 to-blue-50/94 shadow-[0_28px_90px_rgba(15,23,42,0.18)] p-10">
+        <h3 className="text-3xl font-bold text-slate-800">选择恶意攻击模式</h3>
+        <p className="text-base text-slate-600 mt-2">请选择本次开启时使用的攻击协同模式。</p>
+
+        <div className="mt-6 grid grid-cols-1 gap-4">
+          <button
+            type="button"
+            onClick={() => onSelect('swarm')}
+            className="w-full text-left rounded-2xl border border-slate-200/90 bg-white/72 p-5 hover:border-blue-300 hover:bg-white/92 transition-all duration-200 hover:shadow-lg"
+          >
+            <div className="font-semibold text-xl text-slate-800">蜂群式</div>
+            <div className="text-sm text-slate-600 mt-1">集中攻击同一目标，放大互动信号。</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => onSelect('dispersed')}
+            className="w-full text-left rounded-2xl border border-slate-200/90 bg-white/72 p-5 hover:border-blue-300 hover:bg-white/92 transition-all duration-200 hover:shadow-lg"
+          >
+            <div className="font-semibold text-xl text-slate-800">游离式</div>
+            <div className="text-sm text-slate-600 mt-1">分散到多条帖子，降低集中痕迹。</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => onSelect('chain')}
+            className="w-full text-left rounded-2xl border border-slate-200/90 bg-white/72 p-5 hover:border-blue-300 hover:bg-white/92 transition-all duration-200 hover:shadow-lg"
+          >
+            <div className="font-semibold text-xl text-slate-800">链式传播</div>
+            <div className="text-sm text-slate-600 mt-1">主导账号→扩散账号→控评账号的三层协同攻击。</div>
+          </button>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   )
 }
 
 function HeatLeaderboardCard({
   posts,
   onSelect,
+  onRefresh,
+  isRefreshing,
   error
 }: {
   posts: HeatPost[]
   onSelect: (post: HeatPost) => void
+  onRefresh?: () => void
+  isRefreshing?: boolean
   error?: Error | null
 }) {
   return (
@@ -965,6 +1331,17 @@ function HeatLeaderboardCard({
             <p className="text-sm text-slate-600">实时热度排名</p>
           </div>
         </div>
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="p-2 rounded-xl hover:bg-slate-100 transition-colors disabled:opacity-50"
+            title="刷新热度榜"
+          >
+            <RefreshCw size={16} className={`text-slate-500 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
+        )}
       </div>
 
       {error && (
@@ -1047,6 +1424,7 @@ function PostDetailCard({
   error,
   isTracking,
   onStartTracking,
+  onStopTracking,
   onOpenConfig
 }: {
   post: HeatPost
@@ -1055,6 +1433,7 @@ function PostDetailCard({
   error?: Error | null
   isTracking?: boolean
   onStartTracking?: () => void
+  onStopTracking?: () => void
   onOpenConfig?: () => void
 }) {
   // 优先使用 postDetail 的完整内容，否则使用 post 的 summary
@@ -1086,26 +1465,29 @@ function PostDetailCard({
               返回榜单
             </button>
             <div className="flex items-center gap-2">
-              {onStartTracking && (
+              {isTracking && onStopTracking ? (
+                <button
+                  onClick={onStopTracking}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center justify-center gap-1.5 transition-all bg-gradient-to-r from-red-500 to-rose-500 text-white hover:shadow-lg"
+                  title="关闭分析，停止追踪"
+                >
+                  <Eye size={14} />
+                  关闭分析
+                </button>
+              ) : onStartTracking ? (
                 <button
                   onClick={onStartTracking}
-                  disabled={isTracking || hasNoComments}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center justify-center gap-1.5 transition-all ${isTracking || hasNoComments
+                  disabled={hasNoComments}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center justify-center gap-1.5 transition-all ${hasNoComments
                     ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-blue-500 to-green-500 text-white hover:shadow-lg'
                     }`}
-                  title={
-                    hasNoComments
-                      ? '该帖子没有评论'
-                      : isTracking
-                        ? '已在追踪中'
-                        : '开始分析此帖子'
-                  }
+                  title={hasNoComments ? '该帖子没有评论' : '开始分析此帖子'}
                 >
                   <Activity size={14} />
-                  {isTracking ? '分析中' : '开始分析'}
+                  开始分析
                 </button>
-              )}
+              ) : null}
               {onOpenConfig && (
                 <button
                   onClick={onOpenConfig}
@@ -1248,40 +1630,100 @@ function CommentSortTabs({ value, onChange }: { value: 'likes' | 'time'; onChang
   )
 }
 
-function MetricsBarsCard({ emotion, extremity }: { emotion: number; extremity: number }) {
+function DefenseDashboardCard({ dashboard, isLive, isFetching }: { dashboard: DefenseDashboard | null; isLive: boolean; isFetching: boolean }) {
+  const no = dashboard?.niche_occupancy
+  const malDom   = no?.malicious_dominant  ?? 0
+  const malLean  = no?.malicious_leaning   ?? 0
+  const defDom   = no?.defense_dominant    ?? 0
+  const defLean  = no?.defense_leaning     ?? 0
+  const neutDom  = no?.neutral_dominant    ?? 0
+  const total    = no?.total_topics        ?? 0
+  // stacked bar widths
+  const malW     = total > 0 ? ((malDom + malLean) / total) * 100 : 0
+  const defW     = total > 0 ? ((defDom + defLean) / total) * 100 : 0
+  const neutW    = total > 0 ? (neutDom / total) * 100 : 0
+  const neutralW = Math.max(0, 100 - malW - defW - neutW)
+
+  const tc = dashboard?.traffic_concentration
+  const extremeCount = tc?.extreme_account_count ?? 0
+  const gini = dashboard?.algorithmic_bias.overall_gini ?? 0
+  const giniBarColor = gini < 0.3 ? 'bg-green-500' : gini < 0.6 ? 'bg-amber-500' : 'bg-red-500'
+  const giniLabel = gini < 0.3 ? '流量分布正常' : gini < 0.6 ? '流量轻度集中' : '⚠ 流量过度集中'
+  const giniLabelColor = gini < 0.3 ? 'text-green-600' : gini < 0.6 ? 'text-amber-600' : 'text-red-600'
+
   return (
     <div className="glass-card p-6 h-[300px] flex flex-col">
-      <div className="flex items-center gap-3 mb-0">
-        <Activity className="text-blue-500" />
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">实时指标概览</h2>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <Shield className="text-blue-500" />
+          <h2 className="text-2xl font-bold text-slate-800">防御监控中心</h2>
         </div>
+        {isLive && (
+          <div className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-medium">
+            <span className={['w-2 h-2 rounded-full bg-emerald-500', isFetching ? 'animate-ping' : 'animate-pulse'].join(' ')} />
+            实时更新
+          </div>
+        )}
       </div>
-      <div className="space-y-6 flex-1 flex flex-col justify-center">
-        <MetricBar label="情绪度" value={emotion} />
-        <MetricBar label="内容极端度" value={extremity} />
-      </div>
-    </div>
-  )
-}
+      <div className="space-y-5 flex-1 flex flex-col justify-center">
 
-function MetricBar({ label, value }: { label: string; value: number }) {
-  const leftWidth = Math.max(10, Math.min(90, value * 100))
-  const rightWidth = 100 - leftWidth
+        {/* Niche Occupancy */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-slate-700">生态位占有率</span>
+            <span className="text-xs text-slate-400">共 {total} 个热门话题</span>
+          </div>
+          {/* count badges — three sides */}
+          <div className="flex items-center justify-between mb-2">
+            <span className="flex items-center gap-1 text-xs font-semibold text-red-600">
+              <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+              水军主导 {malDom} 个
+              {malLean > 0 && <span className="font-normal text-red-400 ml-1">+倾向 {malLean} 个</span>}
+            </span>
+            {neutDom > 0 && (
+              <span className="flex items-center gap-1 text-xs font-semibold text-slate-500">
+                <span className="w-2 h-2 rounded-full bg-slate-400 inline-block" />
+                中性 {neutDom} 个
+              </span>
+            )}
+            <span className="flex items-center gap-1 text-xs font-semibold text-green-600">
+              EvoCorps 主导 {defDom} 个
+              {defLean > 0 && <span className="font-normal text-green-400 ml-1">+倾向 {defLean} 个</span>}
+              <span className="w-2 h-2 rounded-full bg-green-500 inline-block ml-1" />
+            </span>
+          </div>
+          <div className="h-3 w-full rounded-full overflow-hidden flex bg-slate-100">
+            <div className="bg-red-500 transition-all duration-500" style={{ width: `${malW}%` }} />
+            <div className="bg-slate-300 transition-all duration-500" style={{ width: `${neutW}%` }} />
+            <div className="bg-slate-200 transition-all duration-500" style={{ width: `${neutralW}%` }} />
+            <div className="bg-green-500 transition-all duration-500" style={{ width: `${defW}%` }} />
+          </div>
+        </div>
 
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium text-slate-700">{label}</span>
-        <span className="text-sm font-semibold text-slate-800">{value.toFixed(2)}</span>
-      </div>
-      <div className="h-3 w-full rounded-full overflow-hidden bg-slate-100 flex">
-        <div className="bg-blue-500" style={{ width: `${leftWidth}%` }} />
-        <div className="bg-red-500" style={{ width: `${rightWidth}%` }} />
-      </div>
-      <div className="flex justify-between text-xs text-slate-500 mt-1">
-        <span>0.0</span>
-        <span>1.0</span>
+        {/* Algorithmic Bias Gini */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-slate-700">算法倾斜基尼系数</span>
+            <span className={`text-xs font-semibold ${giniLabelColor}`}>
+              {giniLabel}
+            </span>
+          </div>
+          {/* descriptive line */}
+          <div className="text-xs text-slate-600 mb-2">
+            {extremeCount > 0
+              ? <>极端账号 <span className="font-semibold">{extremeCount}</span> 个</>
+              : <span className="text-slate-400">暂无极端账号数据</span>
+            }
+          </div>
+          <div className="h-3 w-full rounded-full overflow-hidden bg-slate-100">
+            <div className={`${giniBarColor} h-full transition-all duration-500`} style={{ width: `${gini * 100}%` }} />
+          </div>
+          <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+            <span>基尼系数 {gini.toFixed(3)}</span>
+            <span>越高越集中 →</span>
+          </div>
+        </div>
+
       </div>
     </div>
   )
@@ -1353,6 +1795,422 @@ function MetricsLineChartCard({ data }: { data: MetricsPoint[] }) {
             />
           </LineChart>
         </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
+
+function FactionOverviewCard({
+  report,
+  postFactions,
+  isLoading,
+  onRefresh
+}: {
+  report: FactionReport | null
+  postFactions: PostFactionsSummary | null
+  isLoading: boolean
+  onRefresh: () => void
+}) {
+  const communities = report?.communities ?? []
+  const numCommunities = report?.num_communities ?? 0
+  const numEchoChambers = report?.num_echo_chambers ?? 0
+  const totalUsers = report?.total_users ?? 0
+
+  const avgSupport = postFactions?.avg_support_ratio ?? 0
+  const avgNeutral = postFactions?.avg_neutral_ratio ?? 0
+  const avgOppose = postFactions?.avg_oppose_ratio ?? 0
+
+  const hottest = postFactions?.hottest_post
+  const divisive = postFactions?.most_divisive_post
+
+  const hasData = numCommunities > 0 || (postFactions?.total_posts_analyzed ?? 0) > 0
+
+  return (
+    <div className="glass-card p-6 flex flex-col">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <Users className="text-purple-500" />
+          <h2 className="text-2xl font-bold text-slate-800">派系分析概览</h2>
+        </div>
+        <button
+          onClick={onRefresh}
+          disabled={isLoading}
+          className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-40"
+        >
+          <RefreshCw className={`w-4 h-4 text-slate-400 ${isLoading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {!hasData ? (
+        <div className="flex-1 flex items-center justify-center py-8">
+          <p className="text-sm text-slate-400">{isLoading ? '正在分析派系数据...' : '暂无派系数据，请先启动仿真'}</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* 摘要指标 */}
+          <div className="flex items-center gap-4 text-sm">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-purple-500 inline-block" />
+              <span className="text-slate-600">社区 <span className="font-semibold text-slate-800">{numCommunities}</span> 个</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
+              <span className="text-slate-600">回声室 <span className="font-semibold text-slate-800">{numEchoChambers}</span> 个</span>
+            </span>
+            <span className="text-slate-400">|</span>
+            <span className="text-slate-500">覆盖 {totalUsers} 用户</span>
+          </div>
+
+          {/* 全局立场分布 - 堆叠条形图 */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-sm font-medium text-slate-700">全局立场分布</span>
+              <span className="text-xs text-slate-400">基于 {postFactions?.total_posts_analyzed ?? 0} 条帖子</span>
+            </div>
+            <div className="flex items-center justify-between mb-1.5 text-xs">
+              <span className="flex items-center gap-1 font-semibold text-green-600">
+                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                支持 {(avgSupport * 100).toFixed(0)}%
+              </span>
+              <span className="flex items-center gap-1 font-semibold text-slate-500">
+                <span className="w-2 h-2 rounded-full bg-slate-400 inline-block" />
+                中立 {(avgNeutral * 100).toFixed(0)}%
+              </span>
+              <span className="flex items-center gap-1 font-semibold text-red-600">
+                反对 {(avgOppose * 100).toFixed(0)}%
+                <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+              </span>
+            </div>
+            <div className="h-3 w-full rounded-full overflow-hidden flex bg-slate-100">
+              <div className="bg-green-500 transition-all duration-500" style={{ width: `${avgSupport * 100}%` }} />
+              <div className="bg-slate-300 transition-all duration-500" style={{ width: `${avgNeutral * 100}%` }} />
+              <div className="bg-red-500 transition-all duration-500" style={{ width: `${avgOppose * 100}%` }} />
+            </div>
+          </div>
+
+          {/* 各社区概览 */}
+          {communities.length > 0 && (
+            <div>
+              <span className="text-sm font-medium text-slate-700">各社区概览</span>
+              <div className="mt-1.5 space-y-1.5 max-h-[140px] overflow-y-auto">
+                {communities.slice(0, 6).map((c) => (
+                  <div key={c.id} className="flex items-center justify-between text-xs bg-slate-50 rounded-lg px-3 py-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-slate-700">{c.name}</span>
+                      <span className="text-slate-400">{c.size ?? c.members?.length ?? 0} 人</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400">紧密度 {(c.cohesion ?? 0).toFixed(2)}</span>
+                      {c.is_echo_chamber && (
+                        <span className="text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">回声室</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 最火帖 & 最分歧帖 */}
+          <div className="flex gap-3 text-xs">
+            {hottest && (
+              <div className="flex-1 bg-amber-50 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-1 text-amber-600 font-semibold mb-1">
+                  <Flame className="w-3 h-3" /> 最火帖
+                </div>
+                <div className="text-slate-600 truncate">{hottest.post_id}</div>
+                <div className="text-slate-500 mt-0.5">
+                  支持{(hottest.support_ratio * 100).toFixed(0)}%
+                  {' '}中立{(hottest.neutral_ratio * 100).toFixed(0)}%
+                  {' '}反对{(hottest.oppose_ratio * 100).toFixed(0)}%
+                </div>
+              </div>
+            )}
+            {divisive && (
+              <div className="flex-1 bg-rose-50 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-1 text-rose-600 font-semibold mb-1">
+                  <Activity className="w-3 h-3" /> 最分歧帖
+                </div>
+                <div className="text-slate-600 truncate">{divisive.post_id}</div>
+                <div className="text-slate-500 mt-0.5">
+                  支持{(divisive.support_ratio * 100).toFixed(0)}%
+                  {' '}vs 反对{(divisive.oppose_ratio * 100).toFixed(0)}%
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Lines stored in `during`/`after` are processed by compressDisplayLine() in logRouter.ts,
+// which converts key events into Chinese milestone strings via toUserMilestone():
+//   "Activating Amplifier Agent cluster"  → "扩散者：启动集群"
+//   "Amplifier plan: total=N"             → "扩散者：集群规模（N）"
+//   "N amplifier responses generated"     → "扩散者：生成回应（N）"
+//   "💖 N amplifier Agents liked..."      → "扩散者：点赞扩散（N）"
+// Other lines stay in English (possibly normalized).
+// Patterns must match BOTH the Chinese milestone form AND the English fallback form.
+
+// 后端角色类型到前端兵种的映射
+// 后端角色：balanced_moderates, technical_experts, community_voices, fact_checkers
+// 前端兵种：empath (同理心安抚者), factchecker (逻辑辟谣者), amplifier (意见领袖护盘者), nichefiller (生态位填补者)
+const BACKEND_ROLE_TO_TROOP: Record<string, string> = {
+  'balanced_moderates': 'empath',      // 平衡温和派 -> 同理心安抚者
+  'technical_experts': 'factchecker',  // 技术专家 -> 逻辑辟谣者
+  'community_voices': 'amplifier',     // 社区声音 -> 意见领袖护盘者
+  'fact_checkers': 'factchecker',      // 事实核查者 -> 逻辑辟谣者
+  'empath': 'empath',                  // 直接映射
+  'fact_checker': 'factchecker',       // 后端下划线格式直接映射
+  'factchecker': 'factchecker',        // 直接映射
+  'amplifier': 'amplifier',            // 直接映射
+  'niche_filler': 'nichefiller',       // 后端下划线格式直接映射
+  'nichefiller': 'nichefiller',        // 直接映射
+  'general': 'empath',                 // 通用角色默认为同理心安抚者
+}
+
+// 从日志中提取【角色类型】标注
+// 新格式：💬 🤖 amplifier-1【balanced_moderates】(persona_id) (model) commented: ...
+function extractRoleFromLogLine(line: string): string | null {
+  // 匹配【角色类型】格式
+  const roleMatch = line.match(/【([^】]+)】/)
+  if (roleMatch) {
+    return roleMatch[1].toLowerCase()
+  }
+  return null
+}
+
+// 生态位填补者 (Niche Fillers): 监测"封号真空期"，迅速抛出温和的替代性议题
+// 匹配：集群启动、规模规划、代理创建
+const _TROOP_NICHEFILLER =
+  /扩散者：启动集群|扩散者：集群规模|Successfully created.*Amplifier|Activating.*Amplifier.*cluster/i
+
+// 同理心安抚者 (Empaths): 降低社区愤怒值，提供情绪价值
+// 匹配：并行执行、生成回应、代理评论（温和、安抚类内容）
+const _TROOP_EMPATH =
+  /扩散者：并行执行|扩散者：生成回应|Amplifier.*commented|amplifier responses generated/i
+
+// 逻辑辟谣者 (Fact-checkers): 提供核心证据链，主要影响高认知用户
+// 匹配：执行结果（包含成功/失败统计）、事实核查相关
+const _TROOP_FACTCHECKER =
+  /扩散者：执行结果|扩散者：事实核查|扩散者：证据链|Agent results|Fact.?check|evidence/i
+
+// 意见领袖护盘者 (Amplifiers): 利用高信誉度强行阻断谣言传播链
+// 匹配：点赞扩散（利用高 follower 数量提升优质内容权重）
+const _TROOP_LEADER =
+  /扩散者：点赞扩散|liked leader comments|Workflow completed.*effectiveness/i
+
+const TROOP_STAGES: Record<string, readonly [string, string, string]> = {
+  empath:      ['情绪感知', '共情策略', '发布安抚'],
+  factchecker: ['声明识别', '组织论据', '发布辟谣'],
+  amplifier:   ['影响力评估', '确立立场', '发布评论'],
+  nichefiller: ['空位检测', '设计议题', '发布引导'],
+}
+
+function getTroopStageProgress(filteredLines: string[]): number {
+  if (filteredLines.some((l) => /^💬\s*🤖\s*amplifier-\d+\b/i.test(l))) return 2
+  if (filteredLines.some((l) => /^🎯\s*amplifier-\d+\b/i.test(l))) return 1
+  if (filteredLines.some((l) => /^🔍\s*amplifier-\d+\b/i.test(l))) return 0
+  return -1
+}
+
+function getAmplifierTroopLabel(line: string): { icon: string; name: string; color: string } | null {
+  // 优先从日志中提取【角色类型】标注
+  const backendRole = extractRoleFromLogLine(line)
+  if (backendRole) {
+    const troopKey = BACKEND_ROLE_TO_TROOP[backendRole]
+    if (troopKey) {
+      switch (troopKey) {
+        case 'nichefiller':
+          return { icon: '🌱', name: '生态位填补者', color: 'text-emerald-600' }
+        case 'empath':
+          return { icon: '💗', name: '同理心安抚者', color: 'text-pink-600' }
+        case 'factchecker':
+          return { icon: '🔍', name: '逻辑辟谣者', color: 'text-blue-600' }
+        case 'amplifier':
+          return { icon: '👑', name: '意见领袖护盘者', color: 'text-amber-600' }
+      }
+    }
+  }
+  
+  // 回退到正则表达式匹配
+  if (_TROOP_NICHEFILLER.test(line))
+    return { icon: '🌱', name: '生态位填补者', color: 'text-emerald-600' }
+  if (_TROOP_EMPATH.test(line))
+    return { icon: '💗', name: '同理心安抚者', color: 'text-pink-600' }
+  if (_TROOP_FACTCHECKER.test(line))
+    return { icon: '🔍', name: '逻辑辟谣者', color: 'text-blue-600' }
+  if (_TROOP_LEADER.test(line))
+    return { icon: '👑', name: '意见领袖护盘者', color: 'text-amber-600' }
+  return null
+}
+
+function getAmplifierTroopKey(line: string): string | null {
+  // 优先从日志中提取【角色类型】标注
+  const backendRole = extractRoleFromLogLine(line)
+  if (backendRole) {
+    const troopKey = BACKEND_ROLE_TO_TROOP[backendRole]
+    if (troopKey) {
+      return troopKey
+    }
+  }
+  
+  // 回退到正则表达式匹配
+  if (_TROOP_NICHEFILLER.test(line)) return 'nichefiller'
+  if (_TROOP_EMPATH.test(line)) return 'empath'
+  if (_TROOP_FACTCHECKER.test(line)) return 'factchecker'
+  if (_TROOP_LEADER.test(line)) return 'amplifier'
+  return null
+}
+
+function AmplifierTroopGrid({
+  summary,
+  status,
+  selectedTroopKey,
+  onSelectTroopKey,
+}: {
+  summary: string[]
+  status: string
+  selectedTroopKey: string | null
+  onSelectTroopKey: (key: string | null) => void
+}) {
+  const clusterCount = useMemo(() => {
+    for (const line of summary) {
+      const m = line.match(/集群规模[（(](\d+)[）)]/)
+      if (m) return parseInt(m[1], 10)
+    }
+    for (const line of summary) {
+      const m = line.match(/并行执行[（(](\d+)[）)]/)
+      if (m) return parseInt(m[1], 10)
+    }
+    for (const line of summary) {
+      const m = line.match(/生成回应[（(](\d+)[）)]/)
+      if (m) return parseInt(m[1], 10)
+    }
+    return null
+  }, [summary])
+
+  const isActive = status === 'running' || status === 'done'
+  const base = clusterCount ?? 12
+
+  const troops = [
+    {
+      key: 'empath',
+      icon: '💗',
+      name: '同理心安抚者',
+      subtitle: 'Empaths',
+      desc: '降低社区愤怒值，提供情绪价值',
+      count: Math.ceil(base * 0.25),
+      bg: 'bg-pink-50/80',
+      border: 'border-pink-200/60',
+      text: 'text-pink-700',
+      dot: 'bg-pink-400',
+      ring: 'ring-pink-400',
+      isNew: false,
+    },
+    {
+      key: 'factchecker',
+      icon: '🔍',
+      name: '逻辑辟谣者',
+      subtitle: 'Fact-checkers',
+      desc: '提供核心证据链，主要影响高认知用户',
+      count: Math.ceil(base * 0.25),
+      bg: 'bg-blue-50/80',
+      border: 'border-blue-200/60',
+      text: 'text-blue-700',
+      dot: 'bg-blue-400',
+      ring: 'ring-blue-400',
+      isNew: false,
+    },
+    {
+      key: 'amplifier',
+      icon: '👑',
+      name: '意见领袖护盘者',
+      subtitle: 'Amplifiers',
+      desc: '利用高信誉度（Follower 数量）强行阻断谣言传播链口',
+      count: Math.ceil(base * 0.25),
+      bg: 'bg-amber-50/80',
+      border: 'border-amber-200/60',
+      text: 'text-amber-700',
+      dot: 'bg-amber-400',
+      ring: 'ring-amber-400',
+      isNew: false,
+    },
+    {
+      key: 'nichefiller',
+      icon: '🌱',
+      name: '生态位填补者',
+      subtitle: 'Niche Fillers',
+      desc: '监测"封号真空期"，迅速抛出温和的替代性议题，收编流失的流量',
+      count: Math.ceil(base * 0.25),
+      bg: 'bg-emerald-50/80',
+      border: 'border-emerald-200/60',
+      text: 'text-emerald-700',
+      dot: 'bg-emerald-400',
+      ring: 'ring-emerald-400',
+      isNew: true,
+    },
+  ]
+
+  const anySelected = selectedTroopKey !== null
+
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">兵种分工</div>
+        {anySelected && (
+          <button
+            type="button"
+            onClick={() => onSelectTroopKey(null)}
+            className="text-[9px] text-slate-400 hover:text-slate-600 underline transition-colors"
+          >
+            查看全部
+          </button>
+        )}
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {troops.map((t) => {
+          const isSelected = selectedTroopKey === t.key
+          const isDimmed = anySelected && !isSelected
+          return (
+            <button
+              type="button"
+              key={t.key}
+              onClick={() => onSelectTroopKey(isSelected ? null : t.key)}
+              className={[
+                'relative rounded-xl p-2.5 border text-left transition-all cursor-pointer',
+                t.bg,
+                t.border,
+                t.isNew && !isSelected ? 'ring-1 ring-emerald-400/50' : '',
+                isSelected ? 'ring-2 ring-offset-1 ' + t.ring : '',
+                isDimmed ? 'opacity-40' : 'hover:brightness-95',
+              ].join(' ')}
+            >
+              <div className="flex flex-col items-center gap-1 text-center">
+                <span className="text-base leading-none">{t.icon}</span>
+                <div className={['text-[11px] font-semibold', t.text].join(' ')}>{t.name}</div>
+              </div>
+              {t.isNew && isActive ? (
+                <div className="mt-1.5 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[9px] text-emerald-600 font-medium">真空期监测中</span>
+                </div>
+              ) : isActive && clusterCount ? (
+                <div className="mt-1.5 flex items-center gap-1">
+                  <span className={['w-1.5 h-1.5 rounded-full', t.dot].join(' ')} />
+                  <span className={['text-[9px] font-medium', t.text].join(' ')}>{t.count} 名活跃</span>
+                </div>
+              ) : null}
+              {isSelected && (
+                <div className="absolute top-1.5 right-1.5 w-3 h-3 rounded-full bg-white/80 flex items-center justify-center">
+                  <span className={['w-1.5 h-1.5 rounded-full', t.dot].join(' ')} />
+                </div>
+              )}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -1512,6 +2370,14 @@ function RoleDetailSection({
   amplifierSummary: string[]
 }) {
   const displayLines = isLive ? during : (after ?? [])
+  const [selectedTroopKey, setSelectedTroopKey] = useState<string | null>(null)
+  // Reset troop filter whenever the viewed role changes
+  useEffect(() => { setSelectedTroopKey(null) }, [role])
+  const filteredDisplayLines = useMemo(() => {
+    if (role !== 'Amplifier' || !selectedTroopKey) return displayLines
+    const filtered = displayLines.filter((line) => getAmplifierTroopKey(line) === selectedTroopKey)
+    return filtered
+  }, [role, selectedTroopKey, displayLines])
   const emptyCopy = useMemo(() => getEmptyCopy({ enabled }), [enabled])
   const parsedPost = useMemo(() => {
     if (!context.postContent) return null
@@ -1587,6 +2453,15 @@ function RoleDetailSection({
         </div>
       ) : null}
 
+      {role === 'Amplifier' && (
+        <AmplifierTroopGrid
+          summary={summary}
+          status={status}
+          selectedTroopKey={selectedTroopKey}
+          onSelectTroopKey={setSelectedTroopKey}
+        />
+      )}
+
       {role === 'Analyst' ? (
         <div className={getAnalystCombinedCardClassName()}>
           {parsedPost ? (
@@ -1642,17 +2517,111 @@ function RoleDetailSection({
 
       {role !== 'Analyst' ? (
         <div className="mt-4 bg-white/60 border border-white/40 rounded-2xl p-4 min-h-0 flex-1">
-          <div className="space-y-2 h-full overflow-y-auto overflow-x-hidden pr-1">
-            {displayLines.length ? (
-              displayLines.map((line, idx) => (
-                <div key={`${role}_${idx}`} className="text-sm text-slate-700 leading-relaxed break-all">
-                  {line}
-                </div>
-              ))
-            ) : (
-              <div className="space-y-1">
-                <div className="text-sm text-slate-600">{emptyCopy.stream}</div>
+          {role === 'Amplifier' && selectedTroopKey ? (
+            <div className="mb-3">
+              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                {(() => {
+                  const label = { empath: '💗 同理心安抚者', factchecker: '🔍 逻辑辟谣者', amplifier: '👑 意见领袖护盘者', nichefiller: '🌱 生态位填补者' }[selectedTroopKey]
+                  return `${label ?? selectedTroopKey} · 工作流`
+                })()}
               </div>
+              {(() => {
+                const stages = TROOP_STAGES[selectedTroopKey]
+                const currentStage = getTroopStageProgress(filteredDisplayLines)
+                if (!stages || currentStage < 0) return null
+                return (
+                  <div className="flex items-start mb-3">
+                    {stages.map((stageLabel, idx) => {
+                      const isDone = idx < currentStage
+                      const isCurrent = idx === currentStage
+                      const isLast = idx === stages.length - 1
+                      return (
+                        <div key={idx} className="flex items-center flex-1">
+                          {idx > 0 && (
+                            <div className={['h-px flex-1', idx <= currentStage ? 'bg-emerald-300' : 'bg-slate-200'].join(' ')} />
+                          )}
+                          <div className="flex flex-col items-center gap-0.5 shrink-0">
+                            <div className={[
+                              'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold',
+                              isDone ? 'bg-emerald-300 text-white' : isCurrent ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-400',
+                            ].join(' ')}>
+                              {isDone ? '✓' : idx + 1}
+                            </div>
+                            <span className={[
+                              'text-[9px] font-medium text-center leading-tight max-w-[56px]',
+                              isCurrent ? 'text-emerald-700 font-semibold' : isDone ? 'text-slate-500' : 'text-slate-300',
+                            ].join(' ')}>
+                              {stageLabel}
+                            </span>
+                          </div>
+                          {!isLast && (
+                            <div className={['h-px flex-1', idx < currentStage ? 'bg-emerald-300' : 'bg-slate-200'].join(' ')} />
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+            </div>
+          ) : null}
+          <div className="space-y-2 h-full overflow-y-auto overflow-x-hidden pr-1">
+            {filteredDisplayLines.length ? (
+              filteredDisplayLines.map((line, idx) => {
+                const troop = role === 'Amplifier' ? getAmplifierTroopLabel(line) : null
+                const isAnalysisLine = role === 'Amplifier' && /^🔍\s*amplifier-\d+\b/i.test(line)
+                const isDecisionLine = role === 'Amplifier' && /^🎯\s*amplifier-\d+\b/i.test(line)
+                const isCommentLine  = role === 'Amplifier' && /^💬\s*🤖\s*amplifier-\d+\b/i.test(line)
+
+                if (isAnalysisLine) {
+                  return (
+                    <div key={`${role}_${idx}`} className="flex items-start gap-1.5 leading-relaxed break-all">
+                      <span className="text-[9px] font-bold shrink-0 mt-0.5 px-1.5 py-0.5 rounded bg-sky-50 text-sky-400 whitespace-nowrap">分析</span>
+                      <span className="text-slate-400 text-[11px]">{line}</span>
+                    </div>
+                  )
+                }
+
+                if (isDecisionLine) {
+                  return (
+                    <div key={`${role}_${idx}`} className="flex items-start gap-1.5 leading-relaxed break-all">
+                      <span className="text-[9px] font-bold shrink-0 mt-0.5 px-1.5 py-0.5 rounded bg-slate-100 text-slate-400 whitespace-nowrap">决策</span>
+                      <span className="text-slate-400 text-[11px]">{line}</span>
+                    </div>
+                  )
+                }
+
+                if (isCommentLine) {
+                  const publishBg: Record<string, string> = {
+                    'text-pink-600': 'bg-pink-100',
+                    'text-blue-600': 'bg-blue-100',
+                    'text-amber-600': 'bg-amber-100',
+                    'text-emerald-600': 'bg-emerald-100',
+                  }
+                  const bgClass = troop ? (publishBg[troop.color] ?? 'bg-slate-100') : 'bg-slate-100'
+                  return (
+                    <div key={`${role}_${idx}`} className="flex items-start gap-1.5 text-sm leading-relaxed break-all">
+                      <span className={['text-[9px] font-bold shrink-0 mt-0.5 px-1.5 py-0.5 rounded whitespace-nowrap', troop ? troop.color : 'text-slate-500', bgClass].join(' ')}>发布</span>
+                      <span className="text-slate-700">{line}</span>
+                    </div>
+                  )
+                }
+
+                return (
+                  <div key={`${role}_${idx}`} className="flex items-start gap-1.5 text-sm leading-relaxed break-all">
+                    {troop ? (
+                      <span className={['text-[10px] font-semibold shrink-0 mt-0.5 whitespace-nowrap', troop.color].join(' ')}>
+                        {troop.icon}{troop.name}
+                      </span>
+                    ) : null}
+                    <span className="text-slate-700">{line}</span>
+                  </div>
+                )
+              })
+            ) : selectedTroopKey ? (
+              <div className="text-sm text-slate-400 italic">暂无该兵种专属日志</div>
+            ) : (
+              <div className="text-sm text-slate-600">{emptyCopy.stream}</div>
             )}
           </div>
         </div>
@@ -1854,8 +2823,9 @@ function AnalysisConfigDialog({ open, onClose, interval, onSave }: AnalysisConfi
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
-          <button className="btn-secondary" onClick={handleCancel}>取消</button>
+          <button type="button" className="btn-secondary" onClick={handleCancel}>取消</button>
           <button
+            type="button"
             className={`btn-primary ${validationError ? 'opacity-50 cursor-not-allowed' : ''}`}
             onClick={handleSave}
             disabled={!!validationError}
@@ -1905,6 +2875,7 @@ function AnalysisResultView({ status, summary }: { status: 'Idle' | 'Running' | 
 function ToggleCard({ icon: Icon, label, enabled, onToggle }: { icon: ElementType; label: string; enabled: boolean; onToggle: () => void }) {
   return (
     <button
+      type="button"
       onClick={onToggle}
       className={`flex items-center gap-3 rounded-2xl px-4 py-4 border-2 transition-all duration-300 ${enabled
         ? 'bg-gradient-to-r from-blue-500 to-green-500 text-white border-transparent shadow-lg'

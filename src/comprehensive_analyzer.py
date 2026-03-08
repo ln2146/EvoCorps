@@ -17,8 +17,6 @@ try:
 except ImportError:
     ARGUMENT_EVALUATOR_AVAILABLE = False
     logger.warning("Argument quality evaluator unavailable; skipping argument reasonableness analysis")
-from keys import PERSPECTIVE_API_KEY
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

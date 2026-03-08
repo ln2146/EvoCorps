@@ -275,7 +275,7 @@ def main():
     for i in range(6):
         user_persona = manager.select_persona_for_regular_user()
         if user_persona:
- ": {user_persona['name']} ({user_persona['type']}) - {user_persona['demographics']['profession']}")
+            print(f"   Selected persona: {user_persona['name']} ({user_persona['type']}) - {user_persona['demographics']['profession']}")
     print()
     
     # testing malicious agent persona select

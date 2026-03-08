@@ -249,9 +249,11 @@ class DatabaseManager:
                 self.conn = ServiceConnection(self.service_url)
             else:
                 logging.warning("⚠️ Database service unavailable, falling back to direct connection")
+                self.use_service = False
                 self._init_direct_connection()
         except Exception as e:
             logging.warning(f"⚠️ Database service connection failed: {e}, falling back to direct connection")
+            self.use_service = False
             self._init_direct_connection()
     
     def _init_direct_connection(self):
@@ -309,11 +311,8 @@ class DatabaseManager:
         # Enable foreign keys
         self.conn.execute("PRAGMA foreign_keys = ON")
 
-        # Initialize database
-        if self.reset_db:
-            self.reset_database()
-        else:
-            self.create_tables()
+        # Note: Tables will be created by reset_database() called from __init__
+        # Don't call reset_database here to avoid recursion
 
     def reset_database(self):
         """Reset the database and create new tables."""
@@ -407,7 +406,11 @@ class DatabaseManager:
                     total_comments_received INTEGER DEFAULT 0,
                     influence_score FLOAT DEFAULT 0.0,
                     is_influencer BOOLEAN DEFAULT FALSE,
-                    last_influence_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    last_influence_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    status TEXT DEFAULT 'active',
+                    ban_reason TEXT,
+                    banned_at TIMESTAMP,
+                    comment_violation_count INTEGER DEFAULT 0
                 )
             ''',
             'posts': '''
@@ -505,6 +508,9 @@ class DatabaseManager:
                     num_likes INTEGER DEFAULT 0,
                     selected_model TEXT DEFAULT 'unknown',
                     agent_type TEXT DEFAULT 'normal',
+                    status TEXT DEFAULT 'active',
+                    moderation_reason TEXT,
+                    moderated_at TIMESTAMP,
                     FOREIGN KEY (post_id) REFERENCES posts(post_id),
                     FOREIGN KEY (author_id) REFERENCES users(user_id)
                 )
@@ -652,11 +658,37 @@ class DatabaseManager:
         for table_name, create_statement in tables.items():
             cursor.execute(create_statement)
 
+        # Ensure newly introduced moderation-related columns exist on old databases.
+        self._ensure_comment_moderation_columns(cursor)
+
         # Optional database migration: add new fields only when needed
         # self._migrate_database(cursor)  # Temporarily disable forced migration
 
         self.conn.commit()
         logging.info("Database tables created successfully.")
+
+    def _ensure_comment_moderation_columns(self, cursor):
+        """Add moderation columns for users/comments on existing databases."""
+        migrations = [
+            {'table': 'users', 'column': 'status', 'definition': "TEXT DEFAULT 'active'"},
+            {'table': 'users', 'column': 'ban_reason', 'definition': "TEXT"},
+            {'table': 'users', 'column': 'banned_at', 'definition': "TIMESTAMP"},
+            {'table': 'users', 'column': 'comment_violation_count', 'definition': "INTEGER DEFAULT 0"},
+            {'table': 'comments', 'column': 'status', 'definition': "TEXT DEFAULT 'active'"},
+            {'table': 'comments', 'column': 'moderation_reason', 'definition': "TEXT"},
+            {'table': 'comments', 'column': 'moderated_at', 'definition': "TIMESTAMP"},
+        ]
+
+        for migration in migrations:
+            try:
+                cursor.execute(
+                    f"SELECT {migration['column']} FROM {migration['table']} LIMIT 1"
+                )
+            except Exception:
+                cursor.execute(
+                    f"ALTER TABLE {migration['table']} "
+                    f"ADD COLUMN {migration['column']} {migration['definition']}"
+                )
 
     def _migrate_database(self, cursor):
         """Database migration: add new fields to existing tables"""
@@ -703,23 +735,22 @@ class DatabaseManager:
 
     def save_simulation_db(self, timestamp: str):
         """Save a timestamped copy of the simulation database."""
-        if self.use_service:
-            # In service mode, cannot copy file directly
-            logging.warning("Service mode cannot copy database file; skipping backup")
-            return
-        
-        # Original logic for direct connection mode
-        # Close the connection to ensure all data is written
-        self.conn.close()
+        if not self.use_service:
+            # Direct connection: close first to flush WAL
+            self.conn.close()
 
         # Create archive directory if it doesn't exist
         archive_dir = f"experiment_outputs/database_copies"
         os.makedirs(archive_dir, exist_ok=True)
 
-        # Copy the database file
+        # Copy the database file (works for both service and direct mode
+        # because the db file is always at self.db_path on the local filesystem)
         archived_db = f"{archive_dir}/{timestamp}.db"
-        shutil.copy2(self.db_path, archived_db)
-        logging.info(f"Saved simulation database to {archived_db}")
+        try:
+            shutil.copy2(self.db_path, archived_db)
+            logging.info(f"Saved simulation database to {archived_db}")
+        except Exception as e:
+            logging.warning(f"Failed to backup database: {e}")
 
 
     def add_user(self, user_id: str, user_config: dict):

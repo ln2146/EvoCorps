@@ -36,12 +36,16 @@ langchain-community>=0.3.0
 # Wikipedia API
 wikipedia-api
 
-# Optional high-performance dependencies
-faiss-cpu
-flask
-flask-cors
-psutil
+
+# X-Algorithm recommender dependencies
+sentence-transformers>=2.2.0
 
 # Control API server
 fastapi
 uvicorn
+
+# Optional high-performance dependencies
+flask
+flask-cors
+psutil
+faiss-cpu

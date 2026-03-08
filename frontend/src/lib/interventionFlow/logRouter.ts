@@ -33,6 +33,18 @@ export interface FlowState {
 
 const LOG_PREFIX_RE = /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d+\s+-\s+\w+\s+-\s+/
 
+// Mirrors the backend parse_log_timestamp_ms logic.
+// Returns the local-time epoch milliseconds for a log line, or null if not parseable.
+const LOG_TS_RE = /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2}),(\d+)/
+export function parseLogTimestampMs(line: string): number | null {
+  const m = LOG_TS_RE.exec(line)
+  if (!m) return null
+  // Use local time (same as Python time.mktime) so comparisons with Date.now() are consistent.
+  const dt = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6], +m[7])
+  const ms = dt.getTime()
+  return Number.isFinite(ms) ? ms : null
+}
+
 const MAX_DURING_LINES_DEFAULT = 10
 const MAX_AFTER_LINES_DEFAULT = 6
 
@@ -47,6 +59,9 @@ function maxDuringLines(role: Role) {
     case 'Leader':
       // Leader needs to show full evidence + candidate blocks (can be >10 lines).
       return 40
+    case 'Amplifier':
+      // Amplifier cluster can have 12+ agents; keep all comment lines for per-troop filtering.
+      return 60
     default:
       return MAX_DURING_LINES_DEFAULT
   }
@@ -59,6 +74,9 @@ function maxAfterLines(role: Role) {
     case 'Leader':
       // Preserve the full evidence + candidate set for review after switching tabs.
       return 40
+    case 'Amplifier':
+      // Preserve all agent comment lines so per-troop filter works after the round ends.
+      return 60
     default:
       return MAX_AFTER_LINES_DEFAULT
   }
@@ -98,6 +116,18 @@ const strategistAnchors = [
   /Strategist is creating strategy/i,
   /start intelligent strategy creation workflow/i,
   /Use Tree-of-Thought/i,
+  // Mid/late-stage Strategist lines — needed so the role switches back to Strategist
+  // even after an isNewRoundAnchor reset caused by interleaved parallel workflow logs.
+  /Query historical successful strategies/i,
+  /Retrieved \d+ results from action_logs/i,
+  /Found \d+ related historical strategies/i,
+  /Generated \d+ strategy options/i,
+  /Selected optimal strategy:/i,
+  /Selected optimal option:/i,
+  /Intelligent strategy creation completed/i,
+  /Strategy creation completed/i,
+  // Phase 3 evaluation anchor (no content execution — feedback-only pass)
+  /Strategist evaluating/i,
 ]
 
 const leaderAnchors = [
@@ -112,6 +142,13 @@ const amplifierAnchors = [
   /Activating Amplifier Agent cluster/i,
   /Start parallel execution/i,
   /Bulk like/i,
+  // Individual Amplifier agent comment lines — needed so they route back to Amplifier
+  // even when Leader is the active role during parallel Leader+Amplifier execution.
+  /^💬\s*🤖\s*Amplifier-\d+\b/i,
+  // Per-agent decision log lines emitted before each LLM call.
+  /^🎯\s*amplifier-\d+\b/i,
+  // Per-agent content-analysis log lines emitted before the decision step.
+  /^🔍\s*amplifier-\d+\b/i,
 ]
 
 const monitoringAnchors = [
@@ -175,6 +212,8 @@ function mapLineToStageIndex(role: Role, cleanLine: string): number | null {
       if (/Tree-of-Thought/i.test(cleanLine) || /Generated \d+ strategy options/i.test(cleanLine)) return 2
       if (/Selected optimal strategy:/i.test(cleanLine)) return 3
       if (/Step\s*4:\s*Format as agent instructions/i.test(cleanLine) || /Format as agent instructions/i.test(cleanLine) || /Strategy creation completed/i.test(cleanLine)) return 4
+      // Phase 3 evaluation: map to stage 0 (entry) so the stepper shows activity
+      if (/Strategist evaluating/i.test(cleanLine)) return 0
       return null
     }
     case 'Leader': {
@@ -226,8 +265,9 @@ function applyStageUpdateForRole(prevRoles: FlowState['roles'], role: Role, clea
   // (Persistent info is rendered via summary/context, not this buffer.)
   // Strategist/Leader panels benefit from keeping earlier context (candidate strategies / evidence / candidates)
   // across stage transitions.
+  // Amplifier keeps all comment lines across stages so per-troop filtering remains usable.
   // Other roles keep stage-only stream for readability.
-  const shouldResetDuring = cur.stage.current !== nextStage.current && role !== 'Strategist' && role !== 'Leader' && role !== 'Analyst'
+  const shouldResetDuring = cur.stage.current !== nextStage.current && role !== 'Strategist' && role !== 'Leader' && role !== 'Analyst' && role !== 'Amplifier'
   return {
     ...prevRoles,
     [role]: { ...cur, stage: nextStage, during: shouldResetDuring ? [] : cur.during },
@@ -424,15 +464,27 @@ function compressDisplayLine(cleanLine: string) {
     }
   }
 
+  // Amplifier per-agent analysis line: route as-is (carries 【role】 for troop filtering).
+  if (/^🔍\s*amplifier-\d+\b/i.test(trimmed)) {
+    return trimmed
+  }
+  // Amplifier per-agent decision line: route to Amplifier panel as-is (carries 【role】 for troop filtering).
+  if (/^🎯\s*amplifier-\d+\b/i.test(trimmed)) {
+    return trimmed
+  }
+
   // Amplifier per-agent comment: keep the body, but normalize the label and hide model name.
   // Example:
   //   "💬 🤖 Amplifier-3 (positive_john_133) (gemini-2.0-flash) commented: ..."
   // ->"💬 🤖 Amplifier-3 (positive_john_133) commented: ..."
   if (/^💬\s*🤖\s*Amplifier-\d+\b/i.test(trimmed) && /\bcommented:/i.test(trimmed)) {
     const normalized = trimmed.replace(/^💬\s*🤖\s*Amplifier-(\d+)\b/i, '💬 🤖 Amplifier-$1')
+    // 兼容两种格式：
+    //   旧：Amplifier-N (persona) (model) commented:
+    //   新：Amplifier-N【role】 (persona) (model) commented:
     const withoutModel = normalized.replace(
-      /^(💬\s*🤖\s*Amplifier-\d+\s+\([^)]*\))\s+\([^)]*\)\s+commented:/i,
-      '$1 commented:',
+      /^(💬\s*🤖\s*Amplifier-\d+(?:【[^】]*】)?)\s+(\([^)]*\))\s+\([^)]*\)\s+commented:/i,
+      '$1 $2 commented:',
     )
     return withoutModel
   }
@@ -578,6 +630,30 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
     return next
   }
 
+  // No-intervention completion: freeze all 4 role cards so the user can see a complete
+  // round result (Analyst done + the other 3 roles explicitly marked as "not triggered").
+  // 修复：正则需要匹配开头可能有 emoji 的情况 (✅ No intervention needed...)
+  if (/No intervention needed for post.*Workflow completed/i.test(cleanLine) || /✅\s*No intervention needed/i.test(cleanLine)) {
+    const displayLine = compressDisplayLine(cleanLine)
+    const nextRoles = { ...prev.roles }
+
+    // Freeze Analyst with its accumulated analysis lines + the completion message.
+    const analyst = nextRoles.Analyst
+    const withLine = appendDuringWithCap(analyst, displayLine, maxDuringLines('Analyst'))
+    nextRoles.Analyst = freezeAfter(withLine, maxAfterLines('Analyst'))
+
+    // Mark the other 3 roles as "done / not triggered" so the tab indicators turn
+    // green and the cards show a clear "no action" placeholder instead of idle copy.
+    const noActionLine = '✅ 本轮分析完成，无需执行干预'
+    for (const role of ['Strategist', 'Leader', 'Amplifier'] as const) {
+      const card = nextRoles[role]
+      const withMsg = appendDuringWithCap(card, noActionLine, 1)
+      nextRoles[role] = freezeAfter(withMsg, 1)
+    }
+
+    return { ...prev, activeRole: null, roles: nextRoles }
+  }
+
   // Extract user-facing content that should be rendered in full (post body, leader comments, etc.)
   let nextContext = prev.context
   if (/^Post content:\s*/i.test(cleanLine)) {
@@ -649,7 +725,8 @@ export function routeLogLine(prev: FlowState, rawLine: string): FlowState {
   const shouldReleaseSticky = stateAfterSummary.amplifierSticky && matchesAny(cleanLine, monitoringAnchors)
   const amplifierSticky = shouldReleaseSticky ? false : stateAfterSummary.amplifierSticky
 
-  // Role switching is anchor-driven; when amplifier is sticky, we force attribution to Amplifier.
+  // Role switching is anchor-driven; when amplifier is sticky, all non-anchored lines
+  // are forced to Amplifier (sequential execution: Leader finishes before Amplifier starts).
   const anchoredRole = detectRoleByAnchor(cleanLine)
   const nextRole: Role | null = amplifierSticky ? 'Amplifier' : anchoredRole
 

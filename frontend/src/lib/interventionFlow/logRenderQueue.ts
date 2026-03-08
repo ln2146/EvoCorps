@@ -92,7 +92,7 @@ export function createTimestampSmoothLineQueue(opts: TimestampSmoothLineQueueOpt
       ts != null && lastTsMs != null && ts >= lastTsMs ? Math.max(0, ts - lastTsMs) : null
 
     const override = opts.delayOverrideMs?.(next)
-    const baseDelayMsRaw = override != null ? override : (Number.isFinite(deltaMsRaw) ? deltaMsRaw * opts.timeScale : opts.minDelayMs)
+    const baseDelayMsRaw = override != null ? override : (deltaMsRaw != null && Number.isFinite(deltaMsRaw) ? deltaMsRaw * opts.timeScale : opts.minDelayMs)
     const baseDelayMs = clamp(baseDelayMsRaw, opts.minDelayMs, opts.maxDelayMs)
 
     const smoothedDelayMs =

@@ -29,7 +29,8 @@ class NewsSpreadAnalyzer:
         try:
             cursor = self.conn.execute(query, (news_post_id, time_step))
             result = cursor.fetchone()
-            return result[0] if result else 0
+            # Return 0 if result is None or if result[0] is None
+            return result[0] if result and result[0] is not None else 0
         except sqlite3.OperationalError as e:
             if "unable to open database file" in str(e):
                 logging.warning(f"Database connection error in track_news_views, returning 0")
@@ -61,7 +62,10 @@ class NewsSpreadAnalyzer:
         try:
             cursor = self.conn.execute(query, (news_post_id,))
             result = cursor.fetchone()
-            return result[0] if result else 0
+            # Return 0 if result is None or if result[0] is None (empty set = MAX(depth) = NULL)
+            if result and result[0] is not None:
+                return result[0]
+            return 0
         except sqlite3.OperationalError as e:
             if "unable to open database file" in str(e):
                 logging.warning(f"Database connection error in calculate_diffusion_depth, returning 0")
@@ -120,7 +124,8 @@ class NewsSpreadAnalyzer:
         try:
             cursor = self.conn.execute(query, (news_post_id,))
             result = cursor.fetchone()
-            metrics['num_comments'] = result[0] if result else 0
+            # Return 0 if result is None or if result[0] is None
+            metrics['num_comments'] = result[0] if result and result[0] is not None else 0
         except sqlite3.OperationalError as e:
             if "unable to open database file" in str(e):
                 logging.warning(f"Database connection error in calculate_diffusion_breadth (comments), setting to 0")
@@ -137,14 +142,15 @@ class NewsSpreadAnalyzer:
         try:
             cursor = self.conn.execute(query, (news_post_id,))
             result = cursor.fetchone()
-            metrics['num_notes'] = result[0] if result else 0
+            # Return 0 if result is None or if result[0] is None
+            metrics['num_notes'] = result[0] if result and result[0] is not None else 0
         except sqlite3.OperationalError as e:
             if "unable to open database file" in str(e):
                 logging.warning(f"Database connection error in calculate_diffusion_breadth (notes), setting to 0")
                 metrics['num_notes'] = 0
             else:
                 raise e
-        
+
         # Count unique note raters
         query = """
             SELECT COUNT(DISTINCT nr.user_id)
@@ -155,7 +161,8 @@ class NewsSpreadAnalyzer:
         try:
             cursor = self.conn.execute(query, (news_post_id,))
             result = cursor.fetchone()
-            metrics['num_note_ratings'] = result[0] if result else 0
+            # Return 0 if result is None or if result[0] is None
+            metrics['num_note_ratings'] = result[0] if result and result[0] is not None else 0
         except sqlite3.OperationalError as e:
             if "unable to open database file" in str(e):
                 logging.warning(f"Database connection error in calculate_diffusion_breadth (note_ratings), setting to 0")
@@ -203,6 +210,13 @@ class NewsSpreadAnalyzer:
         except sqlite3.OperationalError as e:
             if "unable to open database file" in str(e):
                 logging.warning(f"Database connection error in store_spread_metrics, skipping storage")
+                return
+            else:
+                raise e
+        except sqlite3.IntegrityError as e:
+            # Handle foreign key constraint failure (post_id doesn't exist in posts table)
+            if "FOREIGN KEY" in str(e):
+                logging.warning(f"Foreign key constraint failed for post_id {news_post_id}, skipping storage (likely a dummy post)")
                 return
             else:
                 raise e

@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Home, Activity, FlaskConical, BarChart3, Settings, ChevronLeft, ChevronRight, ArrowLeft, MessageSquare, Network } from 'lucide-react'
+import { Home, Activity, FlaskConical, BarChart3, Settings, ChevronLeft, ChevronRight, ArrowLeft, MessageSquare, Network, Layers } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 interface DashboardLayoutProps {
@@ -13,6 +13,7 @@ const navItems = [
   { path: '/dashboard/monitoring', label: '数据监控', icon: Activity },
   { path: '/dashboard/experiment', label: '实验管理', icon: FlaskConical },
   { path: '/dashboard/visualization', label: '关系图谱', icon: BarChart3 },
+  { path: '/dashboard/filter-bubble', label: '信息茧房', icon: Layers },
   { path: '/dashboard/interview', label: '采访功能', icon: MessageSquare },
 ]
 

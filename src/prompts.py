@@ -158,12 +158,14 @@ Respond with a JSON object containing your chosen actions:
 
             "**ENGAGEMENT LOGIC**:"
             "1. Focus on posts that truly interest or move you.\n"
-            "2. Engage selectively with content that adds real value or insight.\n"
-            "3. Keep your actions diverse and natural, not repetitive.\n"
-            "4. Value quality over quantity and act with authenticity.\n\n"
+            "2. Slightly favor lightweight engagement: when in doubt, prefer like-post over long comments.\n"
+            "3. If a post feels especially useful, timely, or emotionally resonant, actively consider share-post.\n"
+            "4. Keep your actions diverse and natural, not repetitive.\n"
+            "5. Value quality over quantity and act with authenticity.\n\n"
 
-            "**ACTION LIMIT**: Choose up to 4~6 total actions per session.\n"
-            "**COMMENTING LIMIT**: Based on your persona and memories, comment on 2~3 posts you genuinely care about.\n\n"
+            "**ACTION LIMIT**: Choose up to 5~7 total actions per session.\n"
+            "**COMMENTING LIMIT**: Based on your persona and memories, comment on 2~3 posts you genuinely care about.\n"
+            "**REACTION MIX (SOFT TARGET)**: In most sessions, include at least 2 like-post actions and 2 comment-post actions; include 1 share-post when there is a strong match.\n\n"
 
             "Respond with JSON:"
             "{{\"actions\": [{{\"action\": \"...\", \"target\": \"...\", \"content\": \"...\"}}]}}\n"
@@ -302,21 +304,6 @@ class FactCheckerPrompts:
             "\n"
             "Your verdicts must be well-researched and carefully considered."
         )
-        return """You are an expert fact-checker working to verify social media content.
-        Your role is to:
-        1. Analyze claims made in posts
-        2. Research and verify factual accuracy
-        3. Provide clear, evidence-based verdicts
-        4. Cite reliable sources
-        5. Maintain objectivity and thoroughness
-
-        IMPORTANT JUDGMENT GUIDELINES:
-        - If a claim aligns with established scientific consensus → mark as "true"
-        - If a claim contradicts known facts or promotes conspiracy theories → mark as "false"
-        - Use "unverified" for ambiguous claims, future events, or when evidence is insufficient
-        - Your confidence level should accurately reflect the certainty of available evidence
-
-        Your verdicts must be well-researched and carefully considered."""
 
     def create_fact_check_prompt(
         post_content: str,
@@ -343,42 +330,3 @@ class FactCheckerPrompts:
             "For obvious misinformation, you should mark it as false.\n\n"
             "Format your response as a structured verdict with these components."
         )
-        return f"""Please fact-check the following social media post:
-
-Content: {post_content}
-
-Engagement Metrics:
-- Likes: {engagement_metrics['likes']}
-- Shares: {engagement_metrics['shares']}
-- Comments: {engagement_metrics['comments']}
-{community_notes}
-
-Please analyze this content and provide:
-1. A verdict (true/false/unverified)
-2. A detailed explanation of your findings
-3. Your confidence level (0.0 to 1.0)
-4. List of sources consulted
-
-DECISION CRITERIA:
-- "true": The claim is factually accurate and aligns with reliable evidence or scientific consensus
-- "false": The claim is factually incorrect, misleading, or promotes conspiracy theories
-- "unverified": Use this when the claim involves future events, highly specialized knowledge outside your training, genuinely ambiguous statements, or when evidence is insufficient for a clear determination
-
-CONFIDENCE GUIDELINES:
-1. High confidence (0.8-1.0): Strong, clear evidence supporting your verdict
-2. Medium confidence (0.5-0.7): Reasonable evidence but some uncertainty remains
-3. Low confidence (0.0-0.4): Limited evidence or highly ambiguous content
-4. Your confidence should reflect genuine certainty, not forced decisiveness
-
-JUDGMENT APPROACH:
-- For scientific/health claims: Verify against mainstream scientific consensus
-- For conspiracy theories or sensationalist claims: Mark as "false" if clearly contradicts established facts
-- When uncertain: Use "unverified" with appropriate confidence level
-- Prioritize accuracy over appearing decisive
-
-Examples:
-- "Green building standards adoption increases" → likely "true" (0.7-0.8 confidence)
-- "Medical boards target doctors who dissent" → likely "false" (0.7-0.9 confidence, depends on framing)
-- "Scientists release dietary guidelines" → likely "true" (0.8-0.9 confidence)
-
-Format your response as a structured verdict with these components."""

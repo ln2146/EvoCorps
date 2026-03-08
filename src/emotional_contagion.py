@@ -4,14 +4,13 @@ Emotional contagion mechanism implementation
 Let normal users be influenced by negative comments and appear more negative in subsequent posts
 """
 
-def calculate_emotional_influence(user_feed, user_memory):
+def calculate_emotional_influence(user_feed):
     """
     Calculate the emotional influence on a user
-    
+
     Args:
         user_feed: Content the user sees
-        user_memory: User memory
-    
+
     Returns:
         emotional_influence_score: Emotional influence score (-1 to 1, negative means negative influence)
     """

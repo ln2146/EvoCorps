@@ -863,10 +863,19 @@ class EnhancedOpinionSystem:
             if isinstance(existing_path, list):
                 merged_path.extend([step for step in existing_path if isinstance(step, dict)])
 
+            def _make_hashable(v):
+                """Convert unhashable types (list, dict) to hashable tuples."""
+                if isinstance(v, list):
+                    return tuple(_make_hashable(x) for x in v)
+                elif isinstance(v, dict):
+                    return tuple(sorted((k, _make_hashable(val)) for k, val in v.items()))
+                return v
+
             deduped_path: List[Dict[str, Any]] = []
             seen = set()
             for step in merged_path:
-                key = tuple(sorted(step.items()))
+                # Convert dict items to hashable format (lists -> tuples)
+                key = tuple(sorted((k, _make_hashable(v)) for k, v in step.items()))
                 if key in seen:
                     continue
                 seen.add(key)

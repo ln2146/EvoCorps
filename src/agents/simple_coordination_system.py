@@ -4,6 +4,7 @@ Implements complete three-phase workflow without LangGraph dependency
 """
 
 import asyncio
+import contextvars
 import json
 import os
 import random
@@ -13,6 +14,13 @@ import sys
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from pathlib import Path
+
+# Per-task log buffer: when set to a list, workflow_logger writes into the list
+# instead of the file. Phase 2 in simulation.py flushes each buffer to the
+# file in post order, so the SSE stream is always sequential.
+_workflow_log_buffer: contextvars.ContextVar[Optional[list]] = contextvars.ContextVar(
+    'workflow_log_buffer', default=None
+)
 
 try:
     from src.action_logs_store import ActionLogRecord, persist_action_log_record
@@ -27,20 +35,6 @@ except Exception:
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'database'))
 try:
     from database_manager import get_db_manager, execute_query, fetch_one, fetch_all, execute_transaction, execute_with_temp_connection
-    # Import dynamic like increment module
-    try:
-        import sys
-        import os
-        src_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        if src_path not in sys.path:
-            sys.path.insert(0, src_path)
-        from dynamic_like_increment import calculate_dynamic_like_increment, apply_like_increment_to_comments
-    except ImportError:
-        # If import fails, define no-op functions
-        def calculate_dynamic_like_increment(conn, current_timestep=None):
-            return 0
-        def apply_like_increment_to_comments(conn, comment_ids, increment, context=""):
-            return 0
 except ImportError:
     try:
         # If import fails, try relative import
@@ -67,37 +61,56 @@ except ImportError:
             execute_with_temp_connection = database_manager.execute_with_temp_connection
 
 # Configure workflow-specific logging
+class _ContextAwareFileHandler(logging.FileHandler):
+    """FileHandler that diverts records to the per-task context buffer when one is set.
+
+    When _workflow_log_buffer holds a list (inside a buffered task), log records are
+    formatted and appended to that list instead of being written to the file.
+    When no buffer is set (normal / outer context), records go to the file as usual.
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        buf = _workflow_log_buffer.get(None)
+        if buf is not None:
+            try:
+                buf.append(self.format(record))
+            except Exception:
+                self.handleError(record)
+        else:
+            super().emit(record)
+
+
 def setup_workflow_logger():
     """Set up workflow-specific logger."""
     # Ensure logs/workflow directory exists - fix path
     script_dir = Path(__file__).parent.parent.parent  # Public-opinion-balance directory
     workflow_log_dir = script_dir / "logs" / "workflow"
     workflow_log_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Create workflow-specific logger
     workflow_logger = logging.getLogger('workflow')
     workflow_logger.setLevel(logging.INFO)
-    
+
     # Disable propagation to parent logger to avoid terminal output
     workflow_logger.propagate = False
-    
+
     # Avoid adding duplicate handlers
     if not workflow_logger.handlers:
-        # Create file handler using absolute path
+        # Use context-aware handler so parallel tasks buffer their own logs
         log_file = workflow_log_dir.absolute() / f"workflow_{datetime.now().strftime('%Y%m%d')}.log"
-        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        file_handler = _ContextAwareFileHandler(log_file, encoding='utf-8')
         file_handler.setLevel(logging.INFO)
-        
+
         # Create formatter
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         file_handler.setFormatter(formatter)
-        
+
         # Add handler
         workflow_logger.addHandler(file_handler)
-        
+
         # Ensure log file is created
         workflow_logger.info(f"📁 Workflow log file: {log_file}")
-    
+
     return workflow_logger
 
 # Initialize workflow logger
@@ -834,12 +847,17 @@ class SimpleStrategistAgent:
 
             DYNAMIC PARAMETER DETERMINATION:
             - You MUST fully determine all output values yourself; do NOT use example numbers or placeholders
-            - Determine the optimal number of agents within a fixed range:
-              
-              AGENT COUNT RANGE:
-              * Total number of agents should be between 8 and 15 (inclusive)
-              * Select a specific number within this range based on the situation severity
-              
+            - Determine the optimal number of agents dynamically based on the situation:
+
+              AGENT COUNT GUIDELINES (no fixed range - judge based on context):
+              * Urgency level 4 (critical) or extremism > 0.8: consider 15-20 agents
+              * Urgency level 3 or extremism 0.6-0.8: consider 12-15 agents
+              * Urgency level 2 or extremism 0.4-0.6: consider 8-12 agents
+              * Urgency level 1 or extremism < 0.4: consider 5-8 agents
+              * Also factor in comment volume: more comments → more agents for coverage
+              * Use historical success patterns to calibrate - if past similar situations
+                succeeded with fewer agents, do not over-deploy
+
             - Decide role distribution (balanced_moderates, technical_experts, community_voices, fact_checkers) based on content analysis, risk assessment, and heat level
             - Choose timing strategy (immediate/staggered/progressive) based on urgency and heat level
             - Provide concrete coordination instructions and risk assessments
@@ -2379,8 +2397,8 @@ Generate 3-5 diverse strategy options as JSON array."""
                 "technical_experts": 1
             }
         
-        # Generate specific instructions
-        for i in range(min(agent_count, 8)):  # Limit to at most 8
+        # Generate specific instructions - use strategist-determined count directly
+        for i in range(agent_count):
             role_types = list(role_distribution.keys())
             role_type = role_types[i % len(role_types)]
             
@@ -3158,12 +3176,44 @@ class SimpleamplifierAgent:
                     target_post_id = target_content.get("target_post_id")
                 # Combined log record
                 workflow_logger.info(f"🤖 Agent {self.agent_id} ({self.persona_name}) start generating response - enhanced format, instruction: {role_instruction.get('response_style', 'none')}")
+                # 决策日志：供前端展示各兵种工作流
+                try:
+                    _agent_num = int(str(self.agent_id).split("_")[1]) + 1
+                except (IndexError, ValueError):
+                    _agent_num = self.agent_id
+                _role_type = role_instruction.get("role_type", getattr(self, "assigned_role", "general"))
+                _style     = role_instruction.get("response_style", "")
+                _tone      = role_instruction.get("tone", "")
+                _key_msg   = role_instruction.get("key_message", "")
+                if len(_key_msg) > 40:
+                    _key_msg = _key_msg[:40] + "..."
+                # Stage 0: real LLM role-specific content analysis
+                _analysis = self._run_role_analysis_llm(_role_type, actual_content, role_instruction)
+                _role_analysis_context = _analysis.get('context', '')
+                workflow_logger.info(
+                    f"🔍 amplifier-{_agent_num}【{_role_type}】 {_analysis['stage_name']}: {_analysis['summary']}"
+                )
+                # Stage 1: strategy decision
+                workflow_logger.info(
+                    f"🎯 amplifier-{_agent_num}【{_role_type}】({self.persona_name}) "
+                    f"决策: 风格={_style} · 语气={_tone} · 指令={_key_msg}"
+                )
             else:
                 # Simple string content
                 actual_content = str(target_content)
                 role_instruction = {}
                 # Combined log record
                 workflow_logger.info(f"🤖 Agent {self.agent_id} ({self.persona_name}) start generating response - simple format")
+                # 决策日志（简单模式）
+                try:
+                    _agent_num = int(str(self.agent_id).split("_")[1]) + 1
+                except (IndexError, ValueError):
+                    _agent_num = self.agent_id
+                _role_type = getattr(self, "assigned_role", "general")
+                workflow_logger.info(
+                    f"🎯 amplifier-{_agent_num}【{_role_type}】({self.persona_name}) 决策: (简单模式)"
+                )
+                _role_analysis_context = ""
 
             # Validate content is not empty
             if not actual_content or not actual_content.strip():
@@ -3175,6 +3225,10 @@ class SimpleamplifierAgent:
 
             # Prepare role guidance and few-shot examples
             role_guidance = self._prepare_role_guidance(role_instruction)
+            role_analysis_section = (
+                f"\nANALYSIS CONTEXT (based on Stage 0 analysis — use this to make your response more targeted):\n{_role_analysis_context}\n"
+                if _role_analysis_context else ""
+            )
             few_shot_examples_text = self._prepare_few_shot_examples()
 
             # Add timestamp and random seeds to increase diversity
@@ -3238,7 +3292,7 @@ Key traits:
 - Primary goal: {self.primary_goal}
 
 {role_guidance}
-
+{role_analysis_section}
 {few_shot_examples_text}
 
 NATURAL HUMAN CONVERSATION GUIDELINES
@@ -3360,7 +3414,8 @@ CRITICAL REQUIREMENTS
                     "response_content": content,
                     "timing_delay": timing_delay,
                     "timestamp": datetime.now(),
-                    "selected_model": self.selected_model  # Add model info
+                    "selected_model": self.selected_model,  # Add model info
+                    "agent_role": getattr(self, "assigned_role", ""),
                 },
                 "persona_used": self.persona_name,
                 "selected_model": self.selected_model  # Add model info
@@ -3643,6 +3698,97 @@ CRITICAL REQUIREMENTS
             workflow_logger.error(f"       ❌ Failed to prepare role guidance: {e}")
             return ""
 
+    def _run_role_analysis_llm(self, role_type: str, content: str, role_instruction: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Stage 0: Lightweight LLM call for role-specific content analysis.
+        Returns {'stage_name': str, 'summary': str, 'context': str}.
+        The 'context' field is injected into the Stage 2 generation prompt.
+        """
+        _STAGE_NAMES = {
+            "empath": "情绪感知",
+            "fact_checker": "声明识别",
+            "amplifier": "影响力评估",
+            "niche_filler": "空位检测",
+        }
+        stage_name = _STAGE_NAMES.get(role_type, "内容分析")
+        _fallback = {"stage_name": stage_name, "summary": "分析跳过，直接生成", "context": ""}
+
+        try:
+            truncated = content[:500] if len(content) > 500 else content
+
+            if role_type == "empath":
+                system_msg = (
+                    "You are a social psychologist specializing in online emotional dynamics. "
+                    "Analyze briefly and precisely."
+                )
+                user_msg = (
+                    f"Analyze this social media post's emotional context.\n"
+                    f"Post: {truncated}\n\n"
+                    f"Reply in EXACTLY this format (3 lines):\n"
+                    f"Emotion: [dominant emotion: anger/fear/sadness/anxiety/frustration/neutral]\n"
+                    f"Intensity: [high/medium/low]\n"
+                    f"Audience need: [what the audience emotionally needs right now, 1 short sentence]"
+                )
+            elif role_type == "fact_checker":
+                system_msg = (
+                    "You are a professional fact-checker. Identify claims that need verification. "
+                    "Be concise."
+                )
+                user_msg = (
+                    f"Identify the key verifiable claim in this post.\n"
+                    f"Post: {truncated}\n\n"
+                    f"Reply in EXACTLY this format (3 lines):\n"
+                    f"Claim: [the main factual assertion being made]\n"
+                    f"Accuracy risk: [high/medium/low]\n"
+                    f"Evidence type: [what kind of evidence would verify or counter this]"
+                )
+            elif role_type == "amplifier":
+                system_msg = (
+                    "You are a media strategist assessing narrative influence and determining "
+                    "the most effective authoritative response. Be concise."
+                )
+                user_msg = (
+                    f"Assess this post's influence and determine the best authoritative stance.\n"
+                    f"Post: {truncated}\n\n"
+                    f"Reply in EXACTLY this format (3 lines):\n"
+                    f"Narrative: [core message being spread]\n"
+                    f"Viral potential: [high/medium/low]\n"
+                    f"Recommended stance: [what authoritative position to take]"
+                )
+            elif role_type == "niche_filler":
+                system_msg = (
+                    "You are a community manager who identifies missing perspectives and redirects "
+                    "unproductive discussions. Be concise."
+                )
+                user_msg = (
+                    f"Identify what constructive perspective is missing from this discussion.\n"
+                    f"Post: {truncated}\n\n"
+                    f"Reply in EXACTLY this format (3 lines):\n"
+                    f"Missing angle: [what constructive perspective is absent]\n"
+                    f"Alternative topic: [a better direction to redirect this conversation]\n"
+                    f"Gap level: [high/medium/low]"
+                )
+            else:
+                return _fallback
+
+            analysis_response = self.client.chat.completions.create(
+                model=self.selected_model,
+                messages=[
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                max_tokens=120,
+                temperature=0.3,
+            )
+            context_text = analysis_response.choices[0].message.content.strip()
+            # Compact multiline output into a single log line
+            summary = context_text.replace("\n", " · ")[:120]
+            return {"stage_name": stage_name, "summary": summary, "context": context_text}
+
+        except Exception as e:
+            workflow_logger.warning(f"⚠️ Role analysis LLM call failed ({role_type}): {e}")
+            return _fallback
+
     def _prepare_few_shot_examples(self) -> str:
         """Prepare few-shot example content."""
         try:
@@ -3667,6 +3813,19 @@ CRITICAL REQUIREMENTS
         except Exception as e:
             workflow_logger.error(f"       ❌ Failed to prepare few-shot examples: {e}")
             return ""
+
+
+# Import role enhancement patch for automatic defense role integration
+try:
+    from .role_enhancement_patch import (
+        calculate_context_parameters,
+        enhanced_assign_roles_to_agents,
+        enhanced_generate_fallback_instruction,
+        integrate_with_coordination_system
+    )
+    _ROLE_ENHANCEMENT_AVAILABLE = True
+except ImportError:
+    _ROLE_ENHANCEMENT_AVAILABLE = False
 
 
 class SimpleCoordinationSystem:
@@ -3757,6 +3916,16 @@ class SimpleCoordinationSystem:
 
         self.action_history = []
         self.current_phase = "idle"
+        self._last_analysis_data = {}  # Cache last analyst output for smart role distribution
+        self._evolved_allocation = None  # Updated by EvolutionEngine after every 3 cycles
+        self._evolution_cycle_count = 0
+        try:
+            from .defense_evolution_system import DefenseCoordinator
+            self._defense_coordinator = DefenseCoordinator()
+            workflow_logger.info("✅ DefenseCoordinator initialized for evolution feedback loop")
+        except Exception as _e:
+            self._defense_coordinator = None
+            workflow_logger.warning(f"⚠️ DefenseCoordinator unavailable: {_e}")
 
         # Phase three: feedback and iteration
         self.monitoring_active = False
@@ -4278,6 +4447,16 @@ class SimpleCoordinationSystem:
 
     def _assign_roles_to_agents(self, agents: List, role_distribution: Dict[str, int]) -> List:
         """Assign roles to agents - simplified version, fix type comparison errors."""
+        # Try to use enhanced role assignment with defense roles
+        if _ROLE_ENHANCEMENT_AVAILABLE and role_distribution:
+            try:
+                analysis_for_context = getattr(self, '_last_analysis_data', {})
+                context_params = calculate_context_parameters(analysis_for_context)
+                evolved = getattr(self, '_evolved_allocation', None)
+                return enhanced_assign_roles_to_agents(agents, role_distribution, context_params, total_agents=len(agents), base_ratios=evolved)
+            except Exception as e:
+                workflow_logger.warning(f"  ⚠️ Enhanced role assignment failed, using fallback: {e}")
+        
         if not role_distribution:
             # If no role distribution, all agents use general role
             for i, agent in enumerate(agents):
@@ -4316,6 +4495,175 @@ class SimpleCoordinationSystem:
             agent_index += 1
 
         return agents
+
+    def _record_defense_feedback(self, amplifier_responses: List[Dict[str, Any]], likes_count: int = 0):
+        """Record defense agent performance feedback and trigger evolution every 3 cycles."""
+        if not self._defense_coordinator or not self.amplifier_agents:
+            return
+        try:
+            from .defense_evolution_system import FeedbackMetrics
+            from .defense_agent_types import DefenseAgentType
+            role_map = {
+                "empath": DefenseAgentType.EMPATH,
+                "fact_checker": DefenseAgentType.FACT_CHECKER,
+                "amplifier": DefenseAgentType.AMPLIFIER,
+                "niche_filler": DefenseAgentType.NICHE_FILLER,
+            }
+            role_counts: Dict[str, int] = {}
+            for agent in self.amplifier_agents:
+                role = getattr(agent, 'assigned_role', 'general')
+                role_counts[role] = role_counts.get(role, 0) + 1
+
+            total_agents = max(sum(role_counts.values()), 1)
+            success_rate = len([r for r in amplifier_responses if r.get("success")]) / max(len(amplifier_responses), 1)
+            per_agent_likes = likes_count / total_agents
+            sentiment_improvement = (success_rate - 0.5) * 0.4  # proxy: success rate → sentiment
+
+            for role_str, count in role_counts.items():
+                defense_type = role_map.get(role_str)
+                if not defense_type:
+                    continue
+                metrics = FeedbackMetrics(
+                    likes_received=int(per_agent_likes * count),
+                    sentiment_improvement=sentiment_improvement,
+                    engagement_rate=success_rate
+                )
+                self._defense_coordinator.evolution_engine.record_feedback(defense_type, metrics)
+
+            self._evolution_cycle_count += 1
+            if self._evolution_cycle_count % 3 == 0:
+                result = self._defense_coordinator.trigger_evolution()
+                alloc = result.get("current_allocation", {})
+                self._evolved_allocation = alloc
+                workflow_logger.info(
+                    f"🧬 Evolution #{self._evolution_cycle_count // 3} → "
+                    f"empath={alloc.get('empath', 0):.1%} "
+                    f"fact_checker={alloc.get('fact_checker', 0):.1%} "
+                    f"amplifier={alloc.get('amplifier', 0):.1%} "
+                    f"niche_filler={alloc.get('niche_filler', 0):.1%}"
+                )
+            else:
+                cycles_left = 3 - self._evolution_cycle_count % 3
+                workflow_logger.info(f"📊 Defense feedback recorded (cycle {self._evolution_cycle_count}, evolution in {cycles_left} more)")
+        except Exception as e:
+            workflow_logger.warning(f"⚠️ Defense feedback recording failed: {e}")
+
+    async def execute_niche_filler_for_vacuum(
+        self,
+        post_id: str,
+        user_id: str,
+        topic_summary: str,
+        minutes_since_ban: float = 0.0
+    ):
+        """
+        Rapidly deploy NicheFiller agents to fill the discussion vacuum after a ban/takedown.
+        Uses a lightweight path (bypasses Analyst + Strategist + Leader) for fast response.
+
+        Time windows based on NicheFiller golden-window logic:
+          0-30 min  → golden (vacuum=0.9)
+          30-120 min → silver (vacuum=0.6)
+          120-360 min → bronze (vacuum=0.35)
+          >360 min   → skip (too late)
+        """
+        if minutes_since_ban <= 30:
+            vacuum_level = 0.9
+            window = "golden"
+        elif minutes_since_ban <= 120:
+            vacuum_level = 0.6
+            window = "silver"
+        elif minutes_since_ban <= 360:
+            vacuum_level = 0.35
+            window = "bronze"
+        else:
+            workflow_logger.info(f"⏰ NicheFiller: vacuum expired ({minutes_since_ban:.0f}min since ban), skipping")
+            return
+
+        workflow_logger.info(
+            f"🕳️ NicheFiller vacuum activated: post={post_id} user={user_id} "
+            f"vacuum={vacuum_level:.0%} ({window} window)"
+        )
+
+        # Override analysis context to signal high vacuum to _assign_roles_to_agents
+        self._last_analysis_data = {
+            **getattr(self, '_last_analysis_data', {}),
+            "discussion_vacuum": vacuum_level,
+            "account_ban_event": True,
+            "sentiment_score": 0.5,
+            "extremism_level": 0,
+            "engagement_metrics": {"intensity_level": "LOW"},
+        }
+
+        # Temporarily override evolved allocation: NicheFillers dominate proportionally to vacuum_level
+        # Non-niche roles share the remainder in proportion to AgentAllocationStrategy defaults
+        original_allocation = getattr(self, '_evolved_allocation', None)
+        from .defense_agent_types import AgentAllocationStrategy as _AAS
+        _base = _AAS()
+        _non_niche_sum = _base.empath_ratio + _base.fact_checker_ratio + _base.amplifier_ratio
+        _niche_ratio = vacuum_level  # vacuum_level [0,1] directly drives niche dominance
+        _scale = (1.0 - _niche_ratio) / _non_niche_sum
+        self._evolved_allocation = {
+            "niche_filler": round(_niche_ratio, 3),
+            "empath": round(_base.empath_ratio * _scale, 3),
+            "fact_checker": round(_base.fact_checker_ratio * _scale, 3),
+            "amplifier": round(_base.amplifier_ratio * _scale, 3),
+        }
+
+        # Pre-built amplifier plan — no LLM calls needed for Analyst/Strategist/Leader
+        total_agents = 4
+        niche_instruction = {
+            "role_type": "niche_filler",
+            "response_style": "gentle topic redirection",
+            "key_message": "Introduce a constructive alternative topic to fill the discussion vacuum",
+            "tone": "engaging and redirective",
+            "focus_points": [
+                "Fill the discussion vacuum with a fresh constructive topic",
+                "Gently redirect community attention away from the removed content",
+                "Keep tone mild, welcoming, and non-confrontational",
+            ],
+            "typical_phrases": [
+                "On this topic, there's another angle worth exploring...",
+                "While we reflect on this, let's also consider...",
+                "Here's a related discussion that might interest the community...",
+            ],
+            "response_length": "60-120 words",
+        }
+        amplifier_plan = {
+            "total_agents": total_agents,
+            "role_distribution": {
+                "niche_filler": 2,
+                "empath": 1,
+                "amplifier": 1,
+                "fact_checker": 0,
+            },
+            "agent_instructions": [niche_instruction],
+            "coordination_strategy": "rapid vacuum filling",
+            "timing_plan": {},
+        }
+
+        vacuum_content = (
+            f"{topic_summary or 'Community discussion'}\n\n"
+            f"[Vacuum context: A major post was removed. "
+            f"Time since removal: {minutes_since_ban:.0f}min. "
+            f"Goal: fill discussion space with constructive alternative topics. "
+            f"Vacuum intensity: {vacuum_level:.0%}.]"
+        )
+
+        try:
+            amplifier_responses = await self._coordinate_amplifier_agents(
+                target_content=vacuum_content,
+                amplifier_plan=amplifier_plan,
+                target_post_id=post_id,
+            )
+            filled = len([r for r in amplifier_responses if r.get("success")])
+            workflow_logger.info(
+                f"✅ NicheFiller vacuum filled: {filled}/{total_agents} agents responded "
+                f"(post={post_id}, {window} window)"
+            )
+        except Exception as e:
+            workflow_logger.warning(f"⚠️ NicheFiller vacuum response failed: {e}")
+        finally:
+            # Restore original allocation so it doesn't pollute normal workflows
+            self._evolved_allocation = original_allocation
 
     def _assign_few_shot_examples(self, agent, role_type: str):
         """Assign few-shot examples to agent."""
@@ -4562,70 +4910,156 @@ class SimpleCoordinationSystem:
         return successful_responses
 
     def _generate_fallback_instruction(self, role_type: str, index: int, target_content: str) -> Dict[str, Any]:
-        """Generate fallback instructions for a specific role."""
+        """Generate fallback instructions for a specific role - aligned with new defense agent prompts."""
         try:
-            if role_type == "technical_rational":
-                return {
-                    "role_type": role_type,
-                    "agent_index": index,
+            # Import typical phrases from defense_agent_prompts
+            from .defense_agent_prompts import (
+                EmpathPrompts, FactCheckerPrompts, AmplifierPrompts, NicheFillerPrompts
+            )
+            
+            # Role-specific configurations aligned with new prompt design
+            role_configs = {
+                "empath": {
+                    "response_style": "emotional de-escalation",
+                    "key_message": "Reduce emotional escalation and create psychological safety",
+                    "tone": "calm, human, respectful, emotionally aware",
+                    "typical_phrases": EmpathPrompts.get_typical_phrases(),
+                    "avoid_phrases": EmpathPrompts.get_avoid_phrases(),
+                    "focus_points": ["Recognize the emotion", "Validate the concern", "Encourage patience"],
+                    "response_length": "30-80 words",
+                    "output_format": "Empathy → Context → Gentle reframing"
+                },
+                "fact_checker": {
+                    "response_style": "evidence-based correction",
+                    "key_message": "Identify misinformation and respond with clear evidence",
+                    "tone": "analytical, neutral, evidence-driven, professional",
+                    "typical_phrases": FactCheckerPrompts.get_typical_phrases(),
+                    "avoid_phrases": FactCheckerPrompts.get_avoid_phrases(),
+                    "focus_points": ["Identify core claim", "Present verifiable facts", "Provide reasoned conclusion"],
+                    "response_length": "50-150 words",
+                    "output_format": "[Claim] → [Verified Information] → [Analysis] → [Conclusion]"
+                },
+                "amplifier": {
+                    "response_style": "authoritative clarification",
+                    "key_message": "Interrupt misinformation cascades with confident clarification",
+                    "tone": "confident, clear, authoritative, concise",
+                    "typical_phrases": AmplifierPrompts.get_typical_phrases(),
+                    "avoid_phrases": AmplifierPrompts.get_avoid_phrases(),
+                    "focus_points": ["Acknowledge discussion", "Clarify key point", "Reinforce verified information"],
+                    "response_length": "40-90 words",
+                    "output_format": "Recognition → Clarification → Stabilization"
+                },
+                "niche_filler": {
+                    "response_style": "constructive topic introduction",
+                    "key_message": "Introduce alternative, low-conflict topics to fill attention vacuums",
+                    "tone": "curious, inviting, light, inclusive",
+                    "typical_phrases": NicheFillerPrompts.get_typical_phrases(),
+                    "avoid_phrases": NicheFillerPrompts.get_avoid_phrases(),
+                    "focus_points": ["Gentle transition", "Introduce constructive angle", "Invite participation"],
+                    "response_length": "30-80 words",
+                    "output_format": "Transition → New Topic → Invitation"
+                },
+                "technical_rational": {
                     "response_style": "professional analysis",
                     "key_message": "Provide objective analysis from a technical perspective",
                     "tone": "objective and professional",
-                    "typical_phrases": ["From a technical perspective", "According to the data", "Research shows"],
+                    "typical_phrases": [
+                        "The technical details here reveal...",
+                        "Looking at this systematically...",
+                        "What the data actually indicates...",
+                        "From an engineering standpoint...",
+                        "The mechanism at work here..."
+                    ],
+                    "avoid_phrases": ["I think", "Maybe", "In my opinion"],
                     "focus_points": ["Provide data support", "Clarify technical details"],
                     "response_length": "80-150 words"
-                }
-            elif role_type == "moderate_neutral":
-                return {
-                    "role_type": role_type,
-                    "agent_index": index,
+                },
+                "moderate_neutral": {
                     "response_style": "balanced and rational",
                     "key_message": "Provide balanced viewpoints and rational analysis",
                     "tone": "calm and balanced",
-                    "typical_phrases": ["I think", "From another angle", "Rationally speaking"],
+                    "typical_phrases": [
+                        "There's merit to multiple perspectives here...",
+                        "Stepping back from the emotion...",
+                        "What if we framed this differently...",
+                        "The nuance here is worth exploring...",
+                        "A balanced view would acknowledge..."
+                    ],
+                    "avoid_phrases": ["I agree", "That makes sense", "You're wrong"],
                     "focus_points": ["Ease opposing emotions", "Seek common ground"],
                     "response_length": "60-120 words"
-                }
-            elif role_type == "public_concern":
-                return {
-                    "role_type": role_type,
-                    "agent_index": index,
-                    "response_style": "express concern",
+                },
+                "public_concern": {
+                    "response_style": "community perspective",
                     "key_message": "Express concerns and expectations from the public perspective",
                     "tone": "concerned but rational",
-                    "typical_phrases": ["As an ordinary person", "What we care about is", "For everyone"],
+                    "typical_phrases": [
+                        "What hits home for many of us is...",
+                        "The practical reality for regular people...",
+                        "At the end of the day, we just want...",
+                        "Speaking from the community perspective...",
+                        "What matters to most people here..."
+                    ],
+                    "avoid_phrases": ["As an ordinary person", "Everyone thinks"],
                     "focus_points": ["Express public concerns", "Focus on real impact"],
                     "response_length": "70-130 words"
-                }
-            elif role_type == "skeptic":
-                return {
-                    "role_type": role_type,
-                    "agent_index": index,
+                },
+                "skeptic": {
                     "response_style": "rational questioning",
                     "key_message": "Raise reasonable questions and request clarification",
                     "tone": "cautious skepticism",
-                    "typical_phrases": ["Need more evidence", "This claim", "Have you considered"],
+                    "typical_phrases": [
+                        "Something doesn't add up here...",
+                        "The logical gaps concern me...",
+                        "Has anyone actually verified...",
+                        "I'd push back on that assumption...",
+                        "Where's the evidence for..."
+                    ],
+                    "avoid_phrases": ["That's wrong", "You're lying", "This is fake"],
                     "focus_points": ["Raise reasonable questions", "Request evidence"],
                     "response_length": "50-100 words"
                 }
-            else:
-                return {
-                    "role_type": "general_support",
-                    "agent_index": index,
-                    "response_style": "general support",
-                    "key_message": "Express support and understanding",
-                    "tone": "neutral support",
-                    "typical_phrases": ["I agree", "That makes sense", "Worth considering"],
-                    "focus_points": ["Express support", "Increase discussion heat"],
-                    "response_length": "40-80 words"
-                }
+            }
+            
+            # Get configuration for the role type
+            config = role_configs.get(role_type, {
+                "response_style": "constructive engagement",
+                "key_message": "Participate thoughtfully in the discussion",
+                "tone": "neutral and engaged",
+                "typical_phrases": [
+                    "Building on that thought...",
+                    "An additional perspective to consider...",
+                    "What's interesting here is...",
+                    "Let me add something to this...",
+                    "This raises an important point..."
+                ],
+                "avoid_phrases": ["I agree", "That makes sense", "Exactly"],
+                "focus_points": ["Be authentic", "Add value", "Stay constructive"],
+                "response_length": "40-80 words"
+            })
+            
+            # Select different phrases based on index for variety
+            typical_phrases = config.get("typical_phrases", [])
+            if typical_phrases:
+                # Use index to select different starting phrases
+                selected_phrases = typical_phrases[index % len(typical_phrases):] + typical_phrases[:index % len(typical_phrases)]
+                config["typical_phrases"] = selected_phrases[:3]  # Take top 3 rotated phrases
+            
+            return {
+                "role_type": role_type,
+                "agent_index": index,
+                **config,
+                "diversity_note": "Each response must be UNIQUE - lead with interesting observations, not template phrases"
+            }
+            
         except Exception as e:
             workflow_logger.info(f"  ⚠️ Failed to generate fallback instruction: {e}")
             return {
                 "role_type": role_type,
                 "response_style": "default",
                 "key_message": "Participate in discussion",
-                "tone": "neutral"
+                "tone": "neutral",
+                "diversity_note": "Be unique and authentic"
             }
     
     async def execute_workflow(self, content_text: str, content_id: str = None,
@@ -4774,6 +5208,9 @@ class SimpleCoordinationSystem:
                     f"sentiment: {final_sentiment_score:.2f}/1.0"
                 )
 
+            # Cache analysis data for smart role distribution in _assign_roles_to_agents
+            self._last_analysis_data = analysis_data
+
             # If forced intervention, skip checks and execute directly
             if force_intervention:
                 workflow_logger.info("   🔧 Force intervention mode: skip checks and execute intervention")
@@ -4792,6 +5229,7 @@ class SimpleCoordinationSystem:
             
             if not analysis_result["alert_generated"]:
                 self.current_phase = "completed"
+                workflow_logger.info(f"✅ No intervention needed for post {content_id} - Workflow completed (no action taken)")
                 return {
                     "success": True,
                     "action_id": action_id,
@@ -4820,8 +5258,9 @@ class SimpleCoordinationSystem:
 
             workflow_logger.info("   🚨 Analyst determined opinion balance intervention needed!")
             workflow_logger.info(f"  ⚠️  Alert generated - Urgency: {alert['urgency_level']}")
-            
+
             # 2. Strategist creates strategy
+            workflow_logger.info("⚖️ Strategist is creating strategy...")
             strategy_result = await self.strategist.create_strategy(alert)
 
             # Check whether strategy result is None or invalid
@@ -4883,23 +5322,36 @@ class SimpleCoordinationSystem:
                     # Last fallback: get from alert_data
                     alert_data = alert.get("alert_data", {})
                     target_post_id = alert_data.get("post_id", "") or alert_data.get("content_id", "")
-                
+
                 # Clean possible prefix
                 if target_post_id and target_post_id.startswith("intervention_post_"):
                     target_post_id = target_post_id.replace("intervention_post_", "")
-            
-            # Leader Agent runs USC process, generates candidates, and posts two comments
+
+            # Build enhanced amplifier plan immediately after Strategist completes
+            if not isinstance(amplifier_plan, dict):
+                amplifier_plan = {"total_agents": 5, "role_distribution": {}}
+            if not amplifier_plan.get("role_distribution"):
+                amplifier_plan["role_distribution"] = {}
+
+            enhanced_amplifier_plan = amplifier_plan.copy()
+            enhanced_amplifier_plan["agent_instructions"] = amplifier_instructions
+            enhanced_amplifier_plan["coordination_strategy"] = coordination_strategy
+            enhanced_amplifier_plan["timing_plan"] = agent_instructions.get("timing_plan", {})
+
+            workflow_logger.info(f"  📋 Amplifier plan: total={amplifier_plan.get('total_agents', 5)}, role distribution={amplifier_plan.get('role_distribution', {})}")
+            if amplifier_instructions:
+                workflow_logger.info(f"  📋 Applying strategist amplifier instructions: {len(amplifier_instructions)} detailed instructions")
+                workflow_logger.info(f"  🎯 Coordination strategy: {enhanced_amplifier_plan['coordination_strategy']}")
+
+            # Step 1: Leader generates comments first
             workflow_logger.info("🎯 Leader Agent starts USC process and generates candidate comments...")
-            content_result = await self.leader.generate_strategic_content(
-                strategy,  # Pass full strategy object instead of leader_instruction
-                content_text
-            )
+            content_result = await self.leader.generate_strategic_content(strategy, content_text)
 
             if not content_result or not content_result.get("success", False):
                 self.current_phase = "error"
                 error_msg = content_result.get('error', 'content generation failed') if content_result else 'content generation returned None'
                 return {"success": False, "error": f"Leader content generation failed: {error_msg}", "action_id": action_id}
-            
+
             leader_content = content_result["content"]
             leader_model = leader_content.get("selected_model", "unknown")
             selected_comments = leader_content.get("selected_comments", [])
@@ -4921,71 +5373,37 @@ class SimpleCoordinationSystem:
             workflow_logger.info(f"✅ Leader USC core content generated (model: {leader_model})")
             workflow_logger.info(f"💬 👑 Leader comment 1 on post {target_post_id}: {final_content_1}")
             workflow_logger.info(f"💬 👑 Leader comment 2 on post {target_post_id}: {final_content_2}")
-            
+
             # First leader posts a comment
             leader_comment_id = self._save_leader_comment_to_database(final_content_1, target_post_id, action_id)
             if leader_comment_id:
-                # Log to workflow
                 workflow_logger.info(f"💬 First leader comment ID: {leader_comment_id}")
                 workflow_logger.info(f"🎯 Target post: {target_post_id}")
             else:
-                # Log to workflow
                 workflow_logger.warning("⚠️ First leader comment save failed")
-                # Terminal output
                 logging.warning("⚠️ First leader comment save failed")
-            
+
             # Second leader posts a comment (use different action_id seed to generate different "user" ID)
             leader_comment_id_2 = self._save_leader_comment_to_database(final_content_2, target_post_id, f"{action_id}_leader2")
             if leader_comment_id_2:
-                # Log to workflow
                 workflow_logger.info(f"💬 Second leader comment ID: {leader_comment_id_2}")
                 workflow_logger.info(f"🎯 Target post: {target_post_id}")
             else:
-                # Log to workflow
                 workflow_logger.warning("⚠️ Second leader comment save failed")
-                # Terminal output
                 logging.warning("⚠️ Second leader comment save failed")
 
-            # 4. amplifier Agent responses
-            # Activate amplifier Agent cluster
-            # Log to workflow
+            # Step 2: Amplifier starts after Leader finishes, uses Leader's content as input
             workflow_logger.info("⚖️ Activating Amplifier Agent cluster...")
-
-            # Ensure amplifier_plan contains required fields
-            if not isinstance(amplifier_plan, dict):
-                amplifier_plan = {"total_agents": 5, "role_distribution": {}}
-
-            # If role_distribution is missing, use defaults
-            if not amplifier_plan.get("role_distribution"):
-                amplifier_plan["role_distribution"] = {}
-
-            workflow_logger.info(f"  📋 Amplifier plan: total={amplifier_plan.get('total_agents', 5)}, role distribution={amplifier_plan.get('role_distribution', {})}")
-
-            # Enhance amplifier_plan with concrete instructions
-            enhanced_amplifier_plan = amplifier_plan.copy()
-            enhanced_amplifier_plan["agent_instructions"] = amplifier_instructions
-            enhanced_amplifier_plan["coordination_strategy"] = coordination_strategy
-            enhanced_amplifier_plan["timing_plan"] = agent_instructions.get("timing_plan", {})
-
-            if amplifier_instructions:
-                workflow_logger.info(f"  📋 Applying strategist amplifier instructions: {len(amplifier_instructions)} detailed instructions")
-                workflow_logger.info(f"  🎯 Coordination strategy: {enhanced_amplifier_plan['coordination_strategy']}")
-
+            amplifier_input_text = final_content_1 or content_text
             try:
-                # amplifier Agents generate responses based on the overall context of two leader comments
-                amplifier_input_text = final_content_1 if not final_content_2 else f"{final_content_1}\n\n{final_content_2}"
-                amplifier_responses = await self._coordinate_amplifier_agents(
-                    amplifier_input_text,
-                    enhanced_amplifier_plan,
-                    target_post_id  # Pass target post ID to amplifier Agent
-                )
-                if amplifier_responses is None:
-                    amplifier_responses = []
-                    workflow_logger.warning("  ⚠️ amplifier coordination returned None, using empty list")
+                amplifier_responses = await self._coordinate_amplifier_agents(amplifier_input_text, enhanced_amplifier_plan, target_post_id)
             except Exception as e:
                 workflow_logger.warning(f"  ⚠️ amplifier coordination failed: {e}")
                 amplifier_responses = []
-            
+            if amplifier_responses is None:
+                amplifier_responses = []
+                workflow_logger.warning("  ⚠️ amplifier coordination returned None, using empty list")
+
             workflow_logger.info(f"  ✅ {len(amplifier_responses)} amplifier responses generated")
 
             # Highlighted amplifier agent content display
@@ -4996,18 +5414,22 @@ class SimpleCoordinationSystem:
                     comment_id = response_data.get("comment_id", f"amplifier-{i+1}")
                     persona_id = response_data.get("persona_id", f"persona-{i+1}")
                     selected_model = response_data.get("selected_model", "unknown")
+                    agent_role = response_data.get("agent_role", "")
+                    role_tag = f" [{agent_role}]" if agent_role else ""
 
-                    # Highlighted amplifier agent content display
-                    workflow_logger.info(f"💬 🤖 amplifier-{i+1} ({persona_id}) ({selected_model}) commented: {response_content}")
+                    # Highlighted amplifier agent content display with role type
+                    role_display = f"【{agent_role}】" if agent_role else ""
+                    workflow_logger.info(f"💬 🤖 amplifier-{i+1}{role_display} ({persona_id}) ({selected_model}) commented: {response_content}")
 
             # amplifier Agents like leader comments
+            likes_count = 0
             if leader_comment_id and amplifier_responses:
                 workflow_logger.info("💖 amplifier Agents start liking leader comments...")
                 likes_count = await self._amplifier_agents_like_leader_comment(leader_comment_id, amplifier_responses, leader_comment_id_2)
                 if likes_count > 0:
                     workflow_logger.info(f"  ✅ {likes_count} amplifier Agents successfully liked leader comments")
                     workflow_logger.info(f"💖 {likes_count} amplifier Agents liked leader comments")
-                    
+
                     # Based on amplifier agent count, add (amplifier_agent_count * 20) likes to each leader comment
                     amplifier_agent_count = len([r for r in amplifier_responses if r.get("success")])
                     workflow_logger.info(f"  📊 Prepare bulk likes: amplifier_agent_count={amplifier_agent_count}, will add {amplifier_agent_count * 20} likes")
@@ -5020,6 +5442,8 @@ class SimpleCoordinationSystem:
                 else:
                     workflow_logger.info("  ⚠️  amplifier Agent likes failed or no valid responses")
 
+            # Record defense feedback for evolution engine
+            self._record_defense_feedback(amplifier_responses, likes_count)
 
             # ===== Calculate base effectiveness score =====
             workflow_logger.info("📊 Calculating base effectiveness score...")
@@ -5717,6 +6141,44 @@ class SimpleCoordinationSystem:
 
         return monitoring_task_id
 
+    async def _strategist_phase3_evaluation(
+        self,
+        feedback_report: Dict[str, Any],
+        task: Dict[str, Any],
+        monitoring_count: int,
+        is_baseline: bool,
+    ) -> None:
+        """[Iterate] Strategist Agent - Phase 3 evaluation only (no content execution).
+
+        Phase 3 is a feedback-and-learning phase. The Strategist reads the analyst's
+        effectiveness report, assesses the current strategy's impact, and logs its
+        recommendation. Leader and Amplifier are intentionally excluded here; any
+        new content execution cycle happens in Phase 2 of the next workflow run.
+        """
+        round_label = "Baseline" if is_baseline else f"Round {monitoring_count}"
+        workflow_logger.info(f"⚖️ Strategist evaluating {round_label} effectiveness...")
+
+        effectiveness = feedback_report.get("effectiveness_assessment", {})
+        current_metrics = feedback_report.get("current_metrics", {})
+        change_metrics = feedback_report.get("change_metrics", {})
+
+        overall_score = effectiveness.get("overall_score", 0.0)
+        extremism = current_metrics.get("extremism_score", 0.5)
+        sentiment = current_metrics.get("sentiment_score", 0.5)
+        extremism_change = change_metrics.get("extremism_change", 0.0)
+        sentiment_change = change_metrics.get("sentiment_change", 0.0)
+
+        workflow_logger.info(f"  📊 {round_label} effectiveness score: {overall_score:.2f}/1.0")
+        workflow_logger.info(f"  📈 Extremism: {extremism:.2f}/1.0  Sentiment: {sentiment:.2f}/1.0")
+        workflow_logger.info(f"  🔄 Extremism change: {extremism_change:+.3f}  Sentiment change: {sentiment_change:+.3f}")
+
+        if overall_score >= 0.5:
+            workflow_logger.info("  🎯 Strategy assessment: intervention partially effective — continue monitoring")
+        else:
+            workflow_logger.info("  🎯 Strategy assessment: limited effect — next scan cycle will reassess and re-execute if needed")
+
+        workflow_logger.info(f"  📋 Strategist phase 3 evaluation complete (Leader/Amplifier reserved for Phase 2)")
+
     def _on_monitoring_task_done(self, monitoring_task_id: str, task_handle: asyncio.Task):
         """Monitoring task completion callback for tracking/diagnostics."""
         try:
@@ -5790,37 +6252,16 @@ class SimpleCoordinationSystem:
             
             # Check if success criteria are met
             success_achieved = self._check_success_criteria(feedback_report, task)
-            
+
             if success_achieved:
                 workflow_logger.info("  🎉 Monitoring goal achieved! Stopping monitoring loop")
                 break
-            
-            # Check whether intervention is needed
-            if success_achieved is False:
-                workflow_logger.info(f"  🚨 {'Baseline' if is_baseline else f'Round {monitoring_count}'} report indicates intervention needed...")
-                
-                # Construct alert object from feedback report
-                alert = self._construct_alert_from_report(feedback_report, task)
-                if not alert:
-                    workflow_logger.warning("  ⚠️ Failed to construct alert object, skipping intervention")
-                    continue
-                
-                # Execute intervention and update baseline data
-                try:
-                    intervention_result = await self._execute_intervention_from_alert(alert, task)
-                    if intervention_result is None:
-                        workflow_logger.warning("  ⚠️ Intervention execution returned None")
-                        continue
-                except Exception as e:
-                    workflow_logger.warning(f"  ⚠️ Intervention execution error: {e}")
-                    continue
-                
-                if intervention_result.get("success"):
-                    workflow_logger.info(f"  ✅ {'Baseline' if is_baseline else f'Round {monitoring_count}'} intervention executed successfully")
-                else:
-                    workflow_logger.warning(f"  ⚠️ {'Baseline' if is_baseline else f'Round {monitoring_count}'} intervention execution failed: {intervention_result.get('error', 'unknown error')}")
-            else:
-                workflow_logger.info(f"  ✅ {'Baseline' if is_baseline else f'Round {monitoring_count}'} report shows no intervention needed, continue monitoring...")
+
+            # Phase 3 protocol: criteria not yet met — Strategist evaluates only.
+            # Leader and Amplifier do NOT run in Phase 3 (feedback phase).
+            # If a new content execution cycle is needed it will be initiated by
+            # the outer _background_monitoring scan via a fresh execute_workflow call.
+            await self._strategist_phase3_evaluation(feedback_report, task, monitoring_count, is_baseline)
             
             # Wait for interval after each round (except the last)
             if monitoring_count < max_monitoring_cycles:
@@ -6070,6 +6511,7 @@ class SimpleCoordinationSystem:
             workflow_logger.info(f"     📋 Action ID: {action_id}")
             
             # 1. Strategist creates strategy - reuse execute_workflow logic
+            workflow_logger.info("⚖️ Strategist is creating strategy...")
             strategy_result = await self.strategist.create_strategy(alert)
             
             # Check whether strategy result is None or invalid
@@ -6123,7 +6565,7 @@ class SimpleCoordinationSystem:
                 target_post_id_clean = target_post_id_clean.replace("intervention_post_", "")
             
             # First leader uses LLM to generate content
-            workflow_logger.info("🎯 First leader agent starts generating content...")
+            workflow_logger.info("🎯 Leader Agent starts USC process and generates candidate comments...")
             content_result_1 = await self.leader.generate_strategic_content(
                 strategy,  # Pass full strategy object
                 content_text
@@ -6131,13 +6573,15 @@ class SimpleCoordinationSystem:
             
             if not content_result_1 or not content_result_1.get("success", False):
                 error_msg = content_result_1.get('error', 'content generation failed') if content_result_1 else 'content generation returned None'
-                return {"success": False, "error": f"First leader content generation failed: {error_msg}", "action_id": action_id}
-            
-            leader_content_1 = content_result_1["content"]
-            final_content_1 = leader_content_1.get("final_content", "")
-            leader_model_1 = leader_content_1.get("selected_model", "unknown")
-            workflow_logger.info("✅ First leader core content generated")
-            workflow_logger.info(f"💬 👑 First leader ({leader_model_1}) commented on post {target_post_id_clean}: {final_content_1}")
+                workflow_logger.warning(f"⚠️ First leader content generation failed: {error_msg}, falling back to strategy context")
+                final_content_1 = strategy.get("core_counter_argument", content_text)
+                leader_model_1 = "fallback"
+            else:
+                leader_content_1 = content_result_1["content"]
+                final_content_1 = leader_content_1.get("final_content", "")
+                leader_model_1 = leader_content_1.get("selected_model", "unknown")
+                workflow_logger.info("✅ First leader core content generated")
+                workflow_logger.info(f"💬 👑 First leader ({leader_model_1}) commented on post {target_post_id_clean}: {final_content_1}")
             
             # Second leader uses LLM to generate content
             workflow_logger.info("🎯 Second leader agent starts generating content...")
@@ -6226,13 +6670,14 @@ class SimpleCoordinationSystem:
                     workflow_logger.info(f"💬 🤖 amplifier-{i+1} ({persona_id}) ({selected_model}) commented: {response_content}")
             
             # amplifier Agents like leader comments
+            likes_count = 0
             if leader_comment_id and amplifier_responses:
                 workflow_logger.info("💖 amplifier Agents start liking leader comments...")
                 likes_count = await self._amplifier_agents_like_leader_comment(leader_comment_id, amplifier_responses, leader_comment_id_2)
                 if likes_count > 0:
                     workflow_logger.info(f"  ✅ {likes_count} amplifier Agents successfully liked leader comments")
                     workflow_logger.info(f"💖 {likes_count} amplifier Agents liked leader comments")
-                    
+
                     # Based on amplifier agent count, add (amplifier_agent_count * 20) likes to each leader comment
                     amplifier_agent_count = len([r for r in amplifier_responses if r.get("success")])
                     workflow_logger.info(f"  📊 Prepare bulk likes: amplifier_agent_count={amplifier_agent_count}, will add {amplifier_agent_count * 20} likes")
@@ -6244,7 +6689,10 @@ class SimpleCoordinationSystem:
                         workflow_logger.warning("  ⚠️  amplifier_agent_count is 0, skipping bulk likes")
                 else:
                     workflow_logger.info("  ⚠️  amplifier Agent likes failed or no valid responses")
-            
+
+            # Record defense feedback for evolution engine
+            self._record_defense_feedback(amplifier_responses, likes_count)
+
             # Update task baseline data for later monitoring iterations
             combined_leader_content = {
                 "final_content": amplifier_input_text
@@ -9385,7 +9833,7 @@ Please return the evaluation result in JSON format:
                 return 0
             
             if result and result > 0:
-                self._verify_leader_comment_likes(leader_comment_id, result)
+                self._verify_leader_comment_likes(leader_comment_id)
 
             return result or 0
 
@@ -9393,7 +9841,7 @@ Please return the evaluation result in JSON format:
             workflow_logger.info(f"❌ amplifier Agent like operation failed: {e}")
             return 0
 
-    def _verify_leader_comment_likes(self, leader_comment_id: str, expected_likes: int):
+    def _verify_leader_comment_likes(self, leader_comment_id: str):
         """Verify leader comment likes increased correctly"""
         try:
             

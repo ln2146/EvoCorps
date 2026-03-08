@@ -101,7 +101,7 @@ export default function ExperimentManagement() {
   }
 
   // 导出实验数据
-  const handleExport = async (experimentId: string, experimentName: string) => {
+  const handleExport = async (experimentId: string, _experimentName: string) => {
     setLoading(true)
     try {
       const blob = await exportExperiment(experimentId)

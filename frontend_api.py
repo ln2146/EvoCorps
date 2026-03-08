@@ -42,9 +42,18 @@ except ImportError as e:
     print("⚠️ 采访功能将使用简化的模板回答")
     print("💡 提示：请确保已安装所有依赖: pip install -r requirements.txt")
 
+# 导入快照管理器
+try:
+    from snapshot_manager import create_snapshot_manager
+    SNAPSHOT_MANAGER_AVAILABLE = True
+except ImportError as e:
+    SNAPSHOT_MANAGER_AVAILABLE = False
+    print(f"⚠️ 快照管理器加载失败: {e}")
+
 app = Flask(__name__)
 CORS(app)
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_DIR = 'database'
 OPINION_BALANCE_LOG_DIR = os.path.join(os.path.dirname(__file__), 'logs', 'opinion_balance')
 WORKFLOW_LOG_DIR = os.path.join(os.path.dirname(__file__), 'logs', 'workflow')
@@ -101,7 +110,33 @@ class ProcessManager:
                 continue
 
         return found
-    
+
+    def _is_process_running_fast(self, process_name: str) -> bool:
+        """快速检查进程是否运行（仅检查已记录的 PID，不扫描全系统）
+
+        Args:
+            process_name: 进程名称 ('database', 'main', 'opinion_balance')
+
+        Returns:
+            bool: 进程是否正在运行
+        """
+        if self.processes.get(process_name):
+            pid = self.processes[process_name]
+            try:
+                proc = psutil.Process(pid)
+                if proc.is_running():
+                    cmdline = ' '.join(proc.cmdline())
+                    keywords = {
+                        'database': 'start_database_service.py',
+                        'main': 'main.py',
+                        'opinion_balance': 'opinion_balance_launcher.py'
+                    }
+                    if keywords[process_name] in cmdline:
+                        return True
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+        return False
+
     def _is_process_running(self, process_name: str) -> bool:
         """检查进程是否运行（内部方法）
         
@@ -145,31 +180,40 @@ class ProcessManager:
         return False
     
     def _create_auto_input_script(
-        self, 
-        script_path: str, 
+        self,
+        script_path: str,
         inputs: List[str],
-        conda_env: Optional[str] = None
+        conda_env: Optional[str] = None,
+        env_vars: Optional[Dict[str, str]] = None
     ) -> str:
         """创建自动输入的批处理脚本（内部方法）
-        
+
         Args:
             script_path: 要运行的 Python 脚本路径
             inputs: 输入序列列表
             conda_env: conda 环境名称（已废弃，保留兼容性）
-            
+            env_vars: 环境变量字典（可选）
+
         Returns:
             str: 批处理文件路径
         """
-        # 生成唯一的临时批处理文件名
+        # 生成唯一的临时批处理文件名（使用绝对路径，避免新终端找不到）
         timestamp = int(time.time())
-        bat_file = f"temp_input_{timestamp}.bat"
-        
+        bat_file = os.path.join(BASE_DIR, f"temp_input_{timestamp}.bat")
+
         with open(bat_file, 'w', encoding='utf-8') as f:
             # 不需要激活 conda 环境，直接使用当前 Python 解释器
             # 使用 sys.executable 确保使用当前 Python 解释器
-            
+
             # 写入自动输入命令
             f.write('@echo off\n')
+            f.write(f'cd /d "{BASE_DIR}"\n')
+
+            # 设置环境变量
+            if env_vars:
+                for key, value in env_vars.items():
+                    f.write(f'set {key}={value}\n')
+
             f.write('(\n')
             for inp in inputs:
                 if inp == '':  # 空字符串表示回车
@@ -177,42 +221,82 @@ class ProcessManager:
                 else:
                     f.write(f'echo {inp}\n')
             f.write(f') | "{self.python_exe}" {script_path}\n')
-            # 添加 exit 命令，确保批处理执行完毕后立即退出，不显示任何提示
-            f.write('exit\n')
-        
+            # pause 让用户确认后再 exit，避免终端自动关闭
+            f.write('pause\n')
+            # 注意：移除 exit 命令，让终端在模拟结束后保持打开状态
+            # 用户可以手动关闭终端窗口
+            # f.write('exit\n')
+
         # 记录临时文件路径用于后续清理
         self.temp_files.append(bat_file)
         return bat_file
     
     def _start_process_in_terminal(
-        self, 
-        script_path: str, 
+        self,
+        script_path: str,
         title: str,
         auto_inputs: Optional[List[str]] = None,
-        conda_env: Optional[str] = None
+        conda_env: Optional[str] = None,
+        env_vars: Optional[Dict[str, str]] = None
     ) -> subprocess.Popen:
         """在新终端启动进程（内部方法）
-        
+
         Args:
             script_path: 要运行的 Python 脚本路径
             title: 终端窗口标题
             auto_inputs: 自动输入序列（可选）
             conda_env: conda 环境名称（已废弃，保留兼容性）
-            
+            env_vars: 环境变量字典（可选）
+
         Returns:
             subprocess.Popen: 进程对象
         """
         if auto_inputs:
             # 创建临时批处理文件（包含 exit 命令）
-            bat_file = self._create_auto_input_script(script_path, auto_inputs, conda_env)
-            # 直接启动批处理文件
-            cmd = f'cmd /c start "{title}" cmd /c "{bat_file}"'
+            bat_file = self._create_auto_input_script(script_path, auto_inputs, conda_env, env_vars)
+            # 使用 Windows Terminal (wt) 启动，速度更快
+            # -w 0: 新窗口, new-tab --title: 标题, --: 后面是要执行的命令
+            cmd = f'wt -w 0 new-tab --title "{title}" -- cmd /k "{bat_file}"'
         else:
             # 直接启动，使用当前 Python 解释器
-            cmd = f'cmd /c start "{title}" cmd /c ""{self.python_exe}" {script_path} & exit"'
-        
+            # 使用 Windows Terminal (wt) 启动，速度更快
+            # 如果有环境变量，需要创建批处理文件
+            if env_vars:
+                bat_file = self._create_simple_script(script_path, env_vars)
+                cmd = f'wt -w 0 new-tab --title "{title}" -- cmd /k "{bat_file}"'
+            else:
+                cmd = f'wt -w 0 new-tab --title "{title}" -- cmd /k "cd /d "{BASE_DIR}" && "{self.python_exe}" {script_path} & pause"'
+
         process = subprocess.Popen(cmd, shell=True)
         return process
+
+    def _create_simple_script(
+        self,
+        script_path: str,
+        env_vars: Dict[str, str]
+    ) -> str:
+        """创建简单的批处理脚本（无自动输入，只有环境变量）
+
+        Args:
+            script_path: 要运行的 Python 脚本路径
+            env_vars: 环境变量字典
+
+        Returns:
+            str: 批处理文件路径
+        """
+        timestamp = int(time.time())
+        bat_file = os.path.join(BASE_DIR, f"temp_simple_{timestamp}.bat")
+
+        with open(bat_file, 'w', encoding='utf-8') as f:
+            f.write('@echo off\n')
+            f.write(f'cd /d "{BASE_DIR}"\n')
+            for key, value in env_vars.items():
+                f.write(f'set {key}={value}\n')
+            f.write(f'"{self.python_exe}" {script_path}\n')
+            f.write('pause\n')
+
+        self.temp_files.append(bat_file)
+        return bat_file
     
     def _cleanup_temp_files(self):
         """清理记录的临时文件（内部方法）"""
@@ -248,24 +332,34 @@ class ProcessManager:
             # 清理失败不应影响程序运行
             print(f"清理临时文件时出错: {e}")
     
-    def start_demo(self, conda_env: Optional[str] = None) -> dict:
+    def start_demo(self, conda_env: Optional[str] = None, enable_attack: bool = False, enable_aftercare: bool = False, snapshot_id: Optional[str] = None, start_tick: Optional[int] = None) -> dict:
         """启动演示（数据库 + 主程序）
-        
+
         注意: conda_env 参数已废弃，系统自动使用当前 Python 环境
-        
+
         Args:
             conda_env: conda 环境名称（已废弃，保留兼容性）
-            
+            enable_attack: 是否启用恶意攻击（默认 False）
+            enable_aftercare: 是否启用事后干预（默认 False）
+
         Returns:
             dict: 启动结果
         """
         try:
-            # 清理旧的临时文件
-            self._cleanup_all_temp_files()
-            
-            # 检查数据库和主程序是否已运行
-            db_running = self._is_process_running('database')
-            main_running = self._is_process_running('main')
+            # 如果指定了快照恢复，先恢复数据库
+            if snapshot_id and start_tick is not None and SNAPSHOT_MANAGER_AVAILABLE:
+                snapshot_manager = _get_snapshot_manager()
+                restored_path = snapshot_manager.restore_from_tick(start_tick, snapshot_id)
+                if not restored_path:
+                    return {
+                        'success': False,
+                        'message': f'快照恢复失败: 找不到 session_id={snapshot_id}, tick={start_tick}',
+                        'error': 'SnapshotRestoreFailed'
+                    }
+
+            # 快速检查：仅检查已记录的 PID，跳过全系统扫描
+            db_running = self._is_process_running_fast('database')
+            main_running = self._is_process_running_fast('main')
 
             # If everything is already running, treat it as success (idempotent start).
             if db_running and main_running:
@@ -283,62 +377,64 @@ class ProcessManager:
                         }
                     }
                 }
-            
+
             db_pid = self.processes.get('database') if db_running else None
             main_pid = self.processes.get('main') if main_running else None
 
             # 启动数据库服务（如果尚未运行）
             if not db_running:
-                db_script = 'src/start_database_service.py'
+                db_script = os.path.join(BASE_DIR, 'src', 'start_database_service.py')
                 if not os.path.exists(db_script):
                     return {
                         'success': False,
                         'message': f'Database script not found: {db_script}',
                         'error': 'FileNotFound'
                     }
-                
+
                 self._start_process_in_terminal(
                     script_path=db_script,
                     title='EvoCorps-Database',
                     auto_inputs=None,
                     conda_env=conda_env
                 )
-                
-                # 等待进程启动后通过 _is_process_running 来获取 PID
-                time.sleep(2)
-                if self._is_process_running('database'):
-                    db_pid = self.processes.get('database')
-                
-                # 等待 5 秒让数据库初始化
-                print("等待数据库服务初始化...")
-                time.sleep(5)
-            
-            # 创建自动输入脚本并启动主程序
-            main_script = 'src/main.py'
+
+            # 立即启动主程序（不等待数据库）
+            main_script = os.path.join(BASE_DIR, 'src', 'main.py')
             if not os.path.exists(main_script):
                 return {
                     'success': False,
                     'message': f'Main script not found: {main_script}',
                     'error': 'FileNotFound'
                 }
-            
+
             # 启动主程序（如果尚未运行）
             if not main_running:
-                # 输入序列：n, y, n, n, Enter
-                auto_inputs = ['n', 'y', 'n', 'n', '']
-                
+                # 根据前端预置标志动态生成输入序列
+                # 输入序列: [恶意攻击, 舆论平衡, 事后干预, 预启动, 确认]
+                auto_inputs = [
+                    'y' if enable_attack else 'n',   # 恶意攻击
+                    'y',                              # 舆论平衡 (standalone)
+                    'y' if enable_aftercare else 'n', # 事后干预
+                    'n',                              # 预启动
+                    ''                                # 确认
+                ]
+
+                # 如果从快照恢复，设置起始 tick 环境变量
+                env_vars = {}
+                if snapshot_id and start_tick is not None:
+                    env_vars['START_TICK'] = str(start_tick)
+                    env_vars['RESET_DB'] = 'false'
+                    env_vars['PARENT_SESSION_ID'] = snapshot_id
+                    print(f"📌 设置起始 tick: {start_tick}")
+
                 self._start_process_in_terminal(
                     script_path=main_script,
                     title='EvoCorps-Main',
                     auto_inputs=auto_inputs,
-                    conda_env=conda_env
+                    conda_env=conda_env,
+                    env_vars=env_vars if env_vars else None
                 )
-                
-                # 等待主程序启动
-                time.sleep(2)
-                if self._is_process_running('main'):
-                    main_pid = self.processes.get('main')
-            
+
             return {
                 'success': True,
                 'message': 'Dynamic demo started successfully',
@@ -374,72 +470,100 @@ class ProcessManager:
             }
     
     def stop_all_processes(self) -> dict:
-        """停止所有进程
-        
-        遍历所有已记录的进程，使用 psutil.Process.terminate() 优雅关闭，
-        等待 3 秒后检查进程是否终止，对未终止的进程使用 kill() 强制关闭。
-        清理所有临时文件，重置进程记录字典。
-        
+        """停止所有进程并关闭终端窗口
+
+        先做一次进程扫描补全 PID，然后对每个进程：
+        1. 查找整个进程树，找到 Windows Terminal (wt.exe) 或 cmd.exe
+        2. 用 taskkill /F /T 关闭整个终端窗口
+
         Returns:
             dict: 停止结果（包含已停止进程列表和错误信息）
         """
         stopped = []
         errors = []
-        
-        for name, pid in self.processes.items():
+        killed_terminals = set()  # 记录已关闭的终端，避免重复
+
+        # 补全未被记录的 PID（例如手动重启后 self.processes 为 None 的情况）
+        found = self._scan_processes_for_keywords()
+        for name, pid in found.items():
+            if pid is not None and not self.processes.get(name):
+                self.processes[name] = pid
+
+        for name, pid in list(self.processes.items()):
             if pid is None:
                 continue
-                
+
+            # 查找进程树中最高层的终端进程（wt.exe 或 cmd.exe）
+            terminal_pid = None
             try:
                 proc = psutil.Process(pid)
-                
-                # 获取父进程（通常是 cmd.exe）
+                # 向上遍历进程树，找到 Windows Terminal 或 cmd.exe
+                current = proc
+                while current:
+                    parent = current.parent()
+                    if parent:
+                        parent_name = parent.name().lower()
+                        # 找到 Windows Terminal
+                        if 'wt.exe' in parent_name or 'windowsterminal' in parent_name:
+                            terminal_pid = parent.pid
+                            break
+                        # 如果父是 cmd.exe，继续向上找（可能是 wt.exe 启动的）
+                        if 'cmd' in parent_name:
+                            # 检查 cmd 的父进程
+                            grandparent = parent.parent()
+                            if grandparent:
+                                gp_name = grandparent.name().lower()
+                                if 'wt.exe' in gp_name or 'windowsterminal' in gp_name:
+                                    terminal_pid = grandparent.pid
+                                    break
+                            # 如果没有更高的终端，就关闭 cmd.exe
+                            if terminal_pid is None:
+                                terminal_pid = parent.pid
+                            break
+                        current = parent
+                    else:
+                        break
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+
+            # 如果没找到终端，就直接关闭 Python 进程
+            if terminal_pid is None:
                 try:
-                    parent = proc.parent()
-                    parent_pid = parent.pid if parent else None
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    parent_pid = None
-                
-                # 1. 尝试优雅关闭 Python 进程
-                proc.terminate()
-                
-                # 2. 等待最多 3 秒
-                try:
-                    proc.wait(timeout=3)
+                    subprocess.run(
+                        ['taskkill', '/F', '/T', '/PID', str(pid)],
+                        capture_output=True, timeout=10
+                    )
                     stopped.append(name)
-                except psutil.TimeoutExpired:
-                    # 3. 强制关闭 Python 进程
-                    proc.kill()
-                    proc.wait(timeout=1)
-                    stopped.append(name)
-                
-                # 4. 如果有父进程（cmd.exe），也关闭它以关闭终端窗口
-                if parent_pid:
+                except Exception as e:
+                    errors.append(f"{name}: {str(e)}")
+            else:
+                # 关闭整个终端窗口（会连带关闭其中的所有进程）
+                if terminal_pid not in killed_terminals:
                     try:
-                        parent_proc = psutil.Process(parent_pid)
-                        # 检查父进程是否是 cmd.exe
-                        if 'cmd.exe' in parent_proc.name().lower():
-                            parent_proc.terminate()
-                            try:
-                                parent_proc.wait(timeout=2)
-                            except psutil.TimeoutExpired:
-                                parent_proc.kill()
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        pass  # 父进程可能已经关闭
-                    
-            except psutil.NoSuchProcess:
-                # 进程已经不存在
-                stopped.append(name)
-            except Exception as e:
-                errors.append(f"{name}: {str(e)}")
-        
+                        subprocess.run(
+                            ['taskkill', '/F', '/T', '/PID', str(terminal_pid)],
+                            capture_output=True, timeout=10
+                        )
+                        killed_terminals.add(terminal_pid)
+                        stopped.append(name)
+                    except Exception as e:
+                        errors.append(f"{name}: {str(e)}")
+                        # 如果关闭终端失败，尝试直接关闭 Python 进程
+                        try:
+                            subprocess.run(
+                                ['taskkill', '/F', '/T', '/PID', str(pid)],
+                                capture_output=True, timeout=10
+                            )
+                        except Exception:
+                            pass
+
         # 清理临时文件
         self._cleanup_temp_files()
-        self._cleanup_all_temp_files()  # 额外清理所有临时文件
-        
+        self._cleanup_all_temp_files()
+
         # 重置进程记录
         self.processes = {k: None for k in self.processes}
-        
+
         return {
             'success': len(errors) == 0,
             'message': 'All processes stopped' if not errors else 'Some processes failed to stop',
@@ -471,7 +595,7 @@ class ProcessManager:
                 }
             
             # 启动舆论平衡启动器
-            ob_script = 'src/opinion_balance_launcher.py'
+            ob_script = os.path.join(BASE_DIR, 'src', 'opinion_balance_launcher.py')
             if not os.path.exists(ob_script):
                 return {
                     'success': False,
@@ -2096,6 +2220,37 @@ def save_experiment_config():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/config/moderation', methods=['POST'])
+def update_moderation_config():
+    """Update moderation.content_moderation in experiment_config.json.
+
+    This is called by the frontend BEFORE starting a demo so that
+    main.py reads the correct initial value for control_flags.moderation_enabled.
+    """
+    try:
+        data = request.get_json()
+        if data is None:
+            return jsonify({'error': 'No JSON body'}), 400
+
+        enabled = bool(data.get('content_moderation', False))
+        config_path = 'configs/experiment_config.json'
+
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+
+        if 'moderation' not in config:
+            config['moderation'] = {}
+        config['moderation']['content_moderation'] = enabled
+
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=4)
+
+        return jsonify({'message': 'OK', 'content_moderation': enabled})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/interview/send', methods=['POST'])
 def send_interview():
     """向选中的用户发送采访问题并获取回答"""
@@ -3107,14 +3262,18 @@ def stream_opinion_balance_logs():
 @app.route('/api/dynamic/start', methods=['POST'])
 def start_dynamic_demo():
     """启动动态演示系统（数据库 + 主程序）
-    
-    自动使用当前 Python 环境（frontend_api.py 运行的环境）
-    
+
+    自动使用当前 Python 环境（frontend_api.py 运行的环境)
+
     请求体:
         {
-            "conda_env": "环境名称"  // 可选，已废弃，保留兼容性
+            "conda_env": "环境名称",      // 可选，已废弃，保留兼容性
+            "enable_attack": true/false,  // 可选，是否启用恶意攻击
+            "enable_aftercare": true/false, // 可选，是否启用事后干预
+            "snapshot_id": "20260307_123456", // 可选，从指定快照恢复
+            "start_tick": 50              // 可选，从指定 tick 开始（需要 snapshot_id）
         }
-    
+
     响应:
         {
             "success": true/false,
@@ -3126,16 +3285,43 @@ def start_dynamic_demo():
         }
     """
     try:
-        # 解析请求体（保留 conda_env 参数兼容性，但不使用）
+        # 解析请求体
         data = request.get_json() or {}
         conda_env = data.get('conda_env')  # 保留兼容性，但不使用
-        
-        # 调用 process_manager.start_demo()
-        result = process_manager.start_demo(conda_env=conda_env)
-        
+        enable_attack = data.get('enable_attack', False)
+        enable_aftercare = data.get('enable_aftercare', False)
+        snapshot_id = data.get('snapshot_id')  # 新增：快照 ID
+        start_tick = data.get('start_tick')  # 新增：起始 tick
+
+        # 如果指定了快照恢复，先恢复数据库
+        if snapshot_id and start_tick is not None:
+            if not SNAPSHOT_MANAGER_AVAILABLE:
+                return jsonify({
+                    'success': False,
+                    'message': '快照管理器不可用，无法从快照恢复'
+                }), 500
+
+            snapshot_manager = _get_snapshot_manager()
+            restored_path = snapshot_manager.restore_from_tick(start_tick, snapshot_id)
+
+            if not restored_path:
+                return jsonify({
+                    'success': False,
+                    'message': f'从快照 {snapshot_id} 的 tick {start_tick} 恢复失败'
+                }), 500
+
+        # 调用 process_manager.start_demo()，传递父置标志、恢复参数
+        result = process_manager.start_demo(
+            conda_env=conda_env,
+            enable_attack=enable_attack,
+            enable_aftercare=enable_aftercare,
+            snapshot_id=snapshot_id,
+            start_tick=start_tick,
+        )
+
         # 返回 JSON 响应
         return jsonify(result)
-        
+
     except Exception as e:
         # 处理异常并返回错误响应
         import traceback
@@ -3290,18 +3476,21 @@ def get_dynamic_demo_status():
                 control_data = control_response.json()
                 result['control_flags'] = {
                     'attack_enabled': control_data.get('attack_enabled', False),
-                    'aftercare_enabled': control_data.get('aftercare_enabled', False)
+                    'aftercare_enabled': control_data.get('aftercare_enabled', False),
+                    'moderation_enabled': control_data.get('moderation_enabled', False)
                 }
             else:
                 result['control_flags'] = {
                     'attack_enabled': False,
-                    'aftercare_enabled': False
+                    'aftercare_enabled': False,
+                    'moderation_enabled': False
                 }
         except Exception:
             # 如果无法连接到控制服务器，返回默认值
             result['control_flags'] = {
                 'attack_enabled': False,
-                'aftercare_enabled': False
+                'aftercare_enabled': False,
+                'moderation_enabled': False
             }
         
         # 返回 JSON 响应
@@ -3318,12 +3507,264 @@ def get_dynamic_demo_status():
             'opinion_balance': {'status': 'unknown', 'pid': None, 'uptime': 0},
             'control_flags': {
                 'attack_enabled': False,
-                'aftercare_enabled': False
+                'aftercare_enabled': False,
+                'moderation_enabled': False
             }
         }), 500
 
 
+# ============================================================================
+# Control API Proxy Endpoints (proxy to main.py control server on port 8000)
+# ============================================================================
 
+@app.route('/api/control/moderation', methods=['POST'])
+def set_moderation_flag():
+    """Set moderation flag (proxy to control server)"""
+    try:
+        import requests
+        data = request.get_json()
+        enabled = data.get('enabled', False)
+        response = requests.post(
+            'http://localhost:8000/control/moderation',
+            json={'enabled': enabled},
+            timeout=5
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/control/attack', methods=['POST'])
+def set_attack_flag():
+    """Set attack flag (proxy to control server)"""
+    try:
+        import requests
+        data = request.get_json()
+        enabled = data.get('enabled', False)
+        response = requests.post(
+            'http://localhost:8000/control/attack',
+            json={'enabled': enabled},
+            timeout=5
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/control/aftercare', methods=['POST'])
+def set_aftercare_flag():
+    """Set aftercare flag (proxy to control server)"""
+    try:
+        import requests
+        data = request.get_json()
+        enabled = data.get('enabled', False)
+        response = requests.post(
+            'http://localhost:8000/control/aftercare',
+            json={'enabled': enabled},
+            timeout=5
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/control/attack-mode', methods=['POST'])
+def set_attack_mode():
+    """Set attack mode (proxy to control server)"""
+    try:
+        import requests
+        data = request.get_json()
+        mode = data.get('mode', 'swarm')
+        response = requests.post(
+            'http://localhost:8000/control/attack-mode',
+            json={'mode': mode},
+            timeout=5
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+@app.route('/api/control/auto-status', methods=['POST'])
+def set_auto_status_flag():
+    """Set auto-status flag (proxy to control server)"""
+    try:
+        import requests
+        data = request.get_json()
+        enabled = data.get('enabled', False)
+        response = requests.post(
+            'http://localhost:8000/control/auto-status',
+            json={'enabled': enabled},
+            timeout=5
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/analysis/post-comments', methods=['POST'])
+def analyze_post_comments_direct():
+    """直接分析帖子评论（不再代理到 8000 端口）"""
+    import requests as req
+    import re
+
+    data = request.get_json()
+    post_id = data.get('post_id') if data else None
+    if not post_id:
+        return jsonify({'error': 'post_id is required'}), 400
+
+    db_path = os.path.join(BASE_DIR, 'database', 'simulation.db')
+    if not os.path.exists(db_path):
+        return jsonify({'error': 'simulation.db not found'}), 404
+
+    # 1) 读取帖子与评论
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT post_id, content, author_id, created_at, num_comments FROM posts WHERE post_id = ?",
+        (post_id,),
+    )
+    post_row = cursor.fetchone()
+    if not post_row:
+        conn.close()
+        return jsonify({'error': f'Post {post_id} not found'}), 404
+
+    cursor.execute(
+        "SELECT comment_id, content, author_id, created_at, num_likes FROM comments WHERE post_id = ? ORDER BY num_likes DESC, created_at ASC LIMIT 30",
+        (post_id,),
+    )
+    comment_rows = cursor.fetchall()
+    conn.close()
+
+    post_content = post_row['content'] or ''
+    post_author = post_row['author_id']
+
+    comments_block_lines = []
+    for idx, c in enumerate(comment_rows, start=1):
+        comments_block_lines.append(f"[{idx}] author={c['author_id']} likes={c['num_likes']}: {c['content']}")
+    comments_block = "\n".join(comments_block_lines) if comments_block_lines else "(暂无评论)"
+
+    # 2) 构造 LLM 提示词
+    system_prompt = (
+        "你是一名严谨的舆论分析助手，专门分析某个帖子评论区的整体情绪氛围、观点极端程度，"
+        "并用自然语言总结多数观点与少数观点。你需要返回结构化 JSON，便于前端程序直接读取。"
+    )
+    user_prompt = f"""请基于下面的内容进行分析：
+
+    [主帖]
+    作者: {post_author}
+    内容: {post_content}
+
+    [评论区]
+    {comments_block}
+
+    你的任务是：
+    1. **内部评估每条评论**（不在最终输出中显示）：
+    * 对每条评论的情感分数（sentiment_score）进行评估，使用以下五个离散值之一：0, 0.25, 0.5, 0.75, 1。
+    * 对每条评论的极端程度分数（extremeness_score）进行评估，使用以下五个离散值之一：0, 0.25, 0.5, 0.75, 1。
+
+    2. **计算整体分数**：
+    * 基于所有评论的情感分数，计算平均值，得到最终的 `sentiment_score_overall`。
+    * 基于所有评论的极端程度分数，计算平均值，得到最终的 `extremeness_score_overall`。
+    * **重要**：这两个整体分数应为 0 到 1 之间的任意数值（不限于那五个离散值），例如 0.33、0.67 等，以更精确地反映整体水平。
+
+    3. 用一段中文总结评论区的主要观点结构。
+
+    请严格按照下面的 JSON 格式直接作答，只返回整体分析结果：
+
+    {{
+    "sentiment_score_overall": 0.42,
+    "extremeness_score_overall": 0.38,
+    "summary": "一段中文总结，概括评论区的主要观点结构。"
+    }}"""
+
+    # 3) 调用 LLM API
+    try:
+        from keys import OPENAI_API_KEY, OPENAI_BASE_URL
+        base_url = OPENAI_BASE_URL.rstrip("/") if OPENAI_BASE_URL else "https://api.openai.com/v1"
+        response = req.post(
+            url=f"{base_url}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "gpt-4o-mini",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "max_tokens": 600,
+                "temperature": 0.5,
+                "response_format": {"type": "json_object"},
+            },
+            timeout=120,
+        )
+
+        if response.status_code != 200:
+            raise RuntimeError(f"LLM HTTP {response.status_code}: {response.text}")
+
+        resp_json = response.json()
+        raw_content = (
+            resp_json.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            .strip()
+        )
+
+        if not raw_content:
+            analysis_data = {"sentiment_score_overall": None, "extremeness_score_overall": None, "summary": None, "error": "LLM returned empty content"}
+        else:
+            try:
+                analysis_data = json.loads(raw_content)
+            except Exception:
+                m = re.search(r'\{.*\}', raw_content, re.DOTALL)
+                if m:
+                    try:
+                        analysis_data = json.loads(m.group())
+                    except Exception as e2:
+                        analysis_data = {"sentiment_score_overall": None, "extremeness_score_overall": None, "summary": None, "error": f"json_parse_failed: {e2}"}
+                else:
+                    analysis_data = {"sentiment_score_overall": None, "extremeness_score_overall": None, "summary": None, "error": "no_json_in_response"}
+
+    except Exception as e:
+        analysis_data = {"sentiment_score_overall": None, "extremeness_score_overall": None, "summary": None, "error": str(e)}
+
+    return jsonify({
+        "post_id": post_id,
+        "post_content": post_content,
+        "num_comments": len(comment_rows),
+        "sentiment_score_overall": analysis_data.get("sentiment_score_overall"),
+        "extremeness_score_overall": analysis_data.get("extremeness_score_overall"),
+        "summary": analysis_data.get("summary"),
+        "analysis_raw": analysis_data.get("raw_text"),
+        "error": analysis_data.get("error"),
+    }), 200
+
+
+@app.route('/api/defense/dashboard', methods=['GET'])
+def proxy_defense_dashboard():
+    """Read defense monitoring data directly from the simulation database."""
+    try:
+        import importlib.util
+        _mod_path = os.path.join(BASE_DIR, 'src', 'agents', 'defense_monitoring_center.py')
+        _spec = importlib.util.spec_from_file_location('defense_monitoring_center', _mod_path)
+        _mod = importlib.util.module_from_spec(_spec)
+        _spec.loader.exec_module(_mod)
+        create_monitoring_center = _mod.create_monitoring_center
+        db_path = os.path.join(BASE_DIR, 'database', 'simulation.db')
+        if not os.path.exists(db_path):
+            return jsonify({'success': False, 'error': 'simulation.db not found'}), 200
+        conn = sqlite3.connect(db_path)
+        try:
+            center = create_monitoring_center(top_n_topics=10)
+            center.sync_from_db(conn)
+            dashboard = center.generate_dashboard()
+        finally:
+            conn.close()
+        return jsonify({'success': True, 'dashboard': dashboard}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 200
 
 
 # ============================================================================
@@ -3655,10 +4096,10 @@ def get_post_detail_by_id(post_id: str):
         if not os.path.exists(db_path):
             return jsonify({'error': 'Database not found'}), 404
         
-        # 查询帖子
-        conn = sqlite3.connect(db_path)
+        # 查询帖子（设置 timeout 避免模拟写入时锁冲突）
+        conn = sqlite3.connect(db_path, timeout=10)
         cursor = conn.cursor()
-        
+
         # 过滤条件：status IS NULL OR status != 'taken_down'
         cursor.execute("""
             SELECT 
@@ -3751,10 +4192,10 @@ def get_post_comments_by_id(post_id: str):
         if not os.path.exists(db_path):
             return jsonify({'error': 'Database not found'}), 404
         
-        # 查询评论
-        conn = sqlite3.connect(db_path)
+        # 查询评论（设置 busy_timeout 避免模拟写入时锁冲突）
+        conn = sqlite3.connect(db_path, timeout=10)
         cursor = conn.cursor()
-        
+
         # 根据 sort 参数确定排序方式
         if sort_param == 'likes':
             order_by = 'num_likes DESC, created_at DESC'
@@ -3974,14 +4415,563 @@ def event_stream():
     )
 
 
+# ==================== 信息茧房观测相关API ====================
+
+@app.route('/api/filter-bubble/global-stats', methods=['GET'])
+def get_filter_bubble_global_stats():
+    """获取全局信息茧房统计数据（包含新的复合指标）"""
+    try:
+        db_name = request.args.get('db')
+        if not db_name:
+            return jsonify({'error': '请指定数据库'}), 400
+
+        # 移除 .db 后缀（如果存在）
+        if db_name.endswith('.db'):
+            db_name = db_name[:-3]
+
+        db_path = os.path.join(DATABASE_DIR, f'{db_name}.db')
+        if not os.path.exists(db_path):
+            return jsonify({'error': '数据库不存在'}), 404
+
+        from src.filter_bubble_analyzer import FilterBubbleAnalyzer
+
+        analyzer = FilterBubbleAnalyzer(db_path)
+        stats = analyzer.get_global_stats()
+
+        return jsonify({
+            'total_users': stats.total_users,
+            'avg_homogeneity': stats.avg_homogeneity,
+            'avg_echo_index': stats.avg_echo_index,
+            'severe_bubble_users': stats.severe_bubble_users,
+            'moderate_bubble_users': stats.moderate_bubble_users,
+            'mild_bubble_users': stats.mild_bubble_users,
+            'network_density': stats.network_density
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/filter-bubble/user-metrics', methods=['GET'])
+def get_user_bubble_metrics():
+    """获取单个用户的信息茧房指标（包含新的复合指标）"""
+    try:
+        db_name = request.args.get('db')
+        user_id = request.args.get('user_id')
+
+        if not db_name or not user_id:
+            return jsonify({'error': '请指定数据库和用户ID'}), 400
+
+        # 移除 .db 后缀（如果存在）
+        if db_name.endswith('.db'):
+            db_name = db_name[:-3]
+
+        db_path = os.path.join(DATABASE_DIR, f'{db_name}.db')
+        if not os.path.exists(db_path):
+            return jsonify({'error': '数据库不存在'}), 404
+
+        from src.filter_bubble_analyzer import FilterBubbleAnalyzer
+
+        analyzer = FilterBubbleAnalyzer(db_path)
+        metrics = analyzer.analyze_user_bubble(user_id)
+
+        # 使用to_dict方法返回完整的指标
+        return jsonify(metrics.to_dict())
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/filter-bubble/all-users', methods=['GET'])
+def get_all_users_bubble_metrics():
+    """获取所有用户的信息茧房指标（包含新的复合指标）"""
+    try:
+        db_name = request.args.get('db')
+        limit = int(request.args.get('limit', 100))
+
+        if not db_name:
+            return jsonify({'error': '请指定数据库'}), 400
+
+        # 移除 .db 后缀（如果存在）
+        if db_name.endswith('.db'):
+            db_name = db_name[:-3]
+
+        db_path = os.path.join(DATABASE_DIR, f'{db_name}.db')
+        if not os.path.exists(db_path):
+            return jsonify({'error': '数据库不存在'}), 404
+
+        from src.filter_bubble_analyzer import FilterBubbleAnalyzer
+
+        analyzer = FilterBubbleAnalyzer(db_path)
+        all_metrics = analyzer.get_all_user_metrics()
+
+        # 使用to_dict方法返回完整的指标
+        return jsonify([m.to_dict() for m in all_metrics])
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/filter-bubble/user-network', methods=['GET'])
+def get_user_network_data():
+    """获取用户的网络数据（用于可视化）"""
+    try:
+        db_name = request.args.get('db')
+        user_id = request.args.get('user_id')
+
+        if not db_name or not user_id:
+            return jsonify({'error': '请指定数据库和用户ID'}), 400
+
+        # 移除 .db 后缀（如果存在）
+        if db_name.endswith('.db'):
+            db_name = db_name[:-3]
+
+        db_path = os.path.join(DATABASE_DIR, f'{db_name}.db')
+        if not os.path.exists(db_path):
+            return jsonify({'error': '数据库不存在'}), 404
+
+        from src.filter_bubble_analyzer import FilterBubbleAnalyzer
+
+        analyzer = FilterBubbleAnalyzer(db_path)
+        network_data = analyzer.get_user_network_data(user_id)
+
+        return jsonify(network_data)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/filter-bubble/bubble-trend', methods=['GET'])
+def get_bubble_trend():
+    """获取用户信息茧房趋势"""
+    try:
+        db_name = request.args.get('db')
+        user_id = request.args.get('user_id')
+        days = int(request.args.get('days', 7))
+
+        if not db_name or not user_id:
+            return jsonify({'error': '请指定数据库和用户ID'}), 400
+
+        # 移除 .db 后缀（如果存在）
+        if db_name.endswith('.db'):
+            db_name = db_name[:-3]
+
+        db_path = os.path.join(DATABASE_DIR, f'{db_name}.db')
+        if not os.path.exists(db_path):
+            return jsonify({'error': '数据库不存在'}), 404
+
+        from src.filter_bubble_analyzer import FilterBubbleAnalyzer
+
+        analyzer = FilterBubbleAnalyzer(db_path)
+        trend_data = analyzer.get_bubble_trend(user_id, days)
+
+        return jsonify(trend_data)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+# ==================== 社区发现与派系分析相关API ====================
+
+@app.route('/api/community/detect-factions', methods=['GET'])
+def detect_factions():
+    """检测并分析网络中的派系（社区发现）"""
+    try:
+        db_name = request.args.get('db')
+        network_type = request.args.get('network_type', 'social')
+        min_community_size = int(request.args.get('min_size', 3))
+
+        if not db_name:
+            return jsonify({'error': '请指定数据库'}), 400
+
+        # 移除 .db 后缀（如果存在）
+        if db_name.endswith('.db'):
+            db_name = db_name[:-3]
+
+        db_path = os.path.join(DATABASE_DIR, f'{db_name}.db')
+        if not os.path.exists(db_path):
+            return jsonify({'error': '数据库不存在'}), 404
+
+        from src.community_detector import CommunityDetector
+        import numpy as np
+
+        detector = CommunityDetector(db_path, vector_dim=128)
+        report = detector.get_community_report()
+
+        # numpy 类型转 Python 原生类型，避免 JSON 序列化失败
+        def sanitize(obj):
+            if isinstance(obj, (np.integer,)):
+                return int(obj)
+            if isinstance(obj, (np.floating,)):
+                return float(obj)
+            if isinstance(obj, np.bool_):
+                return bool(obj)
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            if isinstance(obj, dict):
+                return {k: sanitize(v) for k, v in obj.items()}
+            if isinstance(obj, (list, tuple)):
+                return [sanitize(v) for v in obj]
+            return obj
+
+        return jsonify(sanitize(report))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/community/post-factions', methods=['GET'])
+def get_post_factions():
+    """获取每个帖子的派系分布（赞成、中立、反对）- 增强版（包含点赞和影响程度）
+
+    智能选择10条代表性帖子（涵盖支持多、中立多、反对多的帖子）
+    + 单独返回最火帖子的详细分析
+    """
+    try:
+        db_name = request.args.get('db')
+        limit = int(request.args.get('limit', 15))
+        min_comments = int(request.args.get('min_comments', 0))
+        use_enhanced = request.args.get('enhanced', 'true').lower() == 'true'
+
+        if not db_name:
+            return jsonify({'error': '请指定数据库'}), 400
+
+        # 移除 .db 后缀（如果存在）
+        if db_name.endswith('.db'):
+            db_name = db_name[:-3]
+
+        db_path = os.path.join(DATABASE_DIR, f'{db_name}.db')
+        if not os.path.exists(db_path):
+            return jsonify({'error': '数据库不存在'}), 404
+
+        from src.community_detector import CommunityDetector
+        import numpy as np
+
+        detector = CommunityDetector(db_path, vector_dim=128)
+        summary = detector.get_post_stances_summary(
+            limit=limit,
+            min_comments=min_comments
+        )
+
+        # numpy 类型转 Python 原生类型
+        def sanitize(obj):
+            if isinstance(obj, (np.integer,)):
+                return int(obj)
+            if isinstance(obj, (np.floating,)):
+                return float(obj)
+            if isinstance(obj, np.bool_):
+                return bool(obj)
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            if isinstance(obj, dict):
+                return {k: sanitize(v) for k, v in obj.items()}
+            if isinstance(obj, (list, tuple)):
+                return [sanitize(v) for v in obj]
+            return obj
+
+        return jsonify(sanitize(summary))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/community/cross-faction-interactions', methods=['GET'])
+def get_cross_faction_interactions():
+    """获取跨派系互动矩阵（基于用户相似度）"""
+    try:
+        db_name = request.args.get('db')
+
+        if not db_name:
+            return jsonify({'error': '请指定数据库'}), 400
+
+        # 移除 .db 后缀（如果存在）
+        if db_name.endswith('.db'):
+            db_name = db_name[:-3]
+
+        db_path = os.path.join(DATABASE_DIR, f'{db_name}.db')
+        if not os.path.exists(db_path):
+            return jsonify({'error': '数据库不存在'}), 404
+
+        from src.community_detector import CommunityDetector
+
+        detector = CommunityDetector(db_path, vector_dim=128)
+        report = detector.get_community_report()
+
+        # 返回社区信息（embedding方法中没有直接的跨社区互动）
+        return jsonify({
+            'note': '使用embedding方法，基于语义相似度进行社区划分',
+            'communities': report['communities'],
+            'num_communities': report['num_communities']
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/community/echo-chamber-users', methods=['GET'])
+def get_echo_chamber_users():
+    """获取处于回声室中的用户列表（基于embedding紧密度）"""
+    try:
+        db_name = request.args.get('db')
+
+        if not db_name:
+            return jsonify({'error': '请指定数据库'}), 400
+
+        # 移除 .db 后缀（如果存在）
+        if db_name.endswith('.db'):
+            db_name = db_name[:-3]
+
+        db_path = os.path.join(DATABASE_DIR, f'{db_name}.db')
+        if not os.path.exists(db_path):
+            return jsonify({'error': '数据库不存在'}), 404
+
+        from src.community_detector import CommunityDetector
+
+        detector = CommunityDetector(db_path, vector_dim=128)
+        report = detector.get_community_report()
+
+        # 收集所有回声室的用户
+        echo_users = []
+        for comm in report['communities']:
+            if comm['is_echo_chamber']:
+                echo_users.extend(comm['members'])
+
+        return jsonify({
+            'echo_chamber_users': echo_users,
+            'count': len(echo_users),
+            'echo_chamber_count': report['num_echo_chambers']
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+# ==================== 快照管理 API ====================
+
+def _get_snapshot_manager():
+    """获取快照管理器实例"""
+    if not SNAPSHOT_MANAGER_AVAILABLE:
+        return None
+    db_path = os.path.join(BASE_DIR, 'database', 'simulation.db')
+    return create_snapshot_manager(BASE_DIR, db_path)
+
+
+@app.route('/api/snapshots/save', methods=['POST'])
+def save_snapshot():
+    """保存当前数据库为命名快照
+
+    请求体:
+        {
+            "name": "快照名称",
+            "description": "快照描述"  // 可选
+        }
+
+    响应:
+        {
+            "success": true/false,
+            "snapshot_id": "20260307_123456",
+            "message": "消息"
+        }
+    """
+    try:
+        if not SNAPSHOT_MANAGER_AVAILABLE:
+            return jsonify({
+                'success': False,
+                'message': '快照管理器不可用'
+            }), 500
+
+        data = request.get_json() or {}
+        name = data.get('name', '').strip()
+        description = data.get('description', '').strip()
+
+        if not name:
+            return jsonify({
+                'success': False,
+                'message': '快照名称不能为空'
+            }), 400
+
+        snapshot_manager = _get_snapshot_manager()
+        result = snapshot_manager.save_named_snapshot(name, description)
+
+        return jsonify(result)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'保存快照失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/snapshots/saved', methods=['GET'])
+def get_saved_snapshots():
+    """获取已保存的快照列表（含详细预览）
+
+    响应:
+        {
+            "snapshots": [{
+                "id": "20260307_123456",
+                "name": "实验1",
+                "description": "描述",
+                "created_at": "2026-03-07T12:34:56",
+                "saved_at": "2026-03-07T14:00:00",
+                "tick_count": 50,
+                "total_users": 100,
+                "total_posts": 234,
+                "total_comments": 567,
+                "ticks": [...]
+            }]
+        }
+    """
+    try:
+        if not SNAPSHOT_MANAGER_AVAILABLE:
+            return jsonify({'snapshots': []})
+
+        snapshot_manager = _get_snapshot_manager()
+        snapshots = snapshot_manager.list_saved_snapshots()
+
+        return jsonify({'snapshots': snapshots})
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'snapshots': [], 'error': str(e)})
+
+
+@app.route('/api/snapshots/<session_id>', methods=['GET'])
+def get_snapshot_detail(session_id):
+    """获取单个快照的详细信息
+
+    响应:
+        {
+            "id": "20260307_123456",
+            "name": "实验1",
+            "description": "描述",
+            "created_at": "2026-03-07T12:34:56",
+            "saved_at": "2026-03-07T14:00:00",
+            "tick_count": 50,
+            "total_users": 100,
+            "total_posts": 234,
+            "total_comments": 567,
+            "ticks": [
+                {"tick": 1, "timestamp": "...", "user_count": 100, "post_count": 5},
+                ...
+            ]
+        }
+    """
+    try:
+        if not SNAPSHOT_MANAGER_AVAILABLE:
+            return jsonify({'error': '快照管理器不可用'}), 500
+
+        snapshot_manager = _get_snapshot_manager()
+        detail = snapshot_manager.get_saved_snapshot_detail(session_id)
+
+        if not detail:
+            return jsonify({'error': '快照不存在或未命名'}), 404
+
+        return jsonify(detail)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/snapshots/<session_id>', methods=['DELETE'])
+def delete_snapshot(session_id):
+    """删除指定的快照
+
+    路径参数:
+        session_id: 要删除的快照会话ID
+
+    响应:
+        {
+            "success": true/false,
+            "message": "消息"
+        }
+    """
+    try:
+        if not SNAPSHOT_MANAGER_AVAILABLE:
+            return jsonify({
+                'success': False,
+                'message': '快照管理器不可用'
+            }), 500
+
+        snapshot_manager = _get_snapshot_manager()
+        result = snapshot_manager.delete_snapshot(session_id)
+
+        if result['success']:
+            return jsonify(result)
+        else:
+            return jsonify(result), 400
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'删除快照失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/snapshots/all', methods=['DELETE'])
+def delete_all_snapshots():
+    """删除所有快照
+
+    响应:
+        {
+            "success": true/false,
+            "message": "消息",
+            "deleted_count": 删除数量
+        }
+    """
+    try:
+        if not SNAPSHOT_MANAGER_AVAILABLE:
+            return jsonify({
+                'success': False,
+                'message': '快照管理器不可用'
+            }), 500
+
+        snapshot_manager = _get_snapshot_manager()
+        result = snapshot_manager.delete_all_snapshots()
+
+        if result['success']:
+            return jsonify(result)
+        else:
+            return jsonify(result), 400
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'删除所有快照失败: {str(e)}',
+            'deleted_count': 0
+        }), 500
+
+
 if __name__ == '__main__':
+    import sys
+    # Allow port to be specified via command line
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 5001
+
     print("=" * 60)
     print("🚀 Starting EvoCorps Frontend API Server...")
     print("=" * 60)
     print(f"📁 Database directory: {os.path.abspath(DATABASE_DIR)}")
-    print(f"🌐 Server running at: http://127.0.0.1:5001")
+    print(f"🌐 Server running at: http://127.0.0.1:{port}")
     print(f"🤖 AI Module Status: {'✅ ENABLED' if AI_AVAILABLE else '⚠️ DISABLED (using template answers)'}")
     print("=" * 60)
     print("Press Ctrl+C to stop")
     print()
-    app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)
+    app.run(host='127.0.0.1', port=port, debug=False, use_reloader=False)

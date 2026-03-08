@@ -11,7 +11,7 @@ from datetime import datetime
 
 # Runtime control API
 import threading
-from typing import Optional
+from typing import Optional, Literal
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,6 +23,9 @@ from openai import OpenAI
 from keys import OPENAI_API_KEY, OPENAI_BASE_URL
 
 import control_flags
+
+# Moderation service (initialized when needed)
+moderation_service = None
 
 # =============================
 # FastAPI control server setup
@@ -45,6 +48,12 @@ class ToggleRequest(BaseModel):
     enabled: bool
 
 
+class AttackModeRequest(BaseModel):
+    """Request body for setting malicious attack coordination mode."""
+
+    mode: Literal["swarm", "dispersed", "chain"]
+
+
 class PostCommentsAnalysisRequest(BaseModel):
     """Request body for analyzing a single post and its comments."""
 
@@ -64,6 +73,22 @@ def set_attack_flag(body: ToggleRequest):
 
     control_flags.attack_enabled = bool(body.enabled)
     return {"attack_enabled": control_flags.attack_enabled}
+
+
+@control_app.post("/control/attack-mode")
+def set_attack_mode(body: AttackModeRequest):
+    """Set malicious attack coordination mode at runtime."""
+
+    mode = str(body.mode).strip().lower()
+
+    # Single source of truth for runtime status
+    control_flags.attack_mode = mode
+
+    # Sync strategy router config used by malicious bot manager
+    from malicious_bots.config import DEFAULT_CONFIG
+    DEFAULT_CONFIG.attack_mode.mode = mode
+
+    return {"attack_mode": control_flags.attack_mode}
 
 
 @control_app.post("/control/aftercare")
@@ -124,6 +149,34 @@ def get_auto_status_flag():
     return {"auto_status": control_flags.auto_status}
 
 
+@control_app.post("/control/moderation")
+def set_moderation_flag(body: ToggleRequest):
+    """Enable or disable moderation system at runtime.
+
+    The moderation system maintains ecological boundaries through:
+    - Visibility degradation: reducing content weight in recommendations
+    - Warning labels: marking content with official warnings
+    - Hard takedowns: removing posts and banning users
+    """
+
+    control_flags.moderation_enabled = bool(body.enabled)
+    return {"moderation_enabled": control_flags.moderation_enabled}
+
+
+@control_app.get("/control/moderation")
+def get_moderation_status():
+    """Get current moderation system status and statistics."""
+
+    stats = {}
+    if moderation_service:
+        stats = moderation_service.get_stats().model_dump()
+
+    return {
+        "moderation_enabled": control_flags.moderation_enabled,
+        "stats": stats,
+    }
+
+
 @control_app.post("/analysis/post-comments")
 def analyze_post_comments(body: PostCommentsAnalysisRequest):
     import os
@@ -162,7 +215,8 @@ def analyze_post_comments(body: PostCommentsAnalysisRequest):
         SELECT comment_id, content, author_id, created_at, num_likes
         FROM comments
         WHERE post_id = ?
-        ORDER BY created_at ASC
+        ORDER BY num_likes DESC, created_at ASC
+        LIMIT 30
         """,
         (post_id,),
     )
@@ -215,10 +269,11 @@ def analyze_post_comments(body: PostCommentsAnalysisRequest):
 
     # 3) 直接用 requests 调用 AIHUBMIX（与 curl 完全一致）
     try:
+        base_url = OPENAI_BASE_URL.rstrip("/") if OPENAI_BASE_URL else "https://api.openai.com/v1"
         response = requests.post(
-            url="https://aihubmix.com/v1/chat/completions",
+            url=f"{base_url}/chat/completions",
             headers={
-                "Authorization": f"Bearer {OPENAI_API_KEY}",  # AIHUBMIX key
+                "Authorization": f"Bearer {OPENAI_API_KEY}",
                 "Content-Type": "application/json",
             },
             data=json.dumps({
@@ -229,8 +284,9 @@ def analyze_post_comments(body: PostCommentsAnalysisRequest):
                 ],
                 "max_tokens": 600,
                 "temperature": 0.5,
+                "response_format": {"type": "json_object"},
             }),
-            timeout=60,
+            timeout=120,
         )
 
         if response.status_code != 200:
@@ -258,14 +314,29 @@ def analyze_post_comments(body: PostCommentsAnalysisRequest):
         else:
             try:
                 analysis_data = json.loads(raw_content)
-            except Exception as e:
-                analysis_data = {
-                    "sentiment_score_overall": None,
-                    "extremeness_score_overall": None,
-                    "summary": None,
-                    "error": f"json_parse_failed: {e}",
-                    "raw_text": raw_content,
-                }
+            except Exception:
+                # 兜底：从 markdown 代码块或裸文本中提取 JSON
+                import re
+                m = re.search(r'\{.*\}', raw_content, re.DOTALL)
+                if m:
+                    try:
+                        analysis_data = json.loads(m.group())
+                    except Exception as e2:
+                        analysis_data = {
+                            "sentiment_score_overall": None,
+                            "extremeness_score_overall": None,
+                            "summary": None,
+                            "error": f"json_parse_failed: {e2}",
+                            "raw_text": raw_content,
+                        }
+                else:
+                    analysis_data = {
+                        "sentiment_score_overall": None,
+                        "extremeness_score_overall": None,
+                        "summary": None,
+                        "error": "no_json_in_response",
+                        "raw_text": raw_content,
+                    }
 
     except Exception as e:
         logging.error(f"Post comments analysis failed for {post_id}: {e}")
@@ -699,12 +770,49 @@ def check_database_service():
 if __name__ == "__main__":
     # Set comprehensive logging configuration affecting all logging calls
     log_file = setup_comprehensive_logging()
-    
+
+    # 读取环境变量（用于从快照恢复）
+    start_tick_env = os.environ.get('START_TICK', '')
+    reset_db_env = os.environ.get('RESET_DB', 'true')
+    parent_session_id = os.environ.get('PARENT_SESSION_ID', '')
+
+    start_tick = int(start_tick_env) if start_tick_env.isdigit() else 1
+    reset_db = reset_db_env.lower() != 'false'
+
+    # 如果从快照恢复但没有通过环境变量传递 parent session，自动查找
+    if start_tick > 1 and not parent_session_id:
+        try:
+            project_root = os.path.dirname(os.path.dirname(__file__))
+            snapshots_dir = os.path.join(project_root, "snapshots")
+            if os.path.exists(snapshots_dir):
+                best_session = None
+                best_time = ""
+                for sid in os.listdir(snapshots_dir):
+                    session_dir = os.path.join(snapshots_dir, sid)
+                    if not os.path.isdir(session_dir):
+                        continue
+                    tick_dir = os.path.join(session_dir, f"tick_{start_tick}")
+                    if os.path.isdir(tick_dir):
+                        if sid > best_time:
+                            best_time = sid
+                            best_session = sid
+                if best_session:
+                    parent_session_id = best_session
+                    print(f"📌 自动检测到父快照会话: {parent_session_id}")
+        except Exception as e:
+            print(f"⚠️ 自动检测父快照失败: {e}")
+
+    if start_tick > 1:
+        print(f"📌 从快照恢复: 起始 tick = {start_tick}")
+        print(f"📌 数据库重置: {'是' if reset_db else '否'}")
+        if parent_session_id:
+            print(f"📌 父快照会话: {parent_session_id}")
+
     # Start the FastAPI control server in the background so that
     # external tools / frontend can toggle runtime flags while the
     # simulation is running.
     start_control_api_server()
-    
+
     # Check database service
     print("🔍 Checking database service status...")
     if not check_database_service():
@@ -731,12 +839,28 @@ if __name__ == "__main__":
         config = json.load(file)
 
     apply_selector_engine(config)
+    config['reset_db'] = reset_db
+    config['restore_from_snapshot'] = bool(parent_session_id)
 
-    # Reset simulation database before each run
+    # Reset simulation database before each run (unless restoring from snapshot)
     from database_manager import DatabaseManager
     db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'database', 'simulation.db')
-    reset_manager = DatabaseManager(db_path, reset_db=True)
-    reset_manager.close()
+    if reset_db:
+        reset_manager = DatabaseManager(db_path, reset_db=True)
+        reset_manager.close()
+    else:
+        print("📌 跳过数据库重置（从快照恢复）")
+
+    # 清理所有旧快照（仅在非快照恢复模式下清理）
+    if reset_db:
+        try:
+            from snapshot_manager import create_snapshot_manager
+            project_root = os.path.dirname(os.path.dirname(__file__))
+            snapshot_mgr = create_snapshot_manager(project_root, db_path)
+            snapshot_mgr.cleanup_all_snapshots()
+            print("🗑️  已清理所有旧快照数据")
+        except Exception as e:
+            print(f"⚠️  清理快照失败: {e}")
 
     # Show persona configuration info
     print_persona_config_info(config)
@@ -783,6 +907,10 @@ if __name__ == "__main__":
     else:
         control_flags.aftercare_enabled = False
 
+    # Content moderation: no CLI prompt — read from config file.
+    # Can be toggled at runtime via /control/moderation API.
+    control_flags.moderation_enabled = config.get('moderation', {}).get('content_moderation', False)
+
     # Get user choice for the prebunking system
     enable_prebunking = get_user_choice_prebunking()
 
@@ -816,16 +944,18 @@ if __name__ == "__main__":
         config['experiment'] = {}
 
     config['experiment']['type'] = fact_check_type
-    if 'settings' not in config['experiment']:
-        config['experiment']['settings'] = {}
-
-    # Update fact-checking settings
-    config['experiment']['settings'].update(fact_check_settings)
+    # Replace settings entirely (avoid stale keys from a previous run)
+    config['experiment']['settings'] = fact_check_settings
 
     # Update prebunking config
     if 'prebunking_system' not in config:
         config['prebunking_system'] = {}
     config['prebunking_system']['enabled'] = enable_prebunking
+
+    # Persist moderation flag so it survives restarts
+    if 'moderation' not in config:
+        config['moderation'] = {}
+    config['moderation']['content_moderation'] = control_flags.moderation_enabled
 
     # Persist user selections to the config file (engine is resolved dynamically via selector; do not persist it)
     config_to_save = dict(config)
@@ -852,6 +982,15 @@ if __name__ == "__main__":
     print(f"🛡️  Prebunking system: {'enabled' if enable_prebunking else 'disabled'}")
     if enable_prebunking:
         print("   • Will insert safety prompts into regular users' feeds")
+
+    # 显示内容审核状态（由全局开关控制）
+    if control_flags.moderation_enabled:
+        print("🛡️  Content moderation: ✅ enabled")
+        print("   • Visibility degradation, warning labels, hard takedowns")
+        print("   • Can be toggled via API at runtime")
+    else:
+        print("🛡️  Content moderation: ❌ disabled")
+        print("   • Can be enabled via API at runtime")
 
     # 显示第三方事实核查状态（由全局开关控制）
     if control_flags.aftercare_enabled:
@@ -1048,12 +1187,29 @@ if __name__ == "__main__":
 
     # Create and run the simulation
     sim = Simulation(config)
-    
-    # Run the simulation
-    print("\n🎬 Starting simulation...")
+
+    # Run the simulation (从 start_tick 开始)
+    if start_tick > 1:
+        print(f"\n🎬 Starting simulation from tick {start_tick}...")
+    else:
+        print("\n🎬 Starting simulation...")
     import asyncio
-    asyncio.run(sim.run(config['num_time_steps']))
+    asyncio.run(sim.run(
+        config['num_time_steps'],
+        start_tick=start_tick,
+        parent_session_id=parent_session_id or None,
+        parent_tick=start_tick if parent_session_id else None
+    ))
 
     # Show final results
     print("\n✅ Simulation completed!")
     print("\n🎉 Thanks for using the social media simulation system!")
+    try:
+        input("\nPress Enter to exit...")
+    except EOFError:
+        # 管道输入耗尽时（自动输入脚本执行完毕），保持终端打开不关闭
+        print("\n📋 Simulation finished. Terminal will remain open.")
+        print("📋 Press Ctrl+C to close this terminal.")
+        import time
+        while True:
+            time.sleep(1)  # 无限等待，保持终端打开

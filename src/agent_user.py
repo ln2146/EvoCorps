@@ -10,6 +10,13 @@ import os
 # Import from the database subdirectory
 from database.database_manager import get_db_manager, execute_query, fetch_one, fetch_all
 
+# Import X-Algorithm recommender system
+try:
+    from recommender import FeedPipeline, FeedRequest, RecommenderConfig
+    RECOMMENDER_AVAILABLE = True
+except ImportError:
+    RECOMMENDER_AVAILABLE = False
+
 if TYPE_CHECKING:
     from openai import OpenAI
 
@@ -99,6 +106,16 @@ class FeedReaction(BaseModel):
     actions: List[FeedAction]
 
 
+def build_comment_moderation_feedback(
+    violation_count: int,
+    ban_threshold: int = 3
+) -> tuple:
+    """Return (is_banned, feedback_message) for comment moderation outcomes."""
+    if violation_count >= ban_threshold:
+        return True, f"评论违规累计 {violation_count}/{ban_threshold}，账号已封禁。"
+    return False, f"评论包含违规关键词，已拦截。当前累计 {violation_count}/{ban_threshold}。"
+
+
 class AgentUser:
     """
     An LLM agent in the simulation.
@@ -120,6 +137,33 @@ class AgentUser:
     MEMORY_TYPE_INTERACTION = 'interaction'
     MEMORY_TYPE_REFLECTION = 'reflection'
     VALID_MEMORY_TYPES = {MEMORY_TYPE_INTERACTION, MEMORY_TYPE_REFLECTION}
+    _comment_keyword_provider = None
+    _comment_keyword_signature = None
+
+    @classmethod
+    def _build_comment_keyword_signature(cls, keyword_cfg) -> str:
+        return json.dumps(
+            {
+                "enabled": bool(getattr(keyword_cfg, "enabled", True)),
+                "threshold": getattr(keyword_cfg, "threshold", None),
+                "keywords": getattr(keyword_cfg, "keywords", {}),
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+
+    @classmethod
+    def _get_comment_keyword_provider(cls):
+        from moderation.config import ModerationConfig
+        from moderation.providers.keyword_provider import KeywordProvider
+
+        keyword_cfg = ModerationConfig().keyword_provider
+        keyword_cfg.enabled = True
+        signature = cls._build_comment_keyword_signature(keyword_cfg)
+        if cls._comment_keyword_provider is None or cls._comment_keyword_signature != signature:
+            cls._comment_keyword_provider = KeywordProvider(keyword_cfg)
+            cls._comment_keyword_signature = signature
+        return cls._comment_keyword_provider
 
     def __init__(
         self,
@@ -173,7 +217,7 @@ class AgentUser:
             self.selected_model = get_random_model()
             # Removed verbose model selection logging
         except ImportError as e:
-            print(f"⚠️ Multi-model selector import failed: {e}, using default model")
+            print(f"[WARN] Multi-model selector import failed: {e}, using default model")
             self.multi_model_selector = None
             from multi_model_selector import MultiModelSelector
             self.selected_model = MultiModelSelector.DEFAULT_POOL[0]
@@ -205,7 +249,7 @@ class AgentUser:
             
             # Keep temperature within a reasonable range
             self.temperature = max(0.3, min(1.0, base_temp))
-            print(f"🌡️ User {user_id} ({persona_type}) temperature set to: {self.temperature}")
+            print(f"[TMP] User {user_id} ({persona_type}) temperature set to: {self.temperature}")
         else:
             self.temperature = temperature
 
@@ -230,6 +274,28 @@ class AgentUser:
         # Remove comment limit; allow unlimited comments
         self.comment_limit = float('inf')  # Unlimited
         self.comment_count = 0
+        self.last_comment_moderation_message = None
+
+        # Initialize X-Algorithm recommender system
+        self._feed_pipeline = None
+        self._init_recommender()
+
+    def _init_recommender(self):
+        """Initialize the X-Algorithm recommender system if available and enabled"""
+        if not RECOMMENDER_AVAILABLE:
+            return
+
+        recommender_config = self.experiment_config.get('recommender', {})
+        if not recommender_config.get('enabled', False):
+            return
+
+        try:
+            config = RecommenderConfig.from_dict(recommender_config)
+            self._feed_pipeline = FeedPipeline(config)
+            logging.info(f"X-Algorithm recommender initialized for user {self.user_id}")
+        except Exception as e:
+            logging.warning(f"Failed to initialize recommender: {e}")
+            self._feed_pipeline = None
 
     def __del__(self):
         """Destructor; DB connection managed globally, no manual close needed"""
@@ -298,7 +364,7 @@ class AgentUser:
                     VALUES (?, ?, ?, ?, ?, ?)
                 ''', (post_id, content, self.user_id, is_news, news_type, status))
                 if success:
-                    print(f"⚠️ User {self.user_id} created post using compatibility mode")
+                    print(f"[WARN] User {self.user_id} created post using compatibility mode")
                 else:
                     logging.warning(f"Skipping post creation due to database connection issue, returning dummy post_id")
                     return post_id
@@ -396,6 +462,18 @@ class AgentUser:
         """
         Create a comment on a post and update the post's comment count.
         """
+        self.last_comment_moderation_message = None
+
+        # Block banned users from commenting.
+        user_state = fetch_one(
+            'SELECT status, comment_violation_count FROM users WHERE user_id = ?',
+            (self.user_id,)
+        )
+        if user_state and user_state.get('status') == 'banned':
+            self.last_comment_moderation_message = "账号已封禁，无法继续评论。"
+            logging.warning(f"User {self.user_id} is banned; comment blocked.")
+            return None
+
         comment_id = Utils.generate_formatted_id("comment")
 
         # Get post author and content for diversity enhancement
@@ -445,7 +523,7 @@ class AgentUser:
                     VALUES (?, ?, ?, ?, ?, ?)
                 ''', (comment_id, final_content, post_id, self.user_id, datetime.now().isoformat(), 0))
                 if success:
-                    print(f"⚠️ User {self.user_id} created comment using compatibility mode")
+                    print(f"[WARN] User {self.user_id} created comment using compatibility mode")
                 else:
                     return None
         except Exception as e:
@@ -478,6 +556,71 @@ class AgentUser:
             WHERE user_id = ?
         ''', (post_author,))
         # Logging moved to _process_reaction method
+
+        # Immediate keyword moderation for comments:
+        # publish first, then revoke + warn user if sensitive keywords are detected.
+        try:
+            import control_flags
+            if control_flags.moderation_enabled:
+                verdict = self._get_comment_keyword_provider().check(
+                    final_content,
+                    metadata={"target_type": "comment", "post_id": post_id, "comment_id": comment_id}
+                )
+
+                if verdict is not None:
+                    # Revoke the comment immediately.
+                    execute_query('DELETE FROM comments WHERE comment_id = ?', (comment_id,))
+
+                    # Keep post engagement counters consistent.
+                    execute_query('''
+                        UPDATE posts
+                        SET num_comments = CASE WHEN num_comments > 0 THEN num_comments - 1 ELSE 0 END
+                        WHERE post_id = ?
+                    ''', (post_id,))
+                    execute_query('''
+                        UPDATE users
+                        SET total_comments_received = CASE
+                            WHEN total_comments_received > 0 THEN total_comments_received - 1
+                            ELSE 0
+                        END
+                        WHERE user_id = ?
+                    ''', (post_author,))
+
+                    # Increase violation count.
+                    execute_query('''
+                        UPDATE users
+                        SET comment_violation_count = COALESCE(comment_violation_count, 0) + 1
+                        WHERE user_id = ?
+                    ''', (self.user_id,))
+                    updated_user = fetch_one(
+                        'SELECT comment_violation_count FROM users WHERE user_id = ?',
+                        (self.user_id,)
+                    ) or {}
+                    violation_count = int(updated_user.get('comment_violation_count') or 0)
+                    is_banned, feedback = build_comment_moderation_feedback(violation_count, 3)
+
+                    if is_banned:
+                        execute_query('''
+                            UPDATE users
+                            SET status = 'banned',
+                                ban_reason = ?,
+                                banned_at = CURRENT_TIMESTAMP
+                            WHERE user_id = ?
+                        ''', ("comment_keyword_violations", self.user_id))
+
+                    execute_query('''
+                        INSERT INTO user_actions (user_id, action_type, target_id, content)
+                        VALUES (?, ?, ?, ?)
+                    ''', (self.user_id, 'moderation_warning', comment_id, feedback))
+
+                    self.last_comment_moderation_message = feedback
+                    logging.warning(
+                        f"Comment blocked for user {self.user_id}: {feedback} "
+                        f"(keywords={verdict.detected_keywords})"
+                    )
+                    return None
+        except Exception as e:
+            logging.error(f"Comment keyword moderation failed for {comment_id}: {e}")
 
         # Trigger scenario class export
         try:
@@ -677,7 +820,7 @@ Your comment:"""
         except Exception as e:
             error_str = str(e)
             if "rate_limit" in error_str.lower() or "429" in error_str:
-                logging.warning(f"⚠️ User {self.user_id} hit rate limit generating comment; model {engine} temporarily unavailable")
+                logging.warning(f"[WARN] User {self.user_id} hit rate limit generating comment; model {engine} temporarily unavailable")
                 return "I'm having some technical issues right now."
             else:
                 logging.error(f"Comment generation failed: {e}")
@@ -931,12 +1074,12 @@ Your comment:"""
                 # Check if content is too similar to recent posts (dedupe)
                 if self._check_content_similarity(post_content):
                     if attempt < max_retries - 1:
-                        logging.info(f"⚠️ User {self.user_id} generated content similar to existing posts, regenerating (attempt {attempt+1}/{max_retries})")
+                        logging.info(f"[WARN] User {self.user_id} generated content similar to existing posts, regenerating (attempt {attempt+1}/{max_retries})")
                         # Increase temperature to boost diversity
                         temperature_to_use = min(1.0, temperature_to_use + 0.1)
                         continue
                     else:
-                        logging.warning(f"⚠️ User {self.user_id} repeatedly generated similar content, accepting current version")
+                        logging.warning(f"[WARN] User {self.user_id} repeatedly generated similar content, accepting current version")
 
                 if not summary:
                     summary = _fallback_summary(post_content)
@@ -950,7 +1093,7 @@ Your comment:"""
             except Exception as e:
                 error_str = str(e)
                 if "rate_limit" in error_str.lower() or "429" in error_str:
-                    logging.warning(f"⚠️ User {self.user_id} hit rate limit; model {actual_engine} temporarily unavailable")
+                    logging.warning(f"[WARN] User {self.user_id} hit rate limit; model {actual_engine} temporarily unavailable")
                     # For rate limits, return a short fallback instead of error
                     fallback_text = "I'm experiencing some technical difficulties right now."
                     return {"content": fallback_text, "summary": _fallback_summary(fallback_text)}
@@ -1720,6 +1863,10 @@ Task:
     def get_feed(self, experiment_config: dict, time_step=None):
         """
         Get the user's feed and track post exposures.
+
+        If X-Algorithm recommender is enabled, uses the 7-stage pipeline.
+        Otherwise, falls back to the original scoring logic.
+
         - time_step == 0: cold start (up to 5 news items).
         - time_step > 0: scoring score = (engagement + β) × (1 - λ × age_steps)
           • News: sample 5 from top 10 + 3 from ranks 11-20
@@ -1728,6 +1875,10 @@ Task:
         """
 
         import random
+
+        # Try X-Algorithm recommender if available and enabled
+        if self._feed_pipeline and time_step is not None and time_step > 0:
+            return self._get_feed_with_recommender(time_step)
 
         # Step 0: cold start
         if time_step == 0 and not self.is_news_agent:
@@ -1887,6 +2038,137 @@ Task:
             for post in posts:
                 if post.post_id not in seen:
                     setattr(post, 'feed_segment', 'primary' if segment_label == 'primary' else 'secondary')
+                    final_feed.append(post)
+                    seen.add(post.post_id)
+
+        return self._enrich_feed_posts(final_feed, time_step)
+
+    def _get_feed_with_recommender(self, time_step: int) -> List[Post]:
+        """
+        Get feed using X-Algorithm recommender system.
+
+        Uses the 7-stage pipeline:
+        1. Query Hydration - 用户上下文补充
+        2. Candidate Sources - 双轨召回
+        3. Candidate Hydration - 候选数据补充
+        4. Pre-Scoring Filters - 前置过滤
+        5. Scoring - 多层评分
+        6. Selection - Top-K 选择
+        7. Post-Selection Filters - 后置过滤
+
+        Args:
+            time_step: Current simulation time step
+
+        Returns:
+            List of Post objects
+        """
+        try:
+            # Create feed request
+            request = FeedRequest(
+                user_id=self.user_id,
+                time_step=time_step,
+                feed_size=10,
+                include_embedding_score=True,
+                cold_start=False
+            )
+
+            # Execute pipeline
+            response = self._feed_pipeline.execute(request)
+
+            # Convert PostCandidate to Post
+            posts = []
+            for candidate in response.posts:
+                post = Post.from_row(candidate.to_post_dict())
+                # Preserve feed segment info
+                setattr(post, 'feed_segment', candidate.feed_segment)
+                posts.append(post)
+
+            # Enrich and track exposures
+            return self._enrich_feed_posts(posts, time_step)
+
+        except Exception as e:
+            logging.warning(f"Recommender failed, falling back to original: {e}")
+            # Fallback to original logic
+            return self._get_feed_original(time_step)
+
+    def _get_feed_original(self, time_step: int) -> List[Post]:
+        """Original get_feed logic as fallback"""
+        import random
+
+        # Scoring parameters
+        lambda_decay = 0.1
+        beta_bias = 180
+
+        # Get post->timestep mapping
+        try:
+            pt_rows = fetch_all('SELECT post_id, time_step FROM post_timesteps')
+            post_step_map = {r['post_id']: r['time_step'] for r in pt_rows}
+        except Exception as e:
+            if "unable to open database file" in str(e):
+                post_step_map = {}
+            else:
+                raise e
+
+        def compute_score(row):
+            eng = (row.get('num_comments') or 0) + (row.get('num_shares') or 0) + (row.get('num_likes') or 0)
+            pstep = post_step_map.get(row['post_id'])
+            age = max(0, (time_step - pstep)) if (pstep is not None) else 0
+            freshness = max(0.1, 1.0 - lambda_decay * age)
+            return (eng + beta_bias) * freshness
+
+        def rank_and_sample(query_sql, params, pick_n, top_k=10, offset=0, include_ties=True):
+            try:
+                rows = fetch_all(query_sql, params)
+            except Exception as e:
+                if "unable to open database file" in str(e):
+                    return []
+                else:
+                    raise e
+            dict_rows = [dict(r) if not isinstance(r, dict) else r for r in rows]
+            for r in dict_rows:
+                r['__score'] = compute_score(r)
+            dict_rows.sort(key=lambda r: (r['__score'], r.get('created_at')), reverse=True)
+            if not dict_rows:
+                return []
+            start = max(0, int(offset))
+            end = max(start, start + int(top_k))
+            top_pool = dict_rows[start:end]
+            if include_ties and end < len(dict_rows) and top_pool:
+                last_score = top_pool[-1]['__score']
+                i = end
+                while i < len(dict_rows) and dict_rows[i]['__score'] == last_score:
+                    top_pool.append(dict_rows[i])
+                    i += 1
+            if len(top_pool) <= pick_n:
+                chosen = top_pool
+            else:
+                chosen = random.sample(top_pool, pick_n)
+            return [Post.from_row(r) for r in chosen]
+
+        news_sql = '''
+            SELECT p.post_id, p.content, p.summary, p.author_id, p.created_at,
+                   p.num_likes, p.num_shares, p.num_flags, p.num_comments, p.original_post_id,
+                   p.is_agent_response, p.agent_role, p.agent_response_type, p.intervention_id
+            FROM posts p
+            WHERE p.is_news = TRUE AND (p.status IS NULL OR p.status != 'taken_down')
+        '''
+        news_top10 = rank_and_sample(news_sql, (), pick_n=5, top_k=10, offset=0, include_ties=False)
+        news_11_20 = rank_and_sample(news_sql, (), pick_n=3, top_k=10, offset=10, include_ties=False)
+
+        non_news_sql = '''
+            SELECT p.post_id, p.content, p.summary, p.author_id, p.created_at,
+                   p.num_likes, p.num_shares, p.num_flags, p.num_comments, p.original_post_id,
+                   p.is_agent_response, p.agent_role, p.agent_response_type, p.intervention_id
+            FROM posts p
+            WHERE (p.is_news IS NULL OR p.is_news != TRUE) AND (p.status IS NULL OR p.status != 'taken_down')
+        '''
+        non_news_selected = rank_and_sample(non_news_sql, (), pick_n=2, top_k=10, offset=0, include_ties=True)
+
+        final_feed = []
+        seen = set()
+        for posts in [news_top10, news_11_20, non_news_selected]:
+            for post in posts:
+                if post.post_id not in seen:
                     final_feed.append(post)
                     seen.add(post.post_id)
 
@@ -2777,11 +3059,17 @@ Task:
                     # Execute the actual action
                     if action == 'comment-post':
                         if self.comment_count < self.comment_limit:
-                            self.create_comment(target, content)
-                            self.comment_count += 1
-                            logging.info(f"💬 User {self.user_id} commented on post {target}: {content}")
+                            comment_id = self.create_comment(target, content)
+                            if comment_id:
+                                self.comment_count += 1
+                                logging.info(f"💬 User {self.user_id} commented on post {target}: {content}")
+                            elif self.last_comment_moderation_message:
+                                logging.warning(
+                                    f"⚠️ User {self.user_id} comment blocked: "
+                                    f"{self.last_comment_moderation_message}"
+                                )
                         else:
-                            logging.warning(f"⚠️ User {self.user_id} reached comment limit, skipping comment")
+                            logging.warning(f"[WARN] User {self.user_id} reached comment limit, skipping comment")
                     elif action == 'add-note':
                         self.add_community_note(target, content)
                         logging.info(f"📝 User {self.user_id} added note to post {target}: {content}")

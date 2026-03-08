@@ -84,7 +84,7 @@ def _auto_status_loop():
             print("\n🔍 Running opinion balance monitoring (auto-status loop)")
             try:
                 launcher._monitor_trending_posts_sync()
-            except Exception as e:
+            except (Exception, asyncio.CancelledError) as e:
                 print(f"   ❌ Monitoring execution failed: {e}")
                 traceback.print_exc()
 
@@ -1331,12 +1331,23 @@ async def main():
                     
                     elif command == "auto-status":
                             print("🔄 Starting timed status printing and monitoring (every 30 seconds, Ctrl+C to stop)")
-                            # 进入定时监控模式时，将全局 auto_status 标记为开启，
-                            # 并在当前线程中运行共享的 auto-status 循环。
+                            # 在后台线程中运行 auto-status 循环，避免阻塞 asyncio 事件循环。
+                            # 这样 _background_monitoring() 协程任务才能正常得到调度。
                             control_flags.auto_status = True
+                            global _auto_status_thread
+                            if _auto_status_thread is None or not _auto_status_thread.is_alive():
+                                _auto_status_thread = threading.Thread(
+                                    target=_auto_status_loop,
+                                    daemon=True,
+                                    name="launcher-auto-status-loop",
+                                )
+                                _auto_status_thread.start()
+                            # 保持 asyncio 事件循环运行，让 _background_monitoring() 能执行
                             try:
-                                _auto_status_loop()
+                                while control_flags.auto_status:
+                                    await asyncio.sleep(30)
                             except KeyboardInterrupt:
+                                control_flags.auto_status = False
                                 print("\n🛑 Timed status printing stopped by user")
                     
                     elif command == "stop":
@@ -1355,6 +1366,16 @@ async def main():
                 
                 except KeyboardInterrupt:
                     print("\n👋 User interrupted, exiting system")
+                    break
+                except EOFError:
+                    # stdin 耗尽（管道输入结束），等待后台任务完成后退出
+                    if control_flags.auto_status:
+                        print("📋 Stdin exhausted; waiting for background monitoring to finish...")
+                        try:
+                            while control_flags.auto_status:
+                                await asyncio.sleep(30)
+                        except KeyboardInterrupt:
+                            pass
                     break
                 except Exception as e:
                     print(f"❌ Command execution failed: {e}")

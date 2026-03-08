@@ -191,6 +191,8 @@ export function toUserMilestone(cleanLine: string): string | null {
   if (/Will continue monitoring/i.test(s)) return '分析师：持续监测与动态调整'
   if (/Needs intervention:\s*yes\b/i.test(s)) return '分析师：判定需要干预'
   if (/Needs intervention:\s*no\b/i.test(s)) return '分析师：判定无需干预（继续监测，无需执行干预）'
+  // 修复：匹配带 emoji 的日志行 (✅ No intervention needed...)
+  if (/No intervention needed for post.*Workflow completed/i.test(s) || /✅\s*No intervention needed/i.test(s)) return '✅ 分析完成：无需干预，流程结束'
   {
     const m = s.match(/^Overall sentiment:\s*([0-9.]+\s*\/\s*[0-9.]+)/i)
     if (m) return `分析师：情绪度 ${m[1].replace(/\s+/g, '')}`
@@ -213,6 +215,14 @@ export function toUserMilestone(cleanLine: string): string | null {
   // Strategist
   if (/Strategist is creating strategy/i.test(s)) return '战略家：生成策略'
   if (/Strategist Agent\s*-\s*start intelligent strategy creation workflow/i.test(s)) return '战略家：启动智能策略生成'
+  // Phase 3 evaluation (feedback-only — no Leader/Amplifier)
+  {
+    const m = s.match(/Strategist evaluating\s+(\S+)\s+effectiveness/i)
+    if (m) return `战略家：评估${m[1] === 'Baseline' ? '基线' : `第${m[1].replace(/^Round\s*/i, '')}轮`}干预效果`
+  }
+  if (/Strategy assessment:\s*intervention partially effective/i.test(s)) return '战略家：干预初显效果，继续监测'
+  if (/Strategy assessment:\s*limited effect/i.test(s)) return '战略家：效果有限，下轮扫描重新评估'
+  if (/Strategist phase 3 evaluation complete/i.test(s)) return '战略家：Phase 3 评估完成'
   if (/Step\s*1:\s*Confirm alert information/i.test(s)) return '战略家：确认告警信息'
   {
     const m = s.match(/^📊\s*Alert ID:\s*(.+)$/i)

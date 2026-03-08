@@ -55,7 +55,9 @@ class MultiModelSelector:
         "experiment": DEFAULT_POOL,
         "interview": DEFAULT_POOL,
         "comment_diversity": DEFAULT_POOL,
-        # Embedding role (client only; embedding model is supplied by caller)
+        # Moderation role (content moderation LLM calls)
+        "moderation": DEFAULT_POOL,
+        # Embedding role
         "embedding": [EMBEDDING_MODEL],
     }
 
@@ -77,8 +79,8 @@ class MultiModelSelector:
             "timeout": 120,  # Increased timeout to match utils.py
             "max_retries": 1,  # Fewer retries to fail fast into fallback
             "retry_delay": 2,  # Retry delay
-            "connection_pool_size": 5,  # Smaller connection pool to avoid conflicts
-            "max_keepalive_connections": 2  # Lower keep-alive count
+            "connection_pool_size": 20,  # Increased connection pool size to handle concurrent requests
+            "max_keepalive_connections": 10  # Increased keep-alive count
         }
 
         # New: request pacing control matching utils.py
@@ -314,12 +316,14 @@ class MultiModelSelector:
             )
         )
 
-        client = OpenAI(
+        client_kwargs = dict(
             api_key=OPENAI_API_KEY,
-            base_url=OPENAI_BASE_URL,
             timeout=self.request_config["timeout"],
-            http_client=http_client
+            http_client=http_client,
         )
+        if OPENAI_BASE_URL:  # only set if non-empty, otherwise SDK uses https://api.openai.com/v1
+            client_kwargs["base_url"] = OPENAI_BASE_URL
+        client = OpenAI(**client_kwargs)
 
         return client, model_name
 

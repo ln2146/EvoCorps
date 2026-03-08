@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { SimulationProvider } from './contexts/SimulationContext'
 import DashboardLayout from './components/DashboardLayout'
 import WelcomePage from './pages/WelcomePage'
 import HomePage from './pages/HomePage'
@@ -10,9 +11,11 @@ import ConfigPage from './pages/ConfigPage'
 import DynamicDemo from './pages/DynamicDemo'
 import TestGraph from './pages/TestGraph'
 import InterviewPage from './pages/InterviewPage'
+import FilterBubbleObservation from './pages/FilterBubbleObservation'
 
 function App() {
   return (
+    <SimulationProvider>
     <Router>
       <Routes>
         {/* 欢迎页 */}
@@ -33,6 +36,7 @@ function App() {
               <Route path="/monitoring" element={<DataMonitoring />} />
               <Route path="/experiment" element={<ExperimentManagement />} />
               <Route path="/visualization" element={<DataVisualization />} />
+              <Route path="/filter-bubble" element={<FilterBubbleObservation />} />
               <Route path="/interview" element={<InterviewPage />} />
               <Route path="/config" element={<ConfigPage />} />
             </Routes>
@@ -40,6 +44,7 @@ function App() {
         } />
       </Routes>
     </Router>
+    </SimulationProvider>
   )
 }
 

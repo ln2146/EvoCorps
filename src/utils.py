@@ -451,7 +451,7 @@ CRITICAL LANGUAGE REQUIREMENT:
                     model=engine,
                     messages=modified_messages,
                     temperature=temperature,
-                    timeout=120,  # 120 seconds timeout for proxy services
+                    timeout=180,  # 180 seconds timeout for proxy services (increased)
                     response_format={"type": "json_object"}  # Use simple JSON format
                 )
 
@@ -637,7 +637,7 @@ CRITICAL LANGUAGE REQUIREMENT:
                     messages=messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
-                    timeout=120,  # 120 seconds timeout for proxy services
+                    timeout=180,  # 180 seconds timeout for proxy services (increased)
                     # frequency_penalty=1.6,
                     # presence_penalty=1.6
                 )

@@ -5,8 +5,9 @@
  * 调用后端 /analysis/post-comments 端点，获取帖子评论区的情绪度、极端度和总结分析
  */
 
-// 控制 API 服务器地址
-const CONTROL_API_BASE = 'http://localhost:8000'
+// 使用相对路径，由 Vite 代理转发到 Flask（端口 5001）
+// 原先调用 http://localhost:8000（模拟控制服务器），但该服务器只在模拟运行时存在
+const CONTROL_API_BASE = ''
 
 /**
  * 帖子分析请求参数

@@ -1,0 +1,1198 @@
+"""
+Malicious bot manager – exercises the opinion balance system by launching counterattacks.
+Triggers simulated malicious bot attacks automatically after regular users post to help evaluate defenses.
+⚠️ For testing and research purposes only.
+"""
+
+import asyncio
+import logging
+import sqlite3
+import random
+import json
+import hashlib
+from typing import Dict, Any, List, Optional
+from datetime import datetime
+
+import os
+from .simple_malicious_agent import SimpleMaliciousCluster, MaliciousPersona
+from .config import MaliciousBotConfig, DEFAULT_CONFIG
+from .attack_orchestrator import AttackOrchestrator
+from .adaptive_controller import AdaptiveController, PressureLevel
+
+
+def _build_comment_moderation_feedback(
+    violation_count: int,
+    ban_threshold: int = 3
+) -> tuple:
+    """Return (is_banned, feedback_message) for comment moderation outcomes."""
+    if violation_count >= ban_threshold:
+        return True, f"评论违规累计 {violation_count}/{ban_threshold}，账号已封禁。"
+    return False, f"评论包含违规关键词，已拦截。当前累计 {violation_count}/{ban_threshold}。"
+
+
+class MaliciousBotManager:
+    """Manages scheduled malicious bot activity and supporting utilities."""
+    
+    def __init__(self, config: Dict[str, Any], db_manager):
+        self.config = config.get("malicious_bot_system", {})
+        # 移除 self.enabled，不再依赖配置文件的 enabled 字段
+        # 运行时控制完全由 control_flags.attack_enabled 负责
+        self.db_manager = db_manager
+        self.conn = db_manager.conn
+
+        # Malicious bot configuration - use cluster size from the config
+        self.cluster_size = self.config.get("cluster_size")  # Number of personas to use per attack
+        # self.attack_probability = self.config.get("attack_probability", 0.8)  # Probability control removed; attacks fire immediately
+        # target_post_types and attack_delay_range are deprecated (no longer used)
+        # Deprecated thresholds: batch attacks ignore heat-based gating
+        self.initial_attack_threshold = None
+        self.subsequent_attack_interval = None
+        self.malicious_prefix = ""  # Remove obvious prefix to make malicious comments less obvious
+        self.fake_news_attack_size = self.config.get("fake_news_attack_size", self.cluster_size)
+        self.comment_ban_threshold = 3
+        self._comment_keyword_provider = None
+        self._ban_exempt_users = set()
+
+        # 始终初始化 bot_cluster，不管配置如何
+        # 实际的执行控制由 control_flags.attack_enabled 在运行时决定
+        self.bot_cluster = SimpleMaliciousCluster(self.cluster_size)
+
+        # 攻击模式配置：使用包内默认值（蜂群式），不依赖 experiment_config.json 新字段
+        self.bot_config: MaliciousBotConfig = DEFAULT_CONFIG
+
+        # 统一攻击策略路由器（传入 conn 供 ChainStrategy 写入 leader post/user）
+        self.orchestrator = AttackOrchestrator(self.bot_cluster, self.bot_config, conn=self.conn)
+
+        # 自适应控制器：根据平台审核压力动态调整策略（参考 MultiAgent4Collusion 反思机制）
+        self.adaptive_controller = AdaptiveController(
+            config=self.bot_config.adaptive,
+            model_selector=self.bot_cluster.model_selector,
+        )
+
+        self._create_database_tables()
+        self._init_comment_moderation_policy()
+        logging.info(f"🔥 Malicious bot manager initialized with cluster size: {self.cluster_size}")
+        logging.info(f"   Coordination mode: {self.bot_config.coordination_mode.value}")
+        logging.info(f"   Runtime control via control_flags.attack_enabled")
+        print(f"Malicious bot cluster initialized. Cluster size: {self.cluster_size}")
+        print(f"   Coordination mode: {self.bot_config.coordination_mode.value}")
+        print(f"💡 Note: Actual attack execution is controlled by control_flags.attack_enabled")
+
+    def _init_comment_moderation_policy(self):
+        """Initialize keyword moderation provider and ban exemption list."""
+        try:
+            from moderation.config import ModerationConfig
+            from moderation.providers.keyword_provider import KeywordProvider
+
+            cfg = ModerationConfig()
+            keyword_cfg = cfg.keyword_provider
+            keyword_cfg.enabled = True
+            self._comment_keyword_provider = KeywordProvider(keyword_cfg)
+            self._ban_exempt_users = set(getattr(cfg.actions, "ban_exempt_users", []) or [])
+        except Exception as e:
+            logging.error(f"Failed to initialize malicious comment moderation policy: {e}")
+            self._comment_keyword_provider = None
+            self._ban_exempt_users = set()
+
+    def _check_comment_policy_violation(
+        self,
+        cursor,
+        user_id: str,
+        post_id: str,
+        comment_id: str,
+        content: str
+    ) -> bool:
+        """
+        Return True if the comment should be blocked by moderation policy.
+        Exempt users bypass this comment policy.
+        """
+        if user_id in self._ban_exempt_users:
+            return False
+
+        cursor.execute(
+            'SELECT status, comment_violation_count FROM users WHERE user_id = ?',
+            (user_id,)
+        )
+        user_state = cursor.fetchone()
+        status = user_state[0] if user_state else "active"
+
+        if status == "banned":
+            logging.warning(f"Malicious user {user_id} is banned; comment blocked.")
+            return True
+
+        import control_flags
+        if not control_flags.moderation_enabled:
+            return False
+
+        if not self._comment_keyword_provider:
+            return False
+
+        verdict = self._comment_keyword_provider.check(
+            content,
+            metadata={"target_type": "comment", "post_id": post_id, "comment_id": comment_id}
+        )
+        if verdict is None:
+            return False
+
+        cursor.execute(
+            '''
+            UPDATE users
+            SET comment_violation_count = COALESCE(comment_violation_count, 0) + 1
+            WHERE user_id = ?
+            ''',
+            (user_id,)
+        )
+        cursor.execute(
+            'SELECT comment_violation_count FROM users WHERE user_id = ?',
+            (user_id,)
+        )
+        row = cursor.fetchone()
+        violation_count = int((row[0] if row else 0) or 0)
+        is_banned, feedback = _build_comment_moderation_feedback(
+            violation_count,
+            self.comment_ban_threshold
+        )
+
+        if is_banned:
+            cursor.execute(
+                '''
+                UPDATE users
+                SET status = 'banned',
+                    ban_reason = ?,
+                    banned_at = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+                ''',
+                ("comment_keyword_violations", user_id)
+            )
+
+        cursor.execute(
+            '''
+            INSERT INTO user_actions (user_id, action_type, target_id, content)
+            VALUES (?, ?, ?, ?)
+            ''',
+            (user_id, 'moderation_warning', comment_id, feedback)
+        )
+        logging.warning(
+            f"Malicious comment blocked for user {user_id}: {feedback} "
+            f"(keywords={getattr(verdict, 'detected_keywords', [])})"
+        )
+        return True
+    
+    def _create_database_tables(self):
+        """Create and validate tables that support the malicious bot workflows."""
+        # Notes for the within-batch amplification logic (kept for reference):
+        # 1) Randomly select up to 5 target comments (or all if fewer exist)
+        # 2) Have other authors from the same batch like the targets (up to 10 likes, guaranteed)
+        # 3) Commit the batch and proceed with the rest of the workflow
+        try:
+            cursor = self.conn.cursor()
+            # Initialize DB tables for malicious attacks/comments
+
+            # Malicious attack record table – ensure schema completeness
+            cursor.execute('DROP TABLE IF EXISTS malicious_attacks')
+            cursor.execute('''
+            CREATE TABLE malicious_attacks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                target_post_id TEXT,
+                target_user_id TEXT,
+                attack_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                cluster_size INTEGER,
+                successful_attacks INTEGER,
+                attack_details TEXT,
+                triggered_intervention BOOLEAN DEFAULT FALSE,
+                attack_round INTEGER DEFAULT 1,
+                engagement_at_attack INTEGER DEFAULT 0
+            )
+            ''')
+
+            # Malicious comments table – ensure schema completeness
+            cursor.execute('DROP TABLE IF EXISTS malicious_comments')
+            cursor.execute('''
+            CREATE TABLE malicious_comments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                attack_id INTEGER,
+                comment_id TEXT,
+                content TEXT,
+                persona_used TEXT,
+                attack_type TEXT,
+                intensity_level TEXT,
+                selected_model TEXT DEFAULT 'unknown',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (attack_id) REFERENCES malicious_attacks (id)
+            )
+            ''')
+
+            self.conn.commit()
+            logging.debug("Malicious bot database tables created successfully")
+
+        except sqlite3.OperationalError as e:
+            logging.error(f"Database error in _create_database_tables: {e}")
+            # If this is a database connection issue, skip table creation
+            if "unable to open database file" in str(e):
+                logging.warning("Skipping malicious bot database table creation due to connection issue")
+                # Do not attempt additional fixes; the time-step logic will handle likes later
+            else:
+                raise e
+
+    async def create_malicious_post(self, news_content: str, time_step: int) -> Optional[Dict[str, Any]]:
+        """
+        (Disabled) Previous mechanism to generate a malicious post from a news item.
+        Retained for interface compatibility but no longer produces content; always returns None.
+        """
+        logging.info("create_malicious_post was called but malicious posting is disabled. No post will be created.")
+        return None
+
+    async def _generate_malicious_post_content(self, news_content: str, persona: Optional[MaliciousPersona]) -> str:
+        """Generate a malicious response draft using persona context."""
+        try:
+            # Use the bot cluster's LLM capabilities
+            import asyncio
+            persona_details = []
+            if persona and persona.name:
+                persona_details.append(f"Name: {persona.name}")
+            if persona and persona.malicious_type:
+                persona_details.append(f"Type: {persona.malicious_type}")
+            if persona and persona.age_range:
+                persona_details.append(f"Age: {persona.age_range}")
+            if persona and persona.profession:
+                persona_details.append(f"Profession: {persona.profession}")
+            if persona and persona.region:
+                persona_details.append(f"Region: {persona.region}")
+            if persona and persona.personality_traits:
+                persona_details.append(f"Traits: {', '.join(persona.personality_traits)}")
+            if persona and persona.background:
+                persona_details.append(f"Background: {persona.background}")
+
+            communication_style = persona.communication_style if persona else {}
+            tone = communication_style.get('tone') if isinstance(communication_style, dict) else None
+            engagement = communication_style.get('engagement_level') if isinstance(communication_style, dict) else None
+            content_pref = communication_style.get('content_preference') if isinstance(communication_style, dict) else None
+            argument_approach = communication_style.get('argument_approach') if isinstance(communication_style, dict) else None
+
+            if tone:
+                persona_details.append(f"Tone: {tone}")
+            if engagement:
+                persona_details.append(f"Engagement: {engagement}")
+            if content_pref:
+                persona_details.append(f"Content Preference: {content_pref}")
+            if argument_approach:
+                persona_details.append(f"Argument Approach: {argument_approach}")
+
+            persona_section = "\n".join(f"- {item}" for item in persona_details) if persona_details else "- Anonymous agitator"
+
+            # Construct the prompt for generating the malicious post
+            prompt = f"""Persona Context:
+{persona_section}
+
+Target News: "{news_content[:200]}"
+
+MISSION:
+- Exploit fears around this topic to inflame outrage and distrust
+- Twist details into conspiracy-flavored narratives that feel urgent and undeniable
+- Rally like-minded readers by sounding like a grassroots insider exposing hidden truth
+
+CONTENT GUIDELINES:
+- Start with a charged hook that signals outrage or betrayal
+- Accuse mainstream sources of lies, cover-ups, or manipulative agendas
+- Use CAPS or punctuation for emphasis; swear naturally when it heightens impact
+- Blend confident misinformation with emotional storytelling and broad accusations
+- Encourage readers to doubt, retaliate, or “wake up” others
+
+OUTPUT REQUIREMENTS:
+- Keep it under 45 words so it reads like a punchy social media screed
+- End with a rallying or accusatory punchline to spark further spreading
+- Prioritize emotional manipulation over factual accuracy—certainty matters more than truth
+
+Write your hostile post:"""
+
+            # Use SimpleMaliciousCluster's model selector
+            client, model_name = self.bot_cluster.model_selector.create_langchain_client()
+
+            # Execute the LLM call in a thread pool
+            def sync_llm_call():
+                try:
+                    response = client.invoke(prompt)
+                    content = response.content.strip() if response and hasattr(response, 'content') else ""
+                    # Limit to a moderate length
+                    words = content.split()[:40]
+                    return ' '.join(words)
+                except Exception as e:
+                    logging.warning(f"LLM failed to generate a malicious post: {e}")
+                    return None
+
+            # Invoke asynchronously
+            content = await asyncio.to_thread(sync_llm_call)
+
+            if content and len(content.strip()) > 10:
+                logging.info(f"🤖 LLM generated malicious post: {content[:80]}...")
+                return content
+            else:
+                # Fallback to English templates
+                logging.warning("⚠️ LLM generation failed, falling back to the English template")
+                return self._get_fallback_malicious_post(news_content)
+
+        except Exception as e:
+            logging.error(f"Failed to generate malicious post content: {e}")
+            return self._get_fallback_malicious_post(news_content)
+
+    def _get_fallback_malicious_post(self, news_content: str) -> str:
+        """Return a canned malicious post when generation fails."""
+        controversial_starters = [
+            "This news is completely misleading!",
+            "The media is manipulating public opinion again...",
+            "The truth is being covered up, wake up people!",
+            "There's definitely a hidden agenda behind this",
+            "Mainstream media never reports the real truth",
+            "This kind of reporting is brainwashing the masses",
+            "Don't be fooled by this fake news",
+            "This is obviously an organized propaganda campaign",
+            "These idiotic journalists don't understand the real truth!",
+            "Anyone supporting this garbage news is brain-dead!",
+            "This stupid reporting is an insult to intelligence!"
+        ]
+
+        controversial_endings = [
+            "Everyone needs to think independently!",
+            "Don't believe blindly!",
+            "The truth will surface eventually",
+            "Open your eyes and see reality",
+            "This is the true face of media today",
+            "Hope more people can see this issue",
+            "We can't be fooled anymore",
+            "It's time to question everything",
+            "Only fools would believe this garbage!",
+            "These idiots will never understand the truth!",
+            "People who support this are brainless trash!"
+        ]
+
+        starter = random.choice(controversial_starters)
+        ending = random.choice(controversial_endings)
+
+        return f"{starter} {ending}"
+
+    async def _execute_attack(
+        self,
+        post_id: str,
+        content: str,
+        user_id: str,
+        override_cluster_size: int = None,
+        post_pool: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """Cross-like among malicious users within the current attack batch."""
+        try:
+
+            # Coordinate cluster size: prioritize override size, fallback to configured cluster_size
+            used_cluster_size = override_cluster_size if override_cluster_size is not None else self.cluster_size
+
+            # Coordinate cluster attack via orchestrator（支持角色分化 + 策略路由）
+            # DISPERSED 模式需要 post_pool；SWARM/CHAIN 模式忽略该参数
+            attack_results = await self.orchestrator.execute(
+                target_post_id=post_id,
+                target_content=content,
+                cluster_size=used_cluster_size,
+                post_pool=post_pool,
+                time_step=getattr(self, 'current_time_step', None),
+            )
+
+            # Record the attack
+            attack_id = self._record_attack(post_id, user_id, attack_results, used_cluster_size)
+
+            # Generate malicious comments（DISPERSED 模式下各结果携带 target_post_id）
+            comment_ids = self._create_malicious_comments(post_id, attack_results, attack_id)
+
+            return {
+                "success": True,
+                "attack_id": attack_id,
+                "target_post_id": post_id,
+                "successful_attacks": len(attack_results),
+                "comment_ids": comment_ids,
+                "attack_details": attack_results
+            }
+
+        except Exception as e:
+            logging.error(f"Execute malicious attack failed: {e}")
+            return {"success": False, "error": str(e)}
+    def _record_attack(self, post_id: str, user_id: str, attack_results: List[Dict[str, Any]], used_cluster_size: int) -> int:
+        """Cross-like among malicious users within the current attack batch."""
+        cursor = self.conn.cursor()
+
+        # Update the placeholder record inserted earlier in _reserve_attack_slot
+        # Find the latest placeholder record (cluster_size = 0 indicates placeholder record)
+        cursor.execute('''
+            UPDATE malicious_attacks SET
+                cluster_size = ?,
+                successful_attacks = ?,
+                attack_details = ?,
+                attack_timestamp = CURRENT_TIMESTAMP
+            WHERE id = (
+                SELECT id FROM malicious_attacks
+                WHERE target_post_id = ? AND cluster_size = 0
+                ORDER BY id DESC
+                LIMIT 1
+            )
+        ''', (
+            used_cluster_size,
+            len(attack_results),
+            str(attack_results),  # JSON string storage
+            post_id
+        ))
+
+        # Get the updated record ID
+        cursor.execute('''
+            SELECT id, attack_round, engagement_at_attack FROM malicious_attacks
+            WHERE target_post_id = ?
+            ORDER BY attack_timestamp DESC
+            LIMIT 1
+        ''', (post_id,))
+
+        result = cursor.fetchone()
+        if result:
+            attack_id, attack_round, engagement = result
+        else:
+            attack_id = None
+
+        self.conn.commit()
+
+        if not attack_id:
+            # If no record found, fallback to inserting new record (backward compatibility)
+            cursor.execute('''
+                INSERT INTO malicious_attacks (
+                    target_post_id, target_user_id, cluster_size,
+                    successful_attacks, attack_details, attack_round, engagement_at_attack
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                post_id,
+                user_id,
+                used_cluster_size,
+                len(attack_results),
+                str(attack_results),
+                1,  # Default round 1
+                0   # Default engagement
+            ))
+            attack_id = cursor.lastrowid
+            self.conn.commit()
+
+        return attack_id
+    
+    def _create_malicious_comments(self, post_id: str, attack_results: List[Dict[str, Any]], attack_id: int) -> List[str]:
+        """Cross-like among malicious users within the current attack batch."""
+        cursor = self.conn.cursor()
+        comment_ids = []
+        batch_comments = []
+        batch_malicious_records = []
+
+        for i, attack in enumerate(attack_results):
+            # Fix: check if attack result is valid (has content means successful)
+            content = attack.get("content", "")
+            # DISPERSED 模式下，每条结果携带 target_post_id（指向各自被攻击的帖子）
+            effective_post_id = attack.get("target_post_id", post_id)
+
+            # Strict validation: content must not be empty and length after trimming must be greater than 0
+            if not content or not content.strip():
+                logging.warning(f"⚠️  Skipping invalid attack result {i}: content is empty")
+                continue
+
+            # Use cleaned content (trimmed)
+            content = content.strip()
+            persona_info = attack.get("persona_info", {})
+            persona_used = persona_info.get("name", "unknown")
+
+            # Generate comment ID and user ID
+            from utils import Utils
+            comment_id = Utils.generate_formatted_id("comment", self.conn)
+
+            # Generate seemingly random userID based on persona and time
+            seed = f"{persona_used}_{i}_{datetime.now().strftime('%Y%m%d')}"
+            hash_obj = hashlib.md5(seed.encode())
+            user_suffix = hash_obj.hexdigest()[:6]
+            malicious_user_id = f"user-{user_suffix}"
+
+            # Batch check and create user (if not exists)
+            cursor.execute('SELECT user_id FROM users WHERE user_id = ?', (malicious_user_id,))
+            if not cursor.fetchone():
+                fake_persona = {
+                    "name": f"User{user_suffix}",
+                    "type": "negative",
+                    "profession": "Various",
+                    "age_range": "25-45",
+                    "personality_traits": ["Critical", "Skeptical"],
+                    "interests": ["Politics", "Current Events"]
+                }
+
+                cursor.execute('''
+                    INSERT INTO users (user_id, persona, creation_time, background_labels)
+                    VALUES (?, ?, ?, ?)
+                ''', (
+                    malicious_user_id,
+                    json.dumps(fake_persona),
+                    datetime.now().isoformat(),
+                    '{"is_malicious_bot":true}',
+                ))
+
+            # Prepare batch insertion data
+            selected_model = attack.get("model_used", "unknown")
+
+            # Apply the same comment moderation policy to non-exempt users.
+            if self._check_comment_policy_violation(
+                cursor=cursor,
+                user_id=malicious_user_id,
+                post_id=post_id,
+                comment_id=comment_id,
+                content=content
+            ):
+                continue
+
+            # Comment data
+            comment_data = (
+                comment_id,
+                content,
+                effective_post_id,  # DISPERSED 模式下指向各自目标帖子
+                malicious_user_id,
+                datetime.now().isoformat(),
+                0,  # Remove fake likes, start from 0, rely only on real mutual likes among malicious bots
+                selected_model,
+                'malicious'
+            )
+            batch_comments.append(comment_data)
+
+            # Malicious comment record data
+            # attack_type 优先使用 bot_role（角色叠加层提供），兜底用 "unknown"
+            bot_role_for_record = attack.get("bot_role", attack.get("attack_type", "unknown"))
+            disguise_level = attack.get("disguise_level", attack.get("intensity", "medium"))
+            malicious_record = (
+                attack_id,
+                comment_id,
+                content,
+                persona_used,
+                bot_role_for_record,
+                disguise_level,
+                selected_model
+            )
+            batch_malicious_records.append(malicious_record)
+
+            comment_ids.append(comment_id)
+
+            # Debug: check content integrity
+            char_count = len(content)
+
+            if char_count < 20:
+                try:
+                    import logging
+                    logging.debug(f"Short malicious comment ({char_count} chars) generated: {comment_id}")
+                except Exception:
+                    pass
+
+            # Display malicious comment (consistent with regular user format, show full content)
+            try:
+                # 角色标签：显示战术角色名称
+                bot_role = attack.get("bot_role", "")
+                role_label = f"[{bot_role}] " if bot_role else ""
+                print(f"🔥 {malicious_user_id} {role_label}({selected_model}) commented on post {post_id}: {content}")
+            except Exception:
+                pass
+
+        # Batch insert comments
+        if batch_comments:
+            try:
+                cursor.executemany('''
+                    INSERT INTO comments (comment_id, content, post_id, author_id, created_at, num_likes, selected_model, agent_type)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', batch_comments)
+            except sqlite3.OperationalError as e:
+                if "no column named" in str(e):
+                    # Compatibility mode: schema lacks the newer columns
+                    cursor.executemany('''
+                        INSERT INTO comments (comment_id, content, post_id, author_id, created_at, num_likes)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ''', [(c[0], c[1], c[2], c[3], c[4], c[5]) for c in batch_comments])
+
+            # Record comment->timestep mappings if current_time_step is provided
+            try:
+                current_step = getattr(self, 'current_time_step', None)
+                if current_step is not None and batch_comments:
+                    mappings = [(c[0], c[3], c[2], int(current_step)) for c in batch_comments]
+                    cursor.executemany('''
+                        INSERT OR REPLACE INTO comment_timesteps (comment_id, user_id, post_id, time_step)
+                        VALUES (?, ?, ?, ?)
+                    ''', mappings)
+            except Exception:
+                pass
+
+        # Batch insert malicious comment records
+        if batch_malicious_records:
+            try:
+                cursor.executemany('''
+                    INSERT INTO malicious_comments (
+                        attack_id, comment_id, content, persona_used,
+                        attack_type, intensity_level, selected_model
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', batch_malicious_records)
+            except sqlite3.OperationalError as e:
+                if "no column named selected_model" in str(e):
+                    # Compatibility mode: selected_model column not present
+                    cursor.executemany('''
+                        INSERT INTO malicious_comments (
+                            attack_id, comment_id, content, persona_used,
+                            attack_type, intensity_level
+                        ) VALUES (?, ?, ?, ?, ?, ?)
+                    ''', [(r[0], r[1], r[2], r[3], r[4], r[5]) for r in batch_malicious_records])
+
+        # Batch update post comment counts（DISPERSED 模式下按 target_post_id 分组统计）
+        if comment_ids:
+            # 统计每条帖子被评论的次数（DISPERSED 模式下结果分散到多条帖子）
+            post_comment_counts: Dict[str, int] = {}
+            for c_data in batch_comments:
+                pid = c_data[2]  # comment_data[2] = effective_post_id
+                post_comment_counts[pid] = post_comment_counts.get(pid, 0) + 1
+
+            for pid, cnt in post_comment_counts.items():
+                cursor.execute('''
+                    UPDATE posts
+                    SET num_comments = num_comments + ?
+                    WHERE post_id = ?
+                ''', (cnt, pid))
+            # Also increment post likes (each attacker adds one like)
+            try:
+                for pid, cnt in post_comment_counts.items():
+                    cursor.execute('''
+                        UPDATE posts
+                        SET num_likes = COALESCE(num_likes, 0) + ?
+                        WHERE post_id = ?
+                    ''', (cnt, pid))
+            except Exception:
+                pass
+
+        # Commit all batched operations at once
+        self.conn.commit()
+
+        # Cross-liking mechanism within the current attack batch (only target these comments)
+        # DISPERSED 模式不执行 cross-like（游离式攻击的核心特征：无互动协调）
+        from .coordination_strategies import CoordinationMode
+        is_dispersed = (self.bot_config.coordination_mode == CoordinationMode.DISPERSED)
+        if comment_ids and not is_dispersed:
+            try:
+                # Step 1: Run the in-batch cross-like (15 bots liking two comments)
+                self._current_attack_cross_like_sync(comment_ids, batch_comments, post_id)
+            except Exception as e:
+                logging.warning(f"Malicious bot cross-like mechanism failed: {e}")
+
+        return comment_ids
+
+    def _current_attack_cross_like_sync(self, comment_ids: List[str], batch_comments: List, post_id: str):
+        """Synchronous version of the in-batch cross-like (15 agents like two malicious comments)."""
+        try:
+            if len(comment_ids) < 2:
+                return  # need at least 2 comments to cross-like
+
+            cursor = self.conn.cursor()
+            import random
+
+            # Select two target comments
+            target_count = min(2, len(comment_ids))
+            target_indices = random.sample(range(len(comment_ids)), target_count)
+            selected_targets = [comment_ids[idx] for idx in target_indices]
+
+            # Gather all malicious user IDs (up to 15)
+            all_agent_ids = [batch_comments[i][3] for i in range(len(batch_comments))]  # c[3]=author_id
+            max_likers = min(15, len(all_agent_ids))
+
+            successful_likes = 0
+            for target_comment_id in selected_targets:
+                # Select up to 15 distinct likers for each target comment
+                likers = random.sample(all_agent_ids, min(max_likers, len(all_agent_ids)))
+                
+                for liker_user_id in likers:
+                    try:
+                        # Check if this liker has already liked the comment
+                        cursor.execute('''
+                            SELECT COUNT(*) FROM user_actions
+                            WHERE user_id = ? AND action_type = 'like_comment' AND target_id = ?
+                        ''', (liker_user_id, target_comment_id))
+
+                        if cursor.fetchone()[0] == 0:  # Not liked yet
+                            # Increment the comment's like count
+                            cursor.execute('''
+                                UPDATE comments
+                                SET num_likes = num_likes + 1
+                                WHERE comment_id = ?
+                            ''', (target_comment_id,))
+
+                            # Record the like action
+                            cursor.execute('''
+                                INSERT INTO user_actions (user_id, action_type, target_id)
+                                VALUES (?, 'like_comment', ?)
+                            ''', (liker_user_id, target_comment_id))
+
+                            successful_likes += 1
+                    except sqlite3.Error:
+                        continue  # Skip failed like attempts
+
+            self.conn.commit()
+
+            # Log the results of the cross-like
+            if successful_likes > 0:
+                logging.info(
+                    f"👍 Cross-like completed: {successful_likes} likes across {len(selected_targets)} malicious comments"
+                )
+
+            # The platform-level extra-like mechanism for malicious comments has been removed
+
+        except Exception as e:
+            logging.warning(f"Cross-like operation failed: {e}")
+
+    async def _current_attack_cross_like(self, comment_ids: List[str], batch_comments: List):
+        """Cross-like among malicious users within the current attack batch."""
+        try:
+            await asyncio.sleep(0.3)  # allow comments to persist before liking
+
+            if len(comment_ids) < 2:
+                return  # need at least 2 comments to perform cross-likes
+
+            cursor = self.conn.cursor()
+
+            like_actions = []
+            # Select a couple of target comments randomly (or all if only two)
+            target_count = min(2, len(comment_ids))
+            target_indices = random.sample(range(len(comment_ids)), target_count)
+
+            for target_index in target_indices:
+                target_comment_id = comment_ids[target_index]
+
+                # Other agents from the same batch act as likers
+                other_agents = [batch_comments[i][3] for i in range(len(batch_comments)) if i != target_index]
+                if not other_agents:
+                    continue
+
+                # Choose one different attacker per target to provide a like
+                selected_agents = random.sample(other_agents, 1)
+                for other_author in selected_agents:
+                    like_actions.append((target_comment_id, other_author))
+
+            # Execute the queued like actions
+            try:
+                selected_targets = [comment_ids[idx] for idx in target_indices if 0 <= idx < len(comment_ids)]
+                counts = {}
+                for cid, _ in like_actions:
+                    counts[cid] = counts.get(cid, 0) + 1
+                # Do not top up like operations with synthetic accounts
+            except Exception:
+                pass
+
+            if like_actions:
+                successful_likes = 0
+                for comment_id, liker_user_id in like_actions:
+                    try:
+                        # Ensure the liker exists in the user table
+                        cursor.execute('SELECT COUNT(*) FROM users WHERE user_id = ?', (liker_user_id,))
+                        if cursor.fetchone()[0] == 0:
+                            fake_persona = {
+                                "name": f"MaliciousUser{liker_user_id[-6:]}",
+                                "type": "malicious",
+                                "profession": "Various",
+                                "age_range": "25-45",
+                                "personality_traits": ["Manipulative", "Coordinated", "Deceptive"],
+                                "agent_role": "malicious",
+                                "is_system_agent": True
+                            }
+                            cursor.execute('''
+                                INSERT OR IGNORE INTO users (user_id, persona, creation_time)
+                                VALUES (?, ?, datetime('now'))
+                            ''', (liker_user_id, json.dumps(fake_persona, ensure_ascii=False)))
+
+                        cursor.execute('''
+                            SELECT COUNT(*) FROM user_actions
+                            WHERE user_id = ? AND action_type = 'like_comment' AND target_id = ?
+                        ''', (liker_user_id, comment_id))
+
+                        if cursor.fetchone()[0] == 0:
+                            cursor.execute('''
+                                UPDATE comments
+                                SET num_likes = num_likes + 1
+                                WHERE comment_id = ?
+                            ''', (comment_id,))
+
+                            cursor.execute('''
+                                INSERT INTO user_actions (user_id, action_type, target_id)
+                                VALUES (?, 'like_comment', ?)
+                            ''', (liker_user_id, comment_id))
+
+                            successful_likes += 1
+                    except sqlite3.Error:
+                        continue  # Skip failed like attempts
+
+                self.conn.commit()
+
+                if successful_likes > 0:
+                    self._verify_likes_increased(comment_ids)
+                    try:
+                        logging.info(
+                            f"👍 Cross-like completed: {successful_likes} likes distributed across {len(selected_targets)} malicious comments"
+                        )
+                    except Exception:
+                        pass
+
+                # Platform-level extra-like and dynamic leader comment increments are disabled
+
+        except Exception:
+            # Silently ignore errors so we do not disturb the main simulation
+            pass
+
+    def _verify_likes_increased(self, comment_ids: List[str]):
+        """Verify and print like counts for each comment in the batch."""
+        try:
+            cursor = self.conn.cursor()
+            total_likes = 0
+            print("   Likes summary:")
+            for i, comment_id in enumerate(comment_ids, 1):
+                cursor.execute('SELECT num_likes FROM comments WHERE comment_id = ?', (comment_id,))
+                result = cursor.fetchone()
+                if result:
+                    likes = result[0]
+                    total_likes += likes
+                    print(f"      Comment {i}: {comment_id} -> {likes} likes")
+                else:
+                    print(f"      Comment {i}: {comment_id} -> not found")
+            print(f"   Total: {len(comment_ids)} comments, {total_likes} likes")
+        except Exception as e:
+            print(f"   Like verification failed: {e}")
+    def get_attack_statistics(self) -> Dict[str, Any]:
+        """Collect basic statistics about past malicious bot activity."""
+
+        cursor = self.conn.cursor()
+        
+        # Total attack count
+        cursor.execute('SELECT COUNT(*) FROM malicious_attacks')
+        total_attacks = cursor.fetchone()[0]
+        
+        # Total successful attacks
+        cursor.execute('SELECT SUM(successful_attacks) FROM malicious_attacks')
+        total_successful = cursor.fetchone()[0] or 0
+        
+        # Total malicious comments
+        cursor.execute('SELECT COUNT(*) FROM malicious_comments')
+        total_comments = cursor.fetchone()[0]
+        
+        # Attacks that triggered interventions
+        cursor.execute('SELECT COUNT(*) FROM malicious_attacks WHERE triggered_intervention = TRUE')
+        triggered_interventions = cursor.fetchone()[0]
+        
+        # Cluster statistics
+        cluster_stats = self.bot_cluster.get_attack_statistics() if self.bot_cluster else {}
+        
+        return {
+            "enabled": True,
+            "cluster_size": self.cluster_size,
+            "total_attacks": total_attacks,
+            "total_successful_attacks": total_successful,
+            "total_malicious_comments": total_comments,
+            "triggered_interventions": triggered_interventions,
+            "intervention_rate": triggered_interventions / total_attacks if total_attacks > 0 else 0,
+            "cluster_statistics": cluster_stats,
+            # "attack_probability": self.attack_probability,  # Probability control has been removed
+        }
+    
+    def mark_intervention_triggered(self, post_id: str):
+        """Record that an intervention was triggered for a specific post."""
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            UPDATE malicious_attacks 
+            SET triggered_intervention = TRUE 
+            WHERE target_post_id = ?
+        ''', (post_id,))
+        self.conn.commit()
+
+    async def attack_top_hot_posts(self, min_engagement: int = 15, top_n: int = 10) -> Dict[str, Any]:
+        """
+        Launch batch attacks against the top hot posts at the end of the timestep.
+
+        Args:
+            min_engagement: minimum engagement threshold (default 15)
+            top_n: number of top posts to target (default 10)
+
+        Returns:
+            A summary of the attack results
+        """
+        # 只检查 bot_cluster 是否初始化，不再检查 self.enabled
+        # 实际的执行控制由 simulation.py 中的 control_flags.attack_enabled 负责
+        if not self.bot_cluster:
+            return {"success": False, "error": "bot_cluster_not_initialized"}
+
+        try:
+            # === 自适应控制：根据平台审核压力调整本轮攻击参数 ===
+            # 保存原始配置，攻击完成后恢复（避免持久化修改影响下一步）
+            _orig_mode = self.bot_config.attack_mode.mode
+            _orig_role_dist = dict(self.bot_config.role_distribution)
+            _effective_attack_size = self.fake_news_attack_size  # 默认值，可被自适应逻辑覆盖
+
+            if self.bot_config.adaptive.enabled:
+                pressure = self.adaptive_controller.update(self.conn)
+
+                # 调整角色分布（HIGH 压力时偏向 ConcernTroll 规避审核）
+                effective_role_dist = self.adaptive_controller.get_effective_role_distribution(
+                    self.bot_config.role_distribution
+                )
+                self.bot_config.role_distribution = effective_role_dist
+
+                # HIGH 压力 + SWARM 模式 → 自动切换为 DISPERSED（降低目标集中度）
+                from .coordination_strategies import CoordinationMode as _CM
+                if (self.adaptive_controller.should_switch_to_dispersed()
+                        and self.bot_config.coordination_mode == _CM.SWARM):
+                    self.bot_config.attack_mode.mode = "dispersed"
+                    logging.info(
+                        "[AdaptiveController] HIGH pressure detected: "
+                        "temporarily switching SWARM → DISPERSED"
+                    )
+
+                # 注入规避补丁到 bot_cluster（在提示词末尾追加规避指令）
+                self.bot_cluster.set_evasion_patch(self.adaptive_controller.get_evasion_patch())
+
+                # 调整集群规模（HIGH 压力时降至 50%，降低攻击频率）
+                _effective_attack_size = self.adaptive_controller.get_effective_cluster_size(
+                    self.fake_news_attack_size
+                )
+
+                if pressure != PressureLevel.LOW:
+                    logging.info(
+                        f"[AdaptiveController] Pressure={pressure.value} | "
+                        f"role_dist={effective_role_dist} | "
+                        f"mode={self.bot_config.attack_mode.mode} | "
+                        f"attack_size={_effective_attack_size}/{self.fake_news_attack_size} | "
+                        f"evasion={'active' if self.adaptive_controller.get_evasion_patch() else 'off'}"
+                    )
+
+            # Unified result collection
+            attacked_posts: List[Dict[str, Any]] = []
+            skipped_posts: List[Dict[str, Any]] = []
+            attack_results: List[Dict[str, Any]] = []
+            max_allowed = 0
+
+            # Current timestep (used to find fake news within the last three steps)
+            current_step = getattr(self, 'current_time_step', None)
+
+            # === Step 1: Attack fake news published within the last three time steps with 15 comments each ===
+            recent_fake_ids: List[str] = []
+            if current_step is not None:
+                try:
+                    from .coordination_strategies import CoordinationMode
+                    cur0 = self.conn.cursor()
+                    cur0.execute(
+                        '''
+                        SELECT p.post_id, p.content, p.author_id,
+                               (COALESCE(p.num_comments,0)+COALESCE(p.num_likes,0)+COALESCE(p.num_shares,0)) AS engagement
+                        FROM posts p
+                        JOIN post_timesteps pt ON p.post_id = pt.post_id
+                        WHERE p.is_news = 1 AND p.news_type = 'fake'
+                          AND (? - pt.time_step) < 3
+                          AND (p.status IS NULL OR p.status='active')
+                        ''',
+                        (int(current_step),),
+                    )
+                    rf_rows = cur0.fetchall()
+
+                    # 收集所有近期虚假新闻帖子信息
+                    fake_news_pool: List[Dict[str, Any]] = []
+                    for row in rf_rows:
+                        try:
+                            pid, content, author_id, engagement = row[0], row[1], row[2], row[3]
+                        except Exception:
+                            pid, content, author_id, engagement = (
+                                row['post_id'],
+                                row['content'],
+                                row['author_id'],
+                                row['engagement'],
+                            )
+                        if not pid:
+                            continue
+                        recent_fake_ids.append(pid)
+                        fake_news_pool.append({
+                            'post_id': pid,
+                            'content': content,
+                            'author_id': author_id,
+                            'engagement': engagement,
+                        })
+
+                    # DISPERSED 模式：将全部虚假新闻帖子作为 post_pool，一次调用分散攻击
+                    # 其他模式：按原逻辑逐条帖子单独攻击
+                    is_dispersed = (self.bot_config.coordination_mode == CoordinationMode.DISPERSED)
+
+                    if is_dispersed and fake_news_pool:
+                        # 游离式：单次调用，bot 自动分散到多条帖子
+                        representative = fake_news_pool[0]
+                        res = await self._execute_attack(
+                            representative['post_id'],
+                            representative['content'],
+                            representative['author_id'],
+                            override_cluster_size=_effective_attack_size,
+                            post_pool=fake_news_pool,
+                        )
+                        if res.get('success'):
+                            for post_info in fake_news_pool:
+                                attacked_posts.append({
+                                    'post_id': post_info['post_id'],
+                                    'engagement': post_info['engagement'],
+                                    'comments_added': 0,  # 已分散，无法精确对应
+                                })
+                            attacked_posts[0]['comments_added'] = len(res.get('comment_ids', []))
+                            attack_results.append(res)
+                        else:
+                            for post_info in fake_news_pool:
+                                skipped_posts.append({
+                                    'post_id': post_info['post_id'],
+                                    'engagement': post_info['engagement'],
+                                    'reason': res.get('error', 'unknown'),
+                                })
+                    else:
+                        # SWARM / CHAIN 模式：逐条帖子单独攻击
+                        for post_info in fake_news_pool:
+                            pid = post_info['post_id']
+                            content = post_info['content']
+                            author_id = post_info['author_id']
+                            engagement = post_info['engagement']
+
+                            # Each recent fake news item receives 15 hostile comments
+                            res = await self._execute_attack(
+                                pid,
+                                content,
+                                author_id,
+                                override_cluster_size=_effective_attack_size,
+                            )
+                            if res.get('success'):
+                                attacked_posts.append(
+                                    {
+                                        'post_id': pid,
+                                        'engagement': engagement,
+                                        'comments_added': len(res.get('comment_ids', [])),
+                                    }
+                                )
+                                attack_results.append(res)
+                            else:
+                                skipped_posts.append(
+                                    {
+                                        'post_id': pid,
+                                        'engagement': engagement,
+                                        'reason': res.get('error', 'unknown'),
+                                    }
+                                )
+                except Exception:
+                    # Stay resilient: if the fake news query fails, continue with other hot posts
+                    pass
+
+            # Step 2 removed: no additional hot posts are attacked
+            max_allowed = len(recent_fake_ids)
+
+            # === 攻击结束：恢复原始配置 + 触发异步反思 ===
+            # 恢复被自适应控制器临时修改的配置（mode、role_distribution）
+            self.bot_config.attack_mode.mode = _orig_mode
+            self.bot_config.role_distribution = _orig_role_dist
+            # 清除规避补丁（避免影响下一步的非自适应调用）
+            self.bot_cluster.set_evasion_patch("")
+
+            # HIGH 压力时触发 LLM 反思（异步，不阻塞主流程）
+            # 参考 MultiAgent4Collusion update_reflection_memory(ban=True) 的异步更新机制
+            if self.bot_config.adaptive.enabled:
+                attack_summary = {
+                    "total_comments": sum(
+                        len(r.get("comment_ids", [])) for r in attack_results
+                        if isinstance(r, dict)
+                    )
+                }
+                asyncio.ensure_future(
+                    self.adaptive_controller.maybe_generate_reflection(
+                        attack_results=attack_summary,
+                        moderation_stats=self.adaptive_controller._last_moderation_stats,
+                    )
+                )
+
+            result = {
+                "success": True,
+                "total_targets": len(recent_fake_ids),
+                "max_allowed": max_allowed,
+                "attacked_count": len(attacked_posts),
+                "skipped_count": len(skipped_posts),
+                "attacked_posts": attacked_posts,
+                "skipped_posts": skipped_posts,
+                "attack_results": attack_results
+            }
+            return result
+
+        except Exception as e:
+            logging.error(f"Batch attack failed: {e}")
+            # 确保即使出现异常也恢复原始配置
+            try:
+                self.bot_config.attack_mode.mode = _orig_mode
+                self.bot_config.role_distribution = _orig_role_dist
+                self.bot_cluster.set_evasion_patch("")
+            except Exception:
+                pass
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def _get_top_hot_posts(self, top_n: int) -> List[Dict[str, Any]]:
+        """
+        Retrieve the top n posts by engagement; duplicates from previous attacks are allowed.
+
+        Note: Already attacked posts are not excluded; each timestep the top N candidates are reassessed.
+
+        Returns:
+            A list of dictionaries describing each hot post.
+        """
+        cursor = self.conn.cursor()
+
+        # Query the top N posts by engagement (re-attacks are allowed)
+        # Includes both news and regular user posts; malicious bots attack any trending content
+        cursor.execute('''
+            SELECT
+                p.post_id,
+                p.content,
+                p.author_id,
+                (COALESCE(p.num_comments, 0) + COALESCE(p.num_likes, 0) + COALESCE(p.num_shares, 0)) as engagement
+            FROM posts p
+            WHERE (p.status IS NULL OR p.status = 'active')
+            ORDER BY engagement DESC
+            LIMIT ?
+        ''', (top_n,))
+
+        results = cursor.fetchall()
+
+        hot_posts = []
+        for row in results:
+            hot_posts.append({
+                'post_id': row[0],
+                'content': row[1],
+                'author_id': row[2],
+                'engagement': row[3]
+            })
+
+        return hot_posts
+
+    def _should_attack_post_simple(self, post_id: str, content: str, user_id: str) -> bool:
+        """
+        Simplified attack filter: basic checks that allow repeat attacks.
+        Designed for batch mode where the top candidates are re-evaluated each timestep.
+        """
+        cursor = self.conn.cursor()
+
+        # 1. Check whether the post was created by a malicious bot account
+        cursor.execute('''
+            SELECT COUNT(*) FROM malicious_comments mc
+            JOIN comments c ON mc.comment_id = c.comment_id
+            WHERE c.author_id = ?
+        ''', (user_id,))
+
+        if cursor.fetchone()[0] > 0:
+            return False
+
+        # 2. Check the content length to avoid attacking very short posts
+        if len(content.strip()) < 20:
+            return False
+
+        # 3. Do not enforce anti-repeat checks; repeat attacks are allowed
+        # The top posts are re-evaluated every timestep and attacked if they satisfy the conditions
+
+        return True
+
+
+
+

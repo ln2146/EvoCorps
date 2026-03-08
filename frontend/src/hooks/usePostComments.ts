@@ -52,6 +52,8 @@ export function usePostComments(
         // 只有当 postId 不为 null 时才启用查询
         enabled: postId !== null,
         staleTime: 3000, // 3 秒内认为数据是新鲜的
+        retry: 2, // 失败时重试 2 次（应对数据库锁冲突）
+        retryDelay: 1000, // 重试间隔 1 秒
         refetchOnWindowFocus: false,
     })
 

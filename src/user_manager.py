@@ -8,16 +8,61 @@ import time
 import os
 from database_manager import DatabaseManager
 class UserManager:
-    def __init__(self, config: dict, db_manager: DatabaseManager):
+    def __init__(self, config: dict, db_manager: DatabaseManager, restore_existing: bool = False):
         self.experiment_config = config
         self.num_users = config['num_users']
         self.db_manager = db_manager
         self.conn = db_manager.get_connection()
+        self.restore_existing = restore_existing
         # Simplified user selection mechanism
         self.current_user_index = 0
         self.all_user_configs = None
         self.used_configs = set()  # Maintain compatibility
-        self.users = self.create_users()
+        self.users = self.load_users_from_database() if restore_existing else self.create_users()
+
+    def load_users_from_database(self):
+        """Recreate AgentUser instances from the restored database."""
+        users = []
+
+        try:
+            cursor = self.conn.execute(
+                '''
+                SELECT user_id, persona, background_labels
+                FROM users
+                ORDER BY user_id ASC
+                '''
+            )
+            rows = cursor.fetchall()
+
+            for row in rows:
+                background_labels = row[2]
+                if isinstance(background_labels, str):
+                    try:
+                        background_labels = json.loads(background_labels)
+                    except json.JSONDecodeError:
+                        background_labels = {}
+                elif background_labels is None:
+                    background_labels = {}
+
+                user_config = {
+                    'persona': row[1],
+                    'background_labels': background_labels,
+                }
+                users.append(
+                    AgentUser(
+                        user_id=row[0],
+                        user_config=user_config,
+                        temperature=self.experiment_config['temperature'],
+                        experiment_config=self.experiment_config,
+                        db_connection=self.db_manager.get_connection()
+                    )
+                )
+
+            logging.info(f"Loaded {len(users)} users from restored database")
+            return users
+        except Exception as e:
+            logging.error(f"Error loading users from restored database: {str(e)}")
+            raise
         
     def load_agent_configs(self):
         """Load agent configurations either from a JSONL file or generate them dynamically."""
@@ -50,7 +95,7 @@ class UserManager:
                 # Update the current index
                 self.current_user_index = (self.current_user_index + num_to_sample) % len(self.all_user_configs)
 
-                print(f"🎭 Selecting users {self.current_user_index-num_to_sample+1}-{self.current_user_index} in sequence (gradual emotional evolution)")
+                print(f"Selecting users {self.current_user_index-num_to_sample+1}-{self.current_user_index} in sequence (gradual emotional evolution)")
                 
             # elif generation_method == 'agent_bank':
             #     from agent_config_generator_persona import generate_agent_configs_agent_bank
@@ -99,22 +144,31 @@ class UserManager:
     def _load_persona_file(self, config_file: str):
         """Load persona configurations from various file types with support for separate positive/negative personas."""
         try:
+            # Get the project root directory for resolving relative paths
+            src_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(src_dir)
+
             # Check if the config requests separate persona files
             if config_file == "separate" or "separate" in config_file.lower():
                 return self._load_separate_personas()
-            
+
+            # Resolve config_file to absolute path if not already absolute
+            if not os.path.isabs(config_file):
+                config_file = os.path.join(project_root, config_file)
+
             # Check if the file exists
             if not os.path.exists(config_file):
                 # Try backup file paths
                 backup_files = [
-                    "personas/extreme_personas.jsonl", 
+                    "personas/extreme_personas.jsonl",
                     "personas/personas_from_prolific_description.jsonl"
                 ]
-                
+
                 for backup_file in backup_files:
-                    if os.path.exists(backup_file):
-                        logging.warning(f"Original file {config_file} not found, using backup: {backup_file}")
-                        config_file = backup_file
+                    abs_backup = os.path.join(project_root, backup_file) if not os.path.isabs(backup_file) else backup_file
+                    if os.path.exists(abs_backup):
+                        logging.warning(f"Original file {config_file} not found, using backup: {abs_backup}")
+                        config_file = abs_backup
                         break
                 else:
                     raise FileNotFoundError(f"Persona file not found: {config_file}")
@@ -134,9 +188,17 @@ class UserManager:
         """Load personas - normal users only use neutral personas, while bots can use positive/negative."""
         all_personas = []
 
+        # Get the project root directory (parent of src/)
+        src_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(src_dir)
+
         # Retrieve sampling ratios and file paths from the configuration
         separate_config = self.experiment_config.get('separate_personas', {})
         neutral_file = separate_config.get('neutral_file', "personas/neutral_personas_database.json")
+
+        # Resolve to absolute path if not already absolute
+        if not os.path.isabs(neutral_file):
+            neutral_file = os.path.join(project_root, neutral_file)
 
         # Calculate the required user count
         total_users = self.experiment_config.get('num_users', 3)
@@ -180,6 +242,8 @@ class UserManager:
         if not all_personas:
             logging.warning("No separate personas loaded, falling back to default file")
             default_file = "personas/personas_from_prolific_description.jsonl"
+            if not os.path.isabs(default_file):
+                default_file = os.path.join(project_root, default_file)
             if os.path.exists(default_file):
                 with jsonlines.open(default_file) as reader:
                     all_personas = list(reader)
@@ -197,17 +261,7 @@ class UserManager:
         try:
             configs = self.load_agent_configs()
             total_users = len(configs)
-            print(f"👥 Creating {total_users} users...")
-            
             for i, user_config in enumerate(configs, 1):
-                # Display the progress bar
-                progress = i / total_users
-                bar_length = 30
-                filled_length = int(bar_length * progress)
-                bar = '█' * filled_length + '░' * (bar_length - filled_length)
-                percentage = int(progress * 100)
-                print(f"\r👥 User creation progress: [{bar}] {percentage}% ({i}/{total_users})", end='', flush=True)
-                
                 user_id = Utils.generate_formatted_id("user")
                 self.db_manager.add_user(user_id, user_config)
                 user = AgentUser(
@@ -218,14 +272,10 @@ class UserManager:
                     db_connection=self.db_manager.get_connection()
                 )
                 users.append(user)
-            
-            # Finalize the progress bar
-            print(f"\r👥 User creation progress: [{'█' * 30}] 100% ({total_users}/{total_users})")
-            print()  # newline
-            
+
             cursor = self.conn.execute("SELECT COUNT(*) FROM users")
             count = cursor.fetchone()[0]
-            print(f"✅ Successfully created {count} users")
+            print(f"[OK] Successfully created {count} users")
             
         except Exception as e:
             logging.error(f"Error creating users: {str(e)}")
@@ -251,21 +301,13 @@ class UserManager:
         
         follow_count = 0
         total_users = len(self.users)
-        print(f"🔗 Building user follow relationships...")
+        print(f"Follows Building user follow relationships...")
 
         # Estimate the number of follow edges to create
         remaining_users = self.users[m0:]
         expected_total = m0 * (m0 - 1) + (len(remaining_users) * m if m > 0 else 0)
         expected_total = max(expected_total, 1)  # Avoid division by zero
 
-        def _print_progress():
-            bar_length = 30
-            ratio = min(1.0, follow_count / expected_total)
-            filled_length = int(bar_length * ratio)
-            bar = '█' * filled_length + '░' * (bar_length - filled_length)
-            percentage = int(ratio * 100)
-            print(f"\r🔗 Follow creation: [{bar}] {percentage}% ({follow_count}/{expected_total})", end='', flush=True)
-            
         # Step 1: Create initial connected network with m0 nodes
         initial_users = self.users[:m0]
         for i, user in enumerate(initial_users):
@@ -274,7 +316,6 @@ class UserManager:
                 user.follow_user(other_user.user_id)
                 other_user.follow_user(user.user_id)
                 follow_count += 2  # Each pair creates 2 follows
-                _print_progress()
         
         # Step 2: Add remaining nodes with preferential attachment
         if m > 0:  # Only proceed if we have parameters for preferential attachment
@@ -319,13 +360,8 @@ class UserManager:
                 for user_id in users_to_follow:
                     new_user.follow_user(user_id)
                     follow_count += 1
-                    _print_progress()
 
-        # Complete the progress bar (overwrite the line and add newline)
-        print(f"\r🔗 Follow creation: [{'█' * 30}] 100% ({follow_count}/{expected_total})")
-        print()  # newline
-        
-        print(f"✅ Created {follow_count} follow relationships")
+        print(f"[OK] Created {follow_count} follow relationships")
         
     def add_random_users(self, num_users_to_add: int = 1, follow_probability: float = 0.0):
         """Add new random users to the simulation with balanced persona distribution."""
@@ -349,7 +385,7 @@ class UserManager:
         self.users.extend(new_users)
 
         # recordlog
-        logging.info(f"✅ Added {len(new_users)} users to the simulation (total users: {len(self.users)})")
+        logging.info(f"[OK] Added {len(new_users)} users to the simulation (total users: {len(self.users)})")
 
         # Log the distribution of new user classes
         self._log_new_users_distribution(new_users)
@@ -410,6 +446,12 @@ class UserManager:
     def _load_personas_from_file(self, file_path: str) -> list:
         """Load persona data from a file"""
         try:
+            # Resolve to absolute path if not already absolute
+            if not os.path.isabs(file_path):
+                src_dir = os.path.dirname(os.path.abspath(__file__))
+                project_root = os.path.dirname(src_dir)
+                file_path = os.path.join(project_root, file_path)
+
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 return data if isinstance(data, list) else data.get('personas', [])
@@ -485,7 +527,7 @@ class UserManager:
         current_total = len(self.users)
         growth_multiple = current_total / initial_users
 
-        logging.info(f"📊 User growth statistics:")
+        logging.info(f"[STATS] User growth statistics:")
         logging.info(f"   Initial user count: {initial_users}")
         logging.info(f"   Current user count: {current_total}")
         logging.info(f"   Users added this round: {new_users_count}")

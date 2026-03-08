@@ -168,7 +168,7 @@ class OpinionBalanceManager:
                 }
                 
                 # Trigger intervention
-                intervention_result = await self._trigger_intervention(post_id, content, user_id, alert)
+                intervention_result = await self._trigger_intervention(post_id, content, alert)
                 return intervention_result
            
             # Use the Analyst Agent to analyze the content
@@ -202,7 +202,7 @@ class OpinionBalanceManager:
                 logging.info(f"Detected content requiring intervention - Post ID: {post_id}, Extremism level: {analysis['extremism_level']}")
 
                 # Trigger intervention
-                intervention_result = await self._trigger_intervention(post_id, content, user_id, alert)
+                intervention_result = await self._trigger_intervention(post_id, content, alert)
                 return intervention_result
             else:
                 logging.debug(f"Post {post_id} does not require intervention - Extremism level: {analysis['extremism_level']}")
@@ -232,7 +232,6 @@ class OpinionBalanceManager:
         self,
         original_post_id: str,
         content: str,
-        original_user_id: str,
         alert: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Trigger an opinion balance intervention using the full three-phase workflow."""
@@ -442,14 +441,15 @@ class OpinionBalanceManager:
 
             # Insert the comment into the comments table
             cursor.execute('''
-                INSERT INTO comments (comment_id, content, post_id, author_id, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO comments (comment_id, content, post_id, author_id, created_at, agent_type)
+                VALUES (?, ?, ?, ?, ?, ?)
             ''', (
                 comment_id,
                 final_content,  # Using the enhanced content
                 actual_post_id,  # Using the actual post ID
                 agent_user_id,
-                datetime.now()
+                datetime.now(),
+                'amplifier_agent'  # Mark as defense agent so niche occupancy counts it correctly
             ))
 
             # Update the original post's comment count

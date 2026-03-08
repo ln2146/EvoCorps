@@ -298,10 +298,8 @@ export function usePostAnalysis(options?: UsePostAnalysisOptions): UsePostAnalys
             ])
         }
 
-        // 更新状态
-        if (response.error) {
-            setAnalysisStatus('Error')
-        } else {
+        // 有有效数据则更新为 Done；无有效数据时保持原状态不变
+        if (response.sentiment_score_overall !== null || response.extremeness_score_overall !== null || response.summary) {
             setAnalysisStatus('Done')
         }
     }, [])
@@ -316,22 +314,13 @@ export function usePostAnalysis(options?: UsePostAnalysisOptions): UsePostAnalys
         try {
             const response = await analyzePostComments(postId)
             handleApiResponse(response, postId)
-        } catch (error) {
-            // API 错误不中断追踪
-            setAnalysisStatus('Error')
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-            setLatestResult({
-                postId,
-                sentimentScore: null,
-                extremenessScore: null,
-                summary: null,
-                timestamp: new Date().toISOString(),
-                error: errorMessage,
-            })
+        } catch {
+            // 失败时保持原有状态，不覆盖已有结果
+            setAnalysisStatus(latestResult ? 'Done' : 'Idle')
         } finally {
             setIsAnalyzing(false)
         }
-    }, [handleApiResponse])
+    }, [handleApiResponse, latestResult])
 
 
     /**
@@ -418,8 +407,9 @@ export function usePostAnalysis(options?: UsePostAnalysisOptions): UsePostAnalys
      */
     const pauseTracking = useCallback(() => {
         clearTimer()
-        // 不清除 trackedPostId，保持追踪状态
-        // 不清除分析结果和指标数据
+        setTrackedPostId(null)
+        trackedPostIdRef.current = null
+        // 不清除分析结果和指标数据，保留图表和摘要
     }, [clearTimer])
 
 
